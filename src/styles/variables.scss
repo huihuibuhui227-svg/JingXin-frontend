@@ -1,0 +1,22 @@
+$primary-color: #2E86AB;
+$secondary-color: #667eea;
+$success-color: #52c41a;
+$warning-color: #faad14;
+$error-color: #ff4d4f;
+$text-color: #262626;
+$text-secondary: #666666;
+$text-tertiary: #999999;
+$border-color: #d9d9d9;
+$background-color: #f0f2f5;
+$card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+$card-hover-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+$border-radius: 8px;
+$transition-speed: 0.3s;
+
+:export {
+  primaryColor: $primary-color;
+  secondaryColor: $secondary-color;
+  successColor: $success-color;
+  warningColor: $warning-color;
+  errorColor: $error-color;
+}
