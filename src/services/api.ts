@@ -30,9 +30,11 @@ export const setSessionId = (id: string | null): void => {
   console.log('🆔 本场 session_id:', id ?? '(尚未开始会话 —— 发帧会落进 NONE 桶)');
 };
 
-/** 给 URL 追一个 session_id 参数;**还没开始会话时不追**(而不是带上一个编出来的 id)。 */
-const withSession = (url: string): string =>
-  sessionId ? `${url}${url.includes('?') ? '&' : '?'}session_id=${sessionId}` : url;
+/** 给 URL 追一个 session_id 参数;**还没开始会话时不追**(而不是带上一个编出来的 id)。
+ *  `override` 用于"要读的/要跑的不是当前这场"的调用(报告页可以指定另一场);
+ *  缺省(传 `undefined`)就是当前这场。 */
+const withSession = (url: string, override: string | null = sessionId): string =>
+  override ? `${url}${url.includes('?') ? '&' : '?'}session_id=${override}` : url;
 
 export const faceApi = {
   analyzeImage: async (file: Blob | File) => {
@@ -189,8 +191,10 @@ export const voiceApi = {
 };
 
 export const dashboardApi = {
-  runModule: async (module: 'face' | 'gesture' | 'voice' | 'report') => {
-    const response = await axios.post(`${API_BASE_URL}/api/run/${module}`);
+  // M2.1(第 18 条):写路径也要带 id —— 不带的话后端取"最新一场",而那可能是一场刚
+  // `/interview/start` 出来、还没有任何数据的会话(实测报告页因此显示「暂无报告数据」)。
+  runModule: async (module: 'face' | 'gesture' | 'voice' | 'report', sessionId?: string | null) => {
+    const response = await axios.post(withSession(`${API_BASE_URL}/api/run/${module}`, sessionId));
     return response.data;
   },
 
@@ -199,8 +203,9 @@ export const dashboardApi = {
     return response.data;
   },
 
-  getStructuredReport: async () => {
-    const response = await axios.get(`${API_BASE_URL}/api/report/structured`);
+  // M2.1:读路径带 id;`sessionId` 缺省 = 当前这场,都没传才让后端取最新一场
+  getStructuredReport: async (sessionId?: string | null) => {
+    const response = await axios.get(withSession(`${API_BASE_URL}/api/report/structured`, sessionId));
     return response.data;
   },
 };
