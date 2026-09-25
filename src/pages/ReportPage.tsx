@@ -7,7 +7,14 @@ import Loading from '@/components/common/Loading';
 import { useAssessmentStore } from '@/store/assessmentStore';
 import { dashboardApi } from '@/services/api';
 import { EvaluationResult } from '@/types/assessment';
-import { getLevelLabel } from '@/utils/constants';
+
+// 后端 `/api/report/structured` 的 `result.coverage` 是「本次观测覆盖」的权威呈现
+// (n_passed / n_slots / confidence_cap,spec §5.4/§5.6)。前端手写的 `EvaluationResult`
+// 里**没有这个字段** —— 那个类型文件工作树里有使用者未提交的改动,不混进本提交,
+// 所以在这里就地声明并断言。
+type ReportExtras = {
+  coverage?: { n_passed: number; n_slots: number; confidence_cap?: string };
+};
 
 const { Content } = Layout;
 
@@ -57,15 +64,8 @@ const ReportPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // ⚠️ 后端契约:`/api/report/structured` 的 `result.total_score` 在**没有任何维度通过
-  // 证据门**时是 `null`(不是 0)—— 那时 `total_level` 是「证据不足」
-  // (`report_frontend/research_mapper.py`;与 `summary_narrative` 那句「未产出综合评分」
-  // 一致)。而前端手写的 `EvaluationResult.total_score` 声明成 `number`,与后端不符。
-  // 这里就地按可空处理 —— 改类型要动 `src/types/assessment.ts`,那个文件工作树里有
-  // 使用者未提交的改动,不混进本提交。
-  // **没有这个守卫时页面会抛 `Cannot read properties of null (reading 'toFixed')`,
-  // 实测停在「页面出现错误」**(2026-09-25,真 Edge + 真面板)。
-  const totalScore = (report?.total_score ?? null) as number | null;
+  // 「本次观测覆盖」:本系统不产出对候选人的评分,只报**过了几个门**。
+  const coverage = (report as (EvaluationResult & ReportExtras) | null)?.coverage;
 
   if (loading) {
     return <Loading fullScreen tip="正在加载报告..." />;
@@ -111,21 +111,36 @@ const ReportPage: React.FC = () => {
           <DownloadButton />
         </div>
 
+        {/* spec §5.4/§5.6:本系统**不产出对候选人的评分与评级** —— 未标定标尺上的复合点分
+            与五档评语一律不渲染(HTML 报告早已如此,这里跟上:同一份载荷的
+            `summary_narrative` 本来就写着「未产出综合评分,也不给评级」,而页面却把
+            `30.8` + 「待提升」印成「综合评分」,自相矛盾)。
+            呈现的是**覆盖事实 + 依据**,聚合只给区间与置信度上限。 */}
         <Card style={{ marginBottom: '24px' }}>
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#2E86AB', marginBottom: '8px' }}>
-              {totalScore == null ? '—' : totalScore.toFixed(1)}
+              {coverage ? `${coverage.n_passed} / ${coverage.n_slots}` : '—'}
             </div>
-            <div style={{ fontSize: '24px', color: '#666', marginBottom: '8px' }}>
-              {totalScore == null
-                ? '未产出综合评分（证据不足）'
-                : `综合评分: ${getLevelLabel(totalScore)}`}
+            <div style={{ fontSize: '20px', color: '#666', marginBottom: '8px' }}>
+              个指标槽通过证据门
             </div>
-            <div style={{ color: '#999' }}>
+            {coverage?.confidence_cap && (
+              <div style={{ color: '#2E86AB', fontWeight: 'bold' }}>
+                置信度上限：{coverage.confidence_cap}
+              </div>
+            )}
+            <div style={{ color: '#999', marginTop: '8px' }}>
               评估时间: {new Date(report.model_metadata.timestamp).toLocaleString('zh-CN')}
             </div>
           </div>
         </Card>
+
+        {report.summary_narrative && (
+          <Card style={{ marginBottom: '24px' }}>
+            <h3 style={{ marginTop: 0 }}>📝 综合总结</h3>
+            <p style={{ margin: 0 }}>{report.summary_narrative}</p>
+          </Card>
+        )}
 
         {/* M2.1(第 18 条):spec D2 的"写明是哪一场"此前只落在 HTML 报告里,前端这条路上没有。
             ⚠️ 只在**服务端真的回答了来源**时渲染(`sources !== null`)。上面那条

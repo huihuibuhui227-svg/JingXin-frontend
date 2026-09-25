@@ -34,7 +34,9 @@ const RadarChart: React.FC<RadarChartProps> = ({
     dimensions.logical_thinking
   ];
 
-  const baselines = [60, 60, 60, 60, 60, 60];
+  // ⚠️ 这里原本还有第二条 `scatterpolar`:`r: [60,60,60,60,60,60]`、`name: '常模基准'` ——
+  // **五个维度全是写死的 60,而本系统没有任何常模样本**。把它画成"基准"是让读者以为
+  // 存在人群参照(spec §5.5:没有真实常模就不给位置)。2026-09-25 删除。
 
   return (
     <Plot
@@ -47,14 +49,6 @@ const RadarChart: React.FC<RadarChartProps> = ({
           name: '候选人得分',
           line: { color: '#2E86AB' },
           fillcolor: 'rgba(46, 134, 171, 0.4)'
-        },
-        {
-          type: 'scatterpolar',
-          r: baselines,
-          theta: categories,
-          fill: 'none',
-          name: '常模基准',
-          line: { color: '#6c757d', dash: 'dot' }
         }
       ]}
       layout={{
