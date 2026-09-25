@@ -57,6 +57,16 @@ const ReportPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // ⚠️ 后端契约:`/api/report/structured` 的 `result.total_score` 在**没有任何维度通过
+  // 证据门**时是 `null`(不是 0)—— 那时 `total_level` 是「证据不足」
+  // (`report_frontend/research_mapper.py`;与 `summary_narrative` 那句「未产出综合评分」
+  // 一致)。而前端手写的 `EvaluationResult.total_score` 声明成 `number`,与后端不符。
+  // 这里就地按可空处理 —— 改类型要动 `src/types/assessment.ts`,那个文件工作树里有
+  // 使用者未提交的改动,不混进本提交。
+  // **没有这个守卫时页面会抛 `Cannot read properties of null (reading 'toFixed')`,
+  // 实测停在「页面出现错误」**(2026-09-25,真 Edge + 真面板)。
+  const totalScore = (report?.total_score ?? null) as number | null;
+
   if (loading) {
     return <Loading fullScreen tip="正在加载报告..." />;
   }
@@ -104,10 +114,12 @@ const ReportPage: React.FC = () => {
         <Card style={{ marginBottom: '24px' }}>
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#2E86AB', marginBottom: '8px' }}>
-              {report.total_score.toFixed(1)}
+              {totalScore == null ? '—' : totalScore.toFixed(1)}
             </div>
             <div style={{ fontSize: '24px', color: '#666', marginBottom: '8px' }}>
-              综合评分: {getLevelLabel(report.total_score)}
+              {totalScore == null
+                ? '未产出综合评分（证据不足）'
+                : `综合评分: ${getLevelLabel(totalScore)}`}
             </div>
             <div style={{ color: '#999' }}>
               评估时间: {new Date(report.model_metadata.timestamp).toLocaleString('zh-CN')}
@@ -115,7 +127,12 @@ const ReportPage: React.FC = () => {
           </div>
         </Card>
 
-        {/* M2.1(第 18 条):spec D2 的"写明是哪一场"此前只落在 HTML 报告里,前端这条路上没有 */}
+        {/* M2.1(第 18 条):spec D2 的"写明是哪一场"此前只落在 HTML 报告里,前端这条路上没有。
+            ⚠️ 只在**服务端真的回答了来源**时渲染(`sources !== null`)。上面那条
+            "store 有结果就不问服务端"的短路走下来时,`sources` 与 `describedSession` 都是
+            `null` —— 那时渲染它就会印出「（无 —— 本场没有任何日志）**,而报告明明就在屏上。
+            不知道就什么都不说,不编。 */}
+        {sources !== null && (
         <Card size="small" style={{ marginBottom: '24px' }}>
           <div style={{ color: '#666' }}>
             <strong>本场会话：</strong>
@@ -139,6 +156,7 @@ const ReportPage: React.FC = () => {
             </ul>
           )}
         </Card>
+        )}
 
         <ReportViewer report={report} />
       </div>
