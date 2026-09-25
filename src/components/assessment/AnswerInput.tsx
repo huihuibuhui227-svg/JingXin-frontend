@@ -6,7 +6,8 @@ const { TextArea } = Input;
 
 interface AnswerInputProps {
   onSubmit: (answer: string, audioFile?: File) => void;
-  onSpeechToText: (audioBlob: Blob) => Promise<string>;
+  // 只有接了 ASR 的页面才传;没传就不渲染录音按钮(见下方),不编一个假的识别函数
+  onSpeechToText?: (audioBlob: Blob) => Promise<string>;
   isRecording: boolean;
   onStartRecording: () => void;
   onStopRecording: () => Blob | null;
@@ -32,6 +33,9 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
   };
 
   const handleStopRecording = async () => {
+    // 没有 onSpeechToText 时录音按钮根本不渲染,这里只是把类型收口
+    if (!onSpeechToText) return;
+
     const audioBlob = onStopRecording();
 
     if (!audioBlob) {
@@ -69,12 +73,16 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
         rows={6}
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
-        placeholder='请输入您的回答，或点击"语音回答"按钮说话...'
+        placeholder={onSpeechToText
+          ? '请输入您的回答，或点击"语音回答"按钮说话...'
+          : '请输入您的回答...'}
         disabled={disabled || isProcessing}
         style={{ marginBottom: '16px', fontSize: '16px' }}
       />
 
       <Space>
+        {/* 没接 ASR 的页面(如科研评估)不该出现一个按下去必然失败的录音按钮 */}
+        {onSpeechToText && (
         <Button
           type={isRecording ? 'primary' : 'default'}
           danger={isRecording}
@@ -85,6 +93,7 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
         >
           {isRecording ? '停止录音' : '语音回答'}
         </Button>
+        )}
 
         <Button
           type="primary"
