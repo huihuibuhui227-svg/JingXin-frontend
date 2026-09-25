@@ -154,6 +154,10 @@ export const voiceApi = {
   research: {
     start: async () => {
       const response = await axios.post(`${VOICE_API_URL}/research/start`);
+      // M2.1(第 19 条):科研评估**自成一场** —— 服务端也铸号了,这里必须存下来。
+      // 不存的话会走两条坏路:新页面直接做科研 → 回答落 NONE 桶;先面试再科研 →
+      // 顺延上一场面试的号,科研回答的原句被写进面试会话的录制目录。
+      setSessionId(response.data?.session_id ?? null);
       return response.data;
     },
 
