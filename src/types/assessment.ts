@@ -70,15 +70,19 @@ export interface RealtimeMetrics {
     jitter: number;
   };
   voice?: {
-    fluency: number;
-    pitch_variation: number;
+    // ⚠️ 前四个是**可选**:实时路径眼下只有 energy 是由音频字节数真算出来的
+    // (voiceActive 是"音频到了"这个事实)。fluency / pitch_variation /
+    // pause_duration / speech_ratio 需要真的声学分析,在那接上来之前**宁可不报**,
+    // 也不写死一个常数把面板填满 —— 那正是本项目在杀的那种"看起来像指标"的假数据。
+    // 消费者请按 `?? 0` 处理(RealtimeMetrics.tsx 已经是这么写的)。
+    fluency?: number;
+    pitch_variation?: number;
+    pause_duration?: number;
+    speech_ratio?: number;
     energy: number;
-    pause_duration: number;
-    speech_ratio: number;
+    voiceActive: boolean;
   };
 }
-
-// ... existing code ...
 
 export interface AnswerRecord {
   question: string;

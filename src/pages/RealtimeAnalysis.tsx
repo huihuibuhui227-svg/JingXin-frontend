@@ -98,12 +98,12 @@ const RealtimeAnalysis: React.FC = () => {
     cognitive_efficiency: Math.round((realtimeMetrics.face?.gaze_stability || 0.75) * 100)
   };
 
-  // 模拟眼动数据（如果没有眼动追踪设备）
-  const gazeData = Array.from({ length: 10 }, (_, i) => ({
-    x: 200 + Math.random() * 200,
-    y: 150 + Math.random() * 100,
-    timestamp: `${i}s`
-  }));
+  const gazeData = React.useMemo(() =>
+    Array.from({ length: 10 }, (_, i) => ({
+      x: 200 + Math.random() * 200,
+      y: 150 + Math.random() * 100,
+      timestamp: `${i}s`
+    })), []);
 
   useEffect(() => {
     return () => {
@@ -165,7 +165,7 @@ const RealtimeAnalysis: React.FC = () => {
         {/* 第一行：三个分析卡片 */}
         <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
           <Col xs={24} md={8}>
-            <Card title="面部表情分析" bordered={false}>
+            <Card title="面部表情分析" variant="borderless">
               {realtimeMetrics.face ? (
                 <div style={{ padding: '16px' }}>
                   <div style={{ marginBottom: '12px' }}>
@@ -204,7 +204,7 @@ const RealtimeAnalysis: React.FC = () => {
           </Col>
 
           <Col xs={24} md={8}>
-            <Card title="手势姿态分析" bordered={false}>
+            <Card title="手势姿态分析" variant="borderless">
               {realtimeMetrics.gesture ? (
                 <div style={{ padding: '16px' }}>
                   <div style={{ marginBottom: '12px' }}>
@@ -237,7 +237,7 @@ const RealtimeAnalysis: React.FC = () => {
           </Col>
 
           <Col xs={24} md={8}>
-            <Card title="眼动轨迹热力图" bordered={false}>
+            <Card title="眼动轨迹热力图" variant="borderless">
               <GazeHeatmap gazeData={gazeData} />
             </Card>
           </Col>
@@ -246,7 +246,7 @@ const RealtimeAnalysis: React.FC = () => {
         {/* 第二行：时间线和雷达图 */}
         <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
           <Col xs={24} md={12}>
-            <Card title="专注度变化趋势" bordered={false}>
+            <Card title="专注度变化趋势" variant="borderless">
               {timelineData.length > 0 ? (
                 <TimelineChart
                   data={timelineData}
@@ -262,14 +262,14 @@ const RealtimeAnalysis: React.FC = () => {
           </Col>
 
           <Col xs={24} md={12}>
-            <Card title="五维能力雷达图" bordered={false}>
+            <Card title="五维能力雷达图" variant="borderless">
               <RadarChart dimensions={radarData} />
             </Card>
           </Col>
         </Row>
 
         {/* 第三行：实时数据流 */}
-        <Card title="实时数据流" bordered={false}>
+        <Card title="实时数据流" variant="borderless">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
             <div style={{ padding: '16px', background: '#f0f5ff', borderRadius: '8px' }}>
               <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>AU12 (微笑)</div>

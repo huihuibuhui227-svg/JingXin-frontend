@@ -3,9 +3,6 @@ export const FACE_API_URL = 'http://localhost:8000';
 export const GESTURE_API_URL = 'http://localhost:8002';
 export const VOICE_API_URL = 'http://localhost:8001';
 
-// ... existing code ...
-
-
 export const SCENARIOS = {
   INTERVIEW: 'interview',
   RESEARCH: 'research'
