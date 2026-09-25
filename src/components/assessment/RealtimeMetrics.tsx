@@ -12,7 +12,7 @@ const RealtimeMetrics: React.FC<RealtimeMetricsProps> = ({ metrics }) => {
   const { face, gesture, voice } = metrics;
 
   return (
-    <Card title="实时多模态分析" bordered={false} style={{ borderRadius: '8px' }}>
+    <Card title="实时多模态分析" variant="borderless" style={{ borderRadius: '8px' }}>
       <Row gutter={[16, 16]}>
         {/* ========== 面部表情分析 ========== */}
         {face && (
@@ -150,12 +150,12 @@ const RealtimeMetrics: React.FC<RealtimeMetricsProps> = ({ metrics }) => {
           </>
         )}
 
-        {/* ========== 语音分析（预留） ========== */}
+        {/* ========== 语音分析 ========== */}
         {voice && (
           <>
             <Col span={24}>
               <Tag color="purple" icon={<FireOutlined />} style={{ fontSize: '14px', padding: '4px 12px' }}>
-                🎤 语音分析
+                🎤 语音分析 {voice.voiceActive && '(录音中)'}
               </Tag>
             </Col>
 

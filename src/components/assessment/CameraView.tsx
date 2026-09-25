@@ -19,9 +19,9 @@ const CameraView: React.FC<CameraViewProps> = ({
   return (
     <Card
       title={title}
-      bordered={false}
+      variant="borderless"
       style={{ borderRadius: '8px' }}
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
     >
       <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#000' }}>
         <video

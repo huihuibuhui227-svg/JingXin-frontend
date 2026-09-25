@@ -18,7 +18,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   return (
     <Card
       title={`问题 ${currentIndex + 1}/${totalQuestions}`}
-      bordered={false}
+      variant="borderless"
       style={{ borderRadius: '8px' }}
     >
       <div style={{ fontSize: '18px', lineHeight: '1.8', marginBottom: '20px' }}>

@@ -77,7 +77,7 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
   return (
     <Card
       title="回答区域"
-      bordered={false}
+      variant="borderless"
       style={{ borderRadius: '8px' }}
     >
       <TextArea
