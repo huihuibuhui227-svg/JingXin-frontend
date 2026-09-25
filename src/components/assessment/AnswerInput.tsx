@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card, Input, Button, Space, message } from 'antd';
 import { AudioOutlined, SendOutlined, LoadingOutlined } from '@ant-design/icons';
 
@@ -24,10 +24,20 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
 }) => {
   const [answer, setAnswer] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  // 最近一次"语音转文字"用的那段音频。**它必须留到提交那一刻** ——
+  // 否则用户是"说"出来的回答,后端却只收到文字,语音特征一个都记不下。
+  // 实测代价(2026-09-25 使用者第一场真会话):8 段回答里 0 段带音频,
+  // 报告 0/20,语音族整族空。
+  const lastAudioRef = useRef<Blob | null>(null);
 
   const handleSubmit = () => {
     if (answer.trim()) {
-      onSubmit(answer);
+      const blob = lastAudioRef.current;
+      const audioFile = blob
+        ? new File([blob], 'answer.webm', { type: blob.type || 'audio/webm' })
+        : undefined;
+      lastAudioRef.current = null;          // 一次录音只算一段回答,不重复挂到下一题
+      onSubmit(answer, audioFile);
       setAnswer('');
     }
   };
@@ -50,6 +60,7 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
       const recognizedText = await onSpeechToText(audioBlob);
 
       if (recognizedText) {
+        lastAudioRef.current = audioBlob;    // 留给 handleSubmit 一起提交
         setAnswer(prev => prev + recognizedText);
         message.success({ content: '语音识别成功！', key: 'asr' });
       } else {
