@@ -17,9 +17,15 @@ const ReportsList: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    dashboardApi.getFiles('report_frontend')
+    // ⚠️ 请求的是 `reports`(面板对 **output 根目录** 的别名),不是 `report_frontend`:
+    //    报告就直接写在 `data/output/` 根下,而后者是个**不存在**的子目录 ——
+    //    面板原先回 403「不允许访问该目录」,列表因此**永远是空的**
+    //    (2026-09-26 实测:使用者反复报"报告列表承接不成功")。
+    // ⚠️ 根目录下还混着别的模块的产物(radar_chart_*.html / evidence_*.html,实测 518 个)
+    //    ⟹ 只列真正的报告文件,否则"历史报告"里会混进几百张证据图。
+    dashboardApi.getFiles('reports')
       .then((files: ReportItem[]) => {
-        const htmlReports = files.filter(f => f.name.endsWith('.html'));
+        const htmlReports = files.filter(f => /Assessment_Report.*\.html$/i.test(f.name));
         setReports(htmlReports);
       })
       .catch(err => {

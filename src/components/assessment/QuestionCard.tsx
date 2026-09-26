@@ -17,7 +17,11 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 }) => {
   return (
     <Card
-      title={`问题 ${currentIndex + 1}/${totalQuestions}`}
+      // ⚠️ 分母由服务端给(`/interview/start` 的 total_questions)。拿不到(0)时
+      //    **不显示分母**,而不是编一个 —— 此前这里是写死的 10,而题库只有 8 题。
+      title={totalQuestions > 0
+        ? `问题 ${currentIndex + 1}/${totalQuestions}`
+        : `问题 ${currentIndex + 1}`}
       variant="borderless"
       style={{ borderRadius: '8px' }}
     >

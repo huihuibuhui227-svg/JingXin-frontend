@@ -96,12 +96,25 @@ export const voiceApi = {
     return response.data;
   },
 
-  speechToText: async (audioFile: File) => {
+  /**
+   * 语音识别(ASR)。
+   *
+   * ⚠️ **`record: false` = 这次识别是「预览」,不是「回答」** —— 服务端不会把它
+   *    算进本场的 transcript.json(仍照常留存原始字节、照常回识别文本)。
+   *    录音后先识别一遍显示给面试官看,提交时**同一份音频**再走
+   *    `/interview/answer_audio`(权威的那条)⟹ 不标这一下,同一句话会在账本里
+   *    存两遍(2026-09-26 实测:24 段 = 12 段 × 2,连时间戳都一样),而 M3 要用
+   *    逐字时间戳算**语速/停顿/反应潜伏期** —— 翻倍是静默的。
+   *    `record` 缺省 true:与从前逐字一致(纯 ASR 调用方不受影响)。
+   */
+  speechToText: async (audioFile: File, opts?: { record?: boolean }) => {
     const formData = new FormData();
     formData.append('audio', audioFile);
 
+    const record = opts?.record !== false;
     // 带 id:这次识别会累积进**该会话**的 transcript.json(不带则落 NONE,报告侧排除)
-    const response = await axios.post(withSession(`${VOICE_API_URL}/asr`), formData, {
+    const response = await axios.post(
+      withSession(`${VOICE_API_URL}/asr${record ? '' : '?record=false'}`), formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
 

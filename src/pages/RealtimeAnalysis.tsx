@@ -4,11 +4,18 @@ import { useCamera } from '@/hooks/useCamera';
 import { faceApi, gestureApi } from '@/services/api';
 import { useAssessmentStore } from '@/store/assessmentStore';
 import RadarChart from '@/components/visualization/RadarChart';
-import GazeHeatmap from '@/components/visualization/GazeHeatmap';
 import TimelineChart from '@/components/visualization/TimelineChart';
 import CameraView from '@/components/assessment/CameraView';
 
 const { Content } = Layout;
+
+const RADAR_LABELS = {
+  logical_thinking: '面部专注度',
+  stress_resilience: '紧张度',
+  communication_fluency: '手势分',
+  confidence_level: '面部对称性',
+  cognitive_efficiency: '眼神稳定性',
+} as const;
 
 const RealtimeAnalysis: React.FC = () => {
   const frameCountRef = useRef(0);
@@ -65,16 +72,23 @@ const RealtimeAnalysis: React.FC = () => {
           // 手势分析
           gestureApi.analyzeGesture(frame).then(result => {
             if (result.status === 'success' && result.result) {
+              // 与 AssessmentPage 同一口径:一并把"这次到底有没有测到"传上去。
+              // 服务端没检测到姿态时会把分**填成 50.0**,光看数量分不出真假。
+              const hands = result.result.detected_hands || 0;
+              const hand = result.result.hand;
               updateRealtimeMetrics({
                 gesture: {
-                  detected_hands: result.result.detected_hands || 0,
-                  hand_score: result.result.hand?.average_score || 0,
+                  detected_hands: hands,
+                  hand_score: hand?.average_score || 0,
                   shoulder_score: result.result.shoulder?.shoulder_score || 0,
                   left_arm_score: result.result.arm?.left?.arm_score || 0,
                   right_arm_score: result.result.arm?.right?.arm_score || 0,
-                  jitter: result.result.hand?.left?.jitter !== undefined ?
-                          (result.result.hand.left.jitter + (result.result.hand.right?.jitter || 0)) / 2 :
-                          0,
+                  // 没测到就**不给值**:填 0 会被下面渲染成"0.0%"(看着像测到了一个很小的抖动)
+                  jitter: hand?.left?.jitter !== undefined
+                    ? (hand.left.jitter + (hand.right?.jitter || 0)) / 2
+                    : undefined,
+                  hand_valid: hands > 0,
+                  shoulder_valid: result.result.shoulder?.is_valid === true,
                 }
               });
             }
@@ -89,21 +103,30 @@ const RealtimeAnalysis: React.FC = () => {
     frameRate: 5
   });
 
-  // 计算雷达图数据（基于实时指标）
-  const radarData = {
-    logical_thinking: Math.round((realtimeMetrics.face?.focus_score || 0.75) * 100),
-    stress_resilience: Math.round((1 - (realtimeMetrics.face?.tension_score || 0.3)) * 100),
-    communication_fluency: Math.round((realtimeMetrics.gesture?.hand_score || 80)),
-    confidence_level: Math.round((realtimeMetrics.face?.symmetry_score || 0.7) * 100),
-    cognitive_efficiency: Math.round((realtimeMetrics.face?.gaze_stability || 0.75) * 100)
-  };
+  // 五维雷达:五个量**都测到了**才画。
+  //
+  // ⚠️ 此前每个量都带一个写死的默认值(`|| 0.75` / `|| 0.3` / `|| 80` / `|| 0.7`),
+  //    于是一个量都没测到时也能画出一张漂亮的雷达图 —— 而那五个数全是编的。
+  //    "没数据"在该页必须是"数据不足",不是一张好看的图。
+  // 另:这五个输入(focus_score / tension_score / hand_score / symmetry_score /
+  //    gaze_stability)在**报告层都已停用**,所以这张图只是实时粗看,不是报告口径 ——
+  //    报告那五维要走证据门(见 report_frontend/research_mapper.py)。
+  const face = realtimeMetrics.face;
+  const gesture = realtimeMetrics.gesture;
+  const radarInputs: Array<[keyof typeof RADAR_LABELS, number | undefined]> = [
+    ['logical_thinking', face ? Math.round(face.focus_score * 100) : undefined],
+    ['stress_resilience', face ? Math.round((1 - face.tension_score) * 100) : undefined],
+    ['communication_fluency', gesture ? Math.round(gesture.hand_score) : undefined],
+    ['confidence_level', face ? Math.round(face.symmetry_score * 100) : undefined],
+    ['cognitive_efficiency', face ? Math.round(face.gaze_stability * 100) : undefined],
+  ];
+  const missingRadar = radarInputs.filter(([, v]) => v === undefined)
+    .map(([k]) => RADAR_LABELS[k]);
+  const radarData = Object.fromEntries(
+    radarInputs.map(([k, v]) => [k, v ?? 0])
+  ) as { logical_thinking: number; stress_resilience: number; communication_fluency: number;
+         confidence_level: number; cognitive_efficiency: number };
 
-  const gazeData = React.useMemo(() =>
-    Array.from({ length: 10 }, (_, i) => ({
-      x: 200 + Math.random() * 200,
-      y: 150 + Math.random() * 100,
-      timestamp: `${i}s`
-    })), []);
 
   useEffect(() => {
     return () => {
@@ -238,7 +261,15 @@ const RealtimeAnalysis: React.FC = () => {
 
           <Col xs={24} md={8}>
             <Card title="眼动轨迹热力图" variant="borderless">
-              <GazeHeatmap gazeData={gazeData} />
+              {/* ⚠️ 这里原先喂的是 `Math.random()` 造的 10 个点 —— 一张**完全编造**的
+                  轨迹热力图。报告层早就按 spec §5.5 决定不生成眼动图(现有坐标支撑不了
+                  "注视"这个构念),前端却在画随机点,两处自相矛盾。宁可空着。 */}
+              <div style={{ height: '200px', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', color: '#999', textAlign: 'center',
+                            padding: '0 24px' }}>
+                待接入 —— 眼动图需要能支撑「注视」构念的坐标(现用的是画面坐标,是取景代理),
+                报告层同样不出这张图
+              </div>
             </Card>
           </Col>
         </Row>
@@ -262,8 +293,16 @@ const RealtimeAnalysis: React.FC = () => {
           </Col>
 
           <Col xs={24} md={12}>
-            <Card title="五维能力雷达图" variant="borderless">
-              <RadarChart dimensions={radarData} />
+            <Card title="五维能力雷达图（实时粗看，非报告口径）" variant="borderless">
+              {missingRadar.length === 0 ? (
+                <RadarChart dimensions={radarData} />
+              ) : (
+                <div style={{ height: '300px', display: 'flex', alignItems: 'center',
+                              justifyContent: 'center', color: '#999', textAlign: 'center',
+                              padding: '0 24px' }}>
+                  数据不足，暂不出图：还缺 {missingRadar.join('、')}
+                </div>
+              )}
             </Card>
           </Col>
         </Row>
@@ -292,8 +331,11 @@ const RealtimeAnalysis: React.FC = () => {
             <div style={{ padding: '16px', background: '#fff7e6', borderRadius: '8px' }}>
               <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>动作抖动指数</div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#faad14' }}>
-                {realtimeMetrics.gesture?.jitter !== undefined ?
-                  (realtimeMetrics.gesture.jitter * 100).toFixed(1) : '0.0'}%
+                {/* 同 RealtimeMetrics:判 "这一帧有没有手",不是判"有没有值" —— 
+                    服务端没检测到手时仍回 0.0,那道判据等于没判 */}
+                {realtimeMetrics.gesture?.hand_valid && realtimeMetrics.gesture?.jitter !== undefined
+                  ? `${(realtimeMetrics.gesture.jitter * 100).toFixed(1)}%`
+                  : '未检出'}
               </div>
             </div>
           </div>

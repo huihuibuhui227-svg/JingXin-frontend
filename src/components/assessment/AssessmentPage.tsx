@@ -94,16 +94,27 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             console.log('🙌 手势分析结果:', result);
 
             if (result.status === 'success' && result.result) {
+              // ⚠️ 一并把"这次到底有没有测到"传上去。服务端在没检测到姿态时会把分
+              //    **填成 50.0**(gesture_analysis/api/app.py 的 shoulder/arm/hand 三处),
+              //    所以面板光看数量分不出"测到 50 分"与"什么都没测到"。
+              // 手部平均分只有在**检测到手**的时候才是个测量值:
+              const hands = result.result.detected_hands || 0;
+              const hand = result.result.hand;
+              const jitter = hand?.left?.jitter !== undefined
+                ? (hand.left.jitter + (hand.right?.jitter || 0)) / 2
+                : undefined;   // 没测到就**不给值**:填 0 会被面板渲染成"100% 稳定"
               updateRealtimeMetrics({
                 gesture: {
-                  detected_hands: result.result.detected_hands || 0,
-                  hand_score: result.result.hand?.average_score || 0,
+                  detected_hands: hands,
+                  hand_score: hand?.average_score || 0,
                   shoulder_score: result.result.shoulder?.shoulder_score || 0,
                   left_arm_score: result.result.arm?.left?.arm_score || 0,
                   right_arm_score: result.result.arm?.right?.arm_score || 0,
-                  jitter: result.result.hand?.left?.jitter !== undefined ?
-                          (result.result.hand.left.jitter + (result.result.hand.right?.jitter || 0)) / 2 :
-                          0,
+                  jitter,
+                  hand_valid: hands > 0,
+                  shoulder_valid: result.result.shoulder?.is_valid === true,
+                  left_arm_valid: result.result.arm?.left?.is_valid === true,
+                  right_arm_valid: result.result.arm?.right?.is_valid === true,
                 }
               });
             }
@@ -180,6 +191,8 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     loading,
     currentQuestion,
     currentQuestionIndex,
+    // 进度分母:服务端在 /interview/start 给的 total_questions(0 = 还不知道,不显示分母)
+    totalQuestions: questionTotal,
     start,
     submitAnswer,
     playQuestion
@@ -248,7 +261,10 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
 
       console.log('🎤 调用 ASR API...');
 
-      const result = await voiceApi.speechToText(audioFile);
+      // `record: false` —— 这一遍是**预览**(填输入框给面试官看/改),不是回答。
+      // 提交时同一份音频还会走 `/interview/answer_audio`,那一条才是账本上的回答;
+      // 不标这一下,同一句话会在 transcript.json 里存两遍(2026-09-26 实测)。
+      const result = await voiceApi.speechToText(audioFile, { record: false });
 
       console.log('✅ 语音识别原始结果:', JSON.stringify(result, null, 2));
 
@@ -314,9 +330,17 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>{config.inProgressTitle}</h2>
+          {/* ⚠️ 这里原先写 `currentQuestionIndex / 10`,而标题那处写 `currentIndex + 1`
+              —— 同一个数一处加一、一处没加,**永远差 1**(使用者 2026-09-26 当场看到
+              「我这边 7/10、那边 6/10」)。分母 10 也是写死的,题库只有 8 题,进度条
+              永远到不了 100%。现在两处同源,分母由服务端在 /interview/start 给出。 */}
           <Progress
-            percent={Math.round((currentQuestionIndex / 10) * 100)}
-            format={() => `进度 ${currentQuestionIndex}/10`}
+            percent={questionTotal > 0
+              ? Math.round(((currentQuestionIndex + 1) / questionTotal) * 100)
+              : 0}
+            format={() => (questionTotal > 0
+              ? `进度 ${currentQuestionIndex + 1}/${questionTotal}`
+              : `进度 ${currentQuestionIndex + 1}`)}
             style={{ width: '300px' }}
           />
         </div>
@@ -332,7 +356,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             <QuestionCard
               question={currentQuestion}
               currentIndex={currentQuestionIndex}
-              totalQuestions={10}
+              totalQuestions={questionTotal}
               onPlayAudio={playQuestion}
             />
 

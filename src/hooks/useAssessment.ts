@@ -9,7 +9,8 @@ export const useAssessment = (type: 'interview' | 'research') => {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [started, setStarted] = useState(false);
 
-  const { addAnswer, currentQuestionIndex } = useAssessmentStore();
+  const { addAnswer, currentQuestionIndex, totalQuestions, setTotalQuestions } =
+    useAssessmentStore();
 
   // ── M2.6:自动播题 + 提问窗口上报(spec §5.6)────────────────────────────
   //
@@ -155,6 +156,9 @@ export const useAssessment = (type: 'interview' | 'research') => {
       ]);
 
       if (voiceResult.status === 'fulfilled') {
+        // 题库共几题只有服务端知道(前端没有来源)⟹ 进度分母由它给。
+        // 给不出就存 0,面板据此**不显示分母**,而不是编一个 10 出来。
+        setTotalQuestions(voiceResult.value.total_questions ?? 0);
         // 推首题:顺带自动朗读一次并上报它的提问窗口(M2.6)。
         pushQuestion(voiceResult.value.question);
         console.log('✅ VOICE服务启动成功');
@@ -248,6 +252,8 @@ export const useAssessment = (type: 'interview' | 'research') => {
     currentQuestion,
     started,
     currentQuestionIndex,
+    // 进度分母:服务端在 /interview/start 给的 total_questions(0 = 还不知道)
+    totalQuestions,
     start,
     submitAnswer,
     // 「播放问题」按钮仍然在,只是现在它和自动播走同一条路:首次成功播完会上报
