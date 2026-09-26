@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Progress } from 'antd';
+import { Layout, Progress, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useCamera } from '@/hooks/useCamera';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useAssessment } from '@/hooks/useAssessment';
 import { useAssessmentStore } from '@/store/assessmentStore';
-import { faceApi, gestureApi, voiceApi } from '@/services/api';
+import { faceApi, gestureApi, voiceApi, sessionApi } from '@/services/api';
 import CameraView from '@/components/assessment/CameraView';
 import RealtimeMetrics from '@/components/assessment/RealtimeMetrics';
 import QuestionCard from '@/components/assessment/QuestionCard';
@@ -117,7 +117,47 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         console.error('❌ 帧处理错误:', error);
       }
     },
-    frameRate: 5
+    frameRate: 5,
+
+    // M2.6:整场**原生音视频**录完 → 上传留存(spec §5.3/§5.4)。一场一个 `camera.webm`。
+    // 触发点在 `useCamera.stopCapture` 里(走 ref,卸载清理那条路也到得了)——
+    // 挂到 `stopCamera` 的 `if (stream)` 里会**静默丢录像**,理由见 useCamera 顶部注释。
+    onVideoReady: (video) => {
+      console.log('🎥 本场原生录像收尾，准备上传:', video.size, 'bytes');
+      // ⚠️ **必须 return 这个 promise**:useCamera 拿它当"什么时候可以撤掉
+      // 「刷新会丢录像」拦截"的信号。不 return 的话,上传还没发完拦截就撤了,
+      // 那几秒里刷新 = 整场录像没了。
+      return sessionApi.uploadMedia(video)
+        .then((result) => {
+          if (result?.stored === false) {
+            // 服务端**明说没存下**(留存被关 / 中途写失败)—— 不许当成功。
+            console.error('❌ 原生录像没有被留存:', result.reason);
+            message.error(`本场原生录像没存下：${result.reason}`);
+          } else {
+            console.log('✅ 原生录像已留存:', result);
+          }
+        })
+        .catch((error) => {
+          // 没有会话 id / 网络断 ⟹ 整场录像没留成。这是**不可逆**的损失,要说出来,
+          // 不能只进 console(本项目在杀的静默失效)。
+          console.error('❌ 原生录像上传失败:', error?.response?.data ?? error);
+          // 服务端的 detail 是有信息量的(413 会说清是多少字节撞了哪个上限),
+          // 原先它只进 console、用户只看到一句泛泛的"失败"。
+          const detail = error?.response?.data?.detail;
+          message.error(
+            detail
+              ? `本场原生录像没有留存:${detail}`
+              : '本场原生录像上传失败 —— 这一场的原生视频没有留存'
+          );
+        });
+    },
+
+    // 降级不是失败,但**必须让面试官当场知道** —— 这一场留下的素材与"正常那一场"
+    // 不是一回事(camera.webm 没声音 / 可能不完整),事后只看文件是看不出来的。
+    onDegraded: (reason) => {
+      console.warn('⚠️ 采集降级:', reason);
+      message.warning(reason, 8);
+    }
   });
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
@@ -152,25 +192,39 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   }, []);
 
   useEffect(() => {
-    if (started) {
-      console.log('🔄 started 变为 true，准备启动摄像头和捕获...');
-
-      startCamera().then(() => {
-        console.log('✅ 摄像头启动完成，等待视频元素就绪...');
-
-        const timer = setTimeout(() => {
-          console.log('⏰ 延迟结束，调用 startCapture');
-          startCapture();
-        }, 500);
-
-        return () => {
-          console.log('🧹 清理定时器');
-          clearTimeout(timer);
-        };
-      });
-    } else {
+    if (!started) {
       stopCapture();
+      return;
     }
+
+    console.log('🔄 started 变为 true，准备启动摄像头和捕获...');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    startCamera().then((ok) => {
+      if (cancelled) return;
+      if (!ok) {
+        // ⚠️ 原先**不看**这个返回值,于是"摄像头没打开"会静默进一场什么都不采的会话:
+        //    没有帧、没有原生录像,而界面一切正常 —— 直到收尾对账才发现。
+        // duration 0 = 不自动消失。这是**整场作废**的条件,比"降级"严重得多,
+        // 反倒不该像降级那样几秒后自己溜走(之前两者时长正好是反的)。
+        message.error('摄像头/麦克风没有打开 —— 这一场采不到任何画面与原生视频', 0);
+        return;
+      }
+      console.log('✅ 摄像头启动完成，等待视频元素就绪...');
+      timer = setTimeout(() => {
+        console.log('⏰ 延迟结束，调用 startCapture');
+        startCapture();
+      }, 500);
+    });
+
+    // ⚠️ 这段 cleanup 原先写在 `.then()` **里面**并 return,于是被丢掉了(effect 本身
+    //    返回 undefined ⟹ 没有任何清理)。卸载时那个 500ms 定时器照旧触发,在已卸载的
+    //    组件上开出一个永不 clear 的 setInterval,继续往 face/gesture 发已完成场次的帧。
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [started]);
 
   const handleStart = async () => {

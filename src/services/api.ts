@@ -194,6 +194,62 @@ export const voiceApi = {
   }
 };
 
+/** 会话级留存端点(voice :8001)要 `session_id`,而且它走的是**路径参数** ——
+ *  别拿 `withSession` 拼(那个拼的是 `?session_id=`,是另外三个服务的形态)。 */
+const requireSessionId = (what: string): string => {
+  const sid = getSessionId();
+  if (!sid) {
+    // 不编一个 id:没有会话就**没有**可上报的对象,编一个只会把数据写进 NONE 桶
+    // (报告侧整体排除 NONE)⟹ 看着成功、其实什么都没有。
+    throw new Error(`尚未开始会话,无法${what}`);
+  }
+  return sid;
+};
+
+// ── M2.6:原始媒体留存 + 提问时刻(spec §5.3 / §5.6)──────────────────────
+export const sessionApi = {
+  /**
+   * 上传本场**原生音视频**(`useCamera` 里 MediaRecorder 录的 `camera.webm`)。
+   *
+   * ⚠️ 刻意不用上面那个 `api` 实例:它 `timeout: 30000`,而整场录像按 R5 实测的
+   *    码率(≈172 KB/s)可以有几百 MB —— 慢链路上 30 秒会把一次**合法**上传掐断,
+   *    后果是这一场的原生录像整个没有。这里显式 `timeout: 0`(不设上限)。
+   * ⚠️ 重复上传**覆盖**服务端同名文件,而账本各留一行(sha 各不同)⟹ 覆盖有据可查。
+   */
+  uploadMedia: async (video: Blob) => {
+    const sid = requireSessionId('上传本场原生视频');
+    const formData = new FormData();
+    formData.append('file', video, 'camera.webm');   // 字段名必须是 file(spec §5.3)
+    const response = await axios.post(
+      `${VOICE_API_URL}/session/${sid}/media`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 }
+    );
+    return response.data;
+  },
+
+  /**
+   * 上报一道题的提问窗口 —— `response_latency` 只此一途(spec §3.9 / §5.6)。
+   *
+   * ⚠️ 时刻是**墙钟秒**。JS 的 `Date.now()` 是**毫秒**,直接发会被服务端的量程闸
+   *    400 掉(`session_meta._validate_window`,容差 1 天),而那条报错就是冲着
+   *    这个写的。**换算由调用方做**(`/1000`)。
+   * ⚠️ `qid` 是**题目原文**:题库没有 id(见 `session_meta` 模块开头)。
+   */
+  reportQuestion: async (window: {
+    qid: string; index: number; ask_start: number; ask_end: number;
+  }) => {
+    const sid = requireSessionId('上报提问时刻');
+    const response = await axios.post(`${VOICE_API_URL}/session/${sid}/question`, {
+      qid: window.qid,
+      index: Math.trunc(window.index),   // 服务端要非负整数,且显式拒 bool
+      ask_start: window.ask_start,
+      ask_end: window.ask_end,
+    });
+    return response.data;
+  },
+};
+
 export const dashboardApi = {
   // M2.1(第 18 条):写路径也要带 id —— 不带的话后端取"最新一场",而那可能是一场刚
   // `/interview/start` 出来、还没有任何数据的会话(实测报告页因此显示「暂无报告数据」)。
