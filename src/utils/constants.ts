@@ -14,12 +14,19 @@
 // ⚠️ 配套的后端一侧:**服务端的 CORS 白名单必须放行这个页面的 Origin**
 //    (四个服务都读环境变量 `CORS_ORIGINS`)。改了地址但没改 CORS,
 //    症状是浏览器控制台一片 CORS 报错、而服务端日志显示请求根本没到。
-const HOST = (typeof window !== 'undefined' && window.location.hostname) || 'localhost';
+const LOC = typeof window !== 'undefined' ? window.location : null;
+const HOST = LOC?.hostname || 'localhost';
+// ⚠️ **协议也要跟着页面走**,不能写死 `http:`。
+//   写死的话,页面一旦是 https(例如经 `tailscale serve` 发的
+//   `https://gpuserver.tail4ffce2.ts.net:5173`),接口就成了 `http://...`
+//   ⟹ 浏览器按**混合内容**拦掉,而且拦得很安静(控制台一条 message,请求根本不发)。
+//   跟着走之后:页面 http → 接口 http(本地开发 / SSH 隧道);页面 https → 接口 https。
+const SCHEME = LOC?.protocol || 'http:';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${HOST}:5000`;
-export const FACE_API_URL = import.meta.env.VITE_FACE_API_URL || `http://${HOST}:8000`;
-export const GESTURE_API_URL = import.meta.env.VITE_GESTURE_API_URL || `http://${HOST}:8002`;
-export const VOICE_API_URL = import.meta.env.VITE_VOICE_API_URL || `http://${HOST}:8001`;
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `${SCHEME}//${HOST}:5000`;
+export const FACE_API_URL = import.meta.env.VITE_FACE_API_URL || `${SCHEME}//${HOST}:8000`;
+export const GESTURE_API_URL = import.meta.env.VITE_GESTURE_API_URL || `${SCHEME}//${HOST}:8002`;
+export const VOICE_API_URL = import.meta.env.VITE_VOICE_API_URL || `${SCHEME}//${HOST}:8001`;
 
 export const SCENARIOS = {
   INTERVIEW: 'interview',
