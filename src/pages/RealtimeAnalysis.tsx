@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Row, Col, Card, Alert, message } from 'antd';
+import { Layout, Row, Col, Card, Alert, Input, Modal, message } from 'antd';
 import { useCamera } from '@/hooks/useCamera';
 import { faceApi, gestureApi, sessionApi, voiceApi, getSessionId } from '@/services/api';
 import { useAssessmentStore } from '@/store/assessmentStore';
@@ -31,7 +31,7 @@ const SEND_EVERY_NTH_FRAME = 5;
 
 const RealtimeAnalysis: React.FC = () => {
   const frameCountRef = useRef(0);
-  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [timelineData, setTimelineData] = useState<Array<{ timestamp: string; value: number; metric: string }>>([]);
   // 本场 session_id(服务端铸的)。显示出来是为了**:录完要知道跑报告时该给哪个 id** ——
   // 此前它只活在模块变量里,页面上看不见,而"报告里什么都没有"往往就是这个号对不上。
@@ -39,6 +39,20 @@ const RealtimeAnalysis: React.FC = () => {
   const [sessionError, setSessionError] = useState<string | null>(null);
   // 采集**降级**的凭证。见 onDegraded:要被留在页面上,不只是弹一下。
   const [degraded, setDegraded] = useState<string[]>([]);
+
+  // ── 本场标注(场次序号 / 姓名 / 学号 / 院系)─────────────────────────────
+  // 它**不是** session_id 的一部分(报告侧只认 `_log_{日期}_{时刻}` 的文件名形态,
+  // 塞进去报告一份日志都加载不到)。另存一份,落服务端的 `label.json`。
+  const [labelFields, setLabelFields] = useState({ serial: '', name: '', student_id: '', department: '' });
+  // 服务端**拼好的**那一个标签。界面显示它,不显示本地拼的 —— 拼法只允许有一处定义。
+  const [savedLabel, setSavedLabel] = useState<string | null>(null);
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [savingLabel, setSavingLabel] = useState(false);
+  // 标注**没存下**的凭证(常驻,与降级同一个讲究:8 秒后溜走的提示不是凭证)。
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const [confirmStopOpen, setConfirmStopOpen] = useState(false);
+  // 这次弹窗是"开录前填标"(确定后开始录制)还是"录完改标"(确定后什么都不开始)。
+  const [labelThenRecord, setLabelThenRecord] = useState(false);
 
   const { realtimeMetrics, updateRealtimeMetrics } = useAssessmentStore();
   const { videoRef, canvasRef, startCamera, stopCamera, startCapture, stopCapture } = useCamera({
@@ -174,10 +188,10 @@ const RealtimeAnalysis: React.FC = () => {
   // ⚠️ **只铸一次**。StrictMode 下 effect 会跑两遍,而"中途重铸"会把一场的数据劈成
   //    两场 —— 三份日志按 id 分文件,报告只看其中一场。交接日志 §6 实测踩过:
   //    `..._afb2`(299 帧)之后手滑重开得到 `..._e70e`(5 帧空壳),看报告时看到的是后者。
-  // ⚠️ 把 promise 存进 ref,`开始监控` 要 `await` 它 —— 否则号还在飞的路上就开始发帧了,
+  // ⚠️ 把 promise 存进 ref,`开始录制` 要 `await` 它 —— 否则号还在飞的路上就开始发帧了,
   //    那几帧照样落 NONE。**"号先到、帧后发"要由顺序保证,不能靠祈祷。**
   const mintRef = useRef<Promise<void> | null>(null);
-  // 失败原文另存一份 ref:`handleStartMonitoring` 里要把它念出来,而那里的闭包是
+  // 失败原文另存一份 ref:`handleStartRecording` 里要把它念出来,而那里的闭包是
   // **点击那一刻**的渲染 —— 铸号刚刚失败时 state 还没传过去,读 state 会读到 null。
   const sessionErrorRef = useRef<string | null>(null);
   useEffect(() => {
@@ -232,7 +246,27 @@ const RealtimeAnalysis: React.FC = () => {
     };
   }, []);
 
-  const handleStartMonitoring = async () => {
+  /** 真正开录。由标注弹窗的「确定」调用 —— 顺序是**先有标注、再开录**:
+   *  弹出弹窗那一刻什么都还没采,取消就是干净地什么都没发生。 */
+  const beginRecording = async () => {
+    setIsRecording(true);
+    message.success('开始录制');
+
+    // 摄像头没打开就别装作开始了。⚠️ 此前**不看**这个返回值 ⟹ 摄像头/麦克风
+    // 没打开时界面一切正常,却一帧都没有、也没有原生录像 —— 直到事后对账才发现。
+    // (与 `AssessmentPage` 同一处置;这是**整场作废**,所以不自动消失。)
+    const ok = await startCamera();
+    if (!ok) {
+      setIsRecording(false);
+      message.error('摄像头/麦克风没有打开 —— 这一场采不到任何画面与原生视频', 0);
+      return;
+    }
+    setTimeout(() => {
+      startCapture();
+    }, 500);
+  };
+
+  const handleStartRecording = async () => {
     // 1) 先把号等回来。号没到就开始发帧 ⟹ 那几帧落 NONE 桶(报告侧整体排除)。
     if (mintRef.current) await mintRef.current;
     if (!getSessionId()) {
@@ -245,27 +279,47 @@ const RealtimeAnalysis: React.FC = () => {
       return;
     }
 
-    setIsMonitoring(true);
-    message.success('开始实时监控');
-
-    // 2) 摄像头没打开就别装作开始了。⚠️ 此前**不看**这个返回值 ⟹ 摄像头/麦克风
-    //    没打开时界面一切正常,却一帧都没有、也没有原生录像 —— 直到事后对账才发现。
-    //    (与 `AssessmentPage` 同一处置;这是**整场作废**,所以不自动消失。)
-    const ok = await startCamera();
-    if (!ok) {
-      setIsMonitoring(false);
-      message.error('摄像头/麦克风没有打开 —— 这一场采不到任何画面与原生视频', 0);
-      return;
-    }
-    setTimeout(() => {
-      startCapture();
-    }, 500);
+    // 2) 开录前先要标注。**取消 = 不录**,而不是"录一场没标的":
+    //    标注的全部意义就是把这一场与别的场次分开,一场没标的录像事后认不出来,
+    //    等于白采 —— 所以宁可不开始。
+    setLabelThenRecord(true);
+    setLabelModalOpen(true);
   };
 
-  const handleStopMonitoring = () => {
-    setIsMonitoring(false);
+  const handleStopRecording = () => {
+    // 防呆:停录是不可逆的(录像只在内存里,停完就上传那一份),所以要二次确认。
+    setConfirmStopOpen(true);
+  };
+
+  const confirmStopRecording = () => {
+    setConfirmStopOpen(false);
+    setIsRecording(false);
     stopCapture();
-    message.info('已停止监控');
+    message.info('已停止录制');
+  };
+
+  /** 提交标注。**存不下也照样录**(调用方决定后续)—— 材料比标注值钱,
+   *  不能因为服务端抖一下就丢一场。但存不下这件事必须**说出来**。 */
+  const submitLabel = async (thenRecord: boolean) => {
+    setSavingLabel(true);
+    try {
+      const r = await sessionApi.setLabel(labelFields);
+      // 显示**服务端回的那一个**(不是本地拼的):拼法只允许有一处定义。
+      setSavedLabel(r?.label ?? null);
+      setLabelError(null);
+      message.success(`本场标注已记录：${r?.label ?? ''}`);
+    } catch (error: any) {
+      console.error('❌ 本场标注没有记下:', error?.response?.data ?? error);
+      const detail = error?.response?.data?.detail;
+      // 材料比标注值钱:标注存不下**不拦录制**。但这件事必须留痕 —— 一场没标的
+      // 录像事后认不出是谁的,而"认不出"与"没标"在文件上长得一模一样。
+      setLabelError(detail || error?.message || '未知错误');
+      message.error('本场标注没能记下(录像照录)—— 见页面顶部告警', 0);
+    } finally {
+      setSavingLabel(false);
+    }
+    setLabelModalOpen(false);
+    if (thenRecord) await beginRecording();
   };
 
   return (
@@ -279,20 +333,33 @@ const RealtimeAnalysis: React.FC = () => {
             <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? '#52c41a' : '#999' }}>
               {sid ? `本场 session_id：${sid}` : sessionError ? `未铸到会话：${sessionError}` : '正在铸会话号…'}
             </div>
+            {/* 本场标注显示**服务端回的那一个**(不是本地拼的)。旁边留一个「改标签」——
+                端点本来就是 upsert,顺手防住"打错一个字就永久错了"。 */}
+            {(savedLabel || sid) && (
+              <div style={{ fontSize: '13px', marginTop: '4px', color: savedLabel ? '#1890ff' : '#999' }}>
+                {savedLabel
+                  ? <>本场标注：{savedLabel}{' '}
+                      <a style={{ cursor: 'pointer' }} onClick={() => { setLabelThenRecord(false); setLabelModalOpen(true); }}>改标签</a>
+                    </>
+                  : <>本场还没有标注{' '}
+                      <a style={{ cursor: 'pointer' }} onClick={() => { setLabelThenRecord(false); setLabelModalOpen(true); }}>去填</a>
+                    </>}
+              </div>
+            )}
           </div>
           <button
-            onClick={isMonitoring ? handleStopMonitoring : handleStartMonitoring}
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
             style={{
               padding: '8px 24px',
               fontSize: '14px',
-              background: isMonitoring ? '#ff4d4f' : '#1890ff',
+              background: isRecording ? '#ff4d4f' : '#1890ff',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer'
             }}
           >
-            {isMonitoring ? '停止监控' : '开始监控'}
+            {isRecording ? '停止录制' : '开始录制'}
           </button>
         </div>
 
@@ -303,6 +370,13 @@ const RealtimeAnalysis: React.FC = () => {
             type="error" showIcon style={{ marginBottom: '16px' }}
             message="本场没有会话号 —— 录下来的东西不属于任何一场"
             description={`报告侧整体排除 NONE 桶,所以这一场进不了报告。原因：${sessionError}`}
+          />
+        )}
+        {labelError && (
+          <Alert
+            type="warning" showIcon style={{ marginBottom: '16px' }}
+            message="本场标注没有记下来 —— 录像在,但事后认不出这一场是谁的"
+            description={`原因：${labelError}(录像不受影响;可点页面顶部「去填 / 改标签」重试)`}
           />
         )}
         {degraded.length > 0 && (
@@ -318,7 +392,7 @@ const RealtimeAnalysis: React.FC = () => {
         )}
 
         {/* 视频流 */}
-        {isMonitoring && (
+        {isRecording && (
           <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
             <Col span={24}>
               <CameraView
@@ -365,7 +439,7 @@ const RealtimeAnalysis: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                  {isMonitoring ? '等待数据...' : '点击"开始监控"'}
+                  {isRecording ? '等待数据...' : '点击"开始录制"'}
                 </div>
               )}
             </Card>
@@ -398,7 +472,7 @@ const RealtimeAnalysis: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                  {isMonitoring ? '等待数据...' : '点击"开始监控"'}
+                  {isRecording ? '等待数据...' : '点击"开始录制"'}
                 </div>
               )}
             </Card>
@@ -486,6 +560,74 @@ const RealtimeAnalysis: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* ── 开录前的标注弹窗 ────────────────────────────────────────────────
+          为什么**开录前**要:标注的意义就是把这一场与别的场次分开,而录完再补
+          等于"先采了再想这是谁的"。取消 = 不开始录制(见 handleStartRecording)。
+          ⚠️ 「时间」那一段是**只读**的:它取自 session_id 自己那一段(`compose_label`),
+             不是另取一个当前时刻 —— 让用户能改它,就会出现"标签说 20:35、文件名说
+             20:33"这种对不上的场面,而标签存在的唯一理由就是能对上。 */}
+      <Modal
+        title={labelThenRecord ? '这一场是谁的?(确定后开始录制)' : '改本场标注'}
+        open={labelModalOpen}
+        onOk={() => submitLabel(labelThenRecord)}
+        okText={labelThenRecord ? '确定并开始录制' : '保存'}
+        cancelText={labelThenRecord ? '取消(不录制)' : '取消'}
+        confirmLoading={savingLabel}
+        onCancel={() => setLabelModalOpen(false)}
+        maskClosable={false}
+      >
+        <div style={{ display: 'grid', gap: '12px', paddingTop: '8px' }}>
+          <div>
+            <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>时间(取自本场 session_id,不可改)</div>
+            <Input value={sid ? sid.replace(/^(\d{8})_(\d{6}).*$/, '$1_$2') : ''} readOnly disabled />
+          </div>
+          {([
+            ['serial', '场次序号(你自己定的口径)'],
+            ['name', '姓名'],
+            ['student_id', '学号'],
+            ['department', '院系'],
+          ] as const).map(([key, title]) => (
+            <div key={key}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>{title}</div>
+              <Input
+                value={labelFields[key]}
+                maxLength={120}
+                onChange={(e) => setLabelFields((prev) => ({ ...prev, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <Alert
+            type={Object.values(labelFields).some((v) => v.trim()) ? 'info' : 'warning'}
+            showIcon
+            message={Object.values(labelFields).some((v) => v.trim())
+              ? `标签预览：${[sid ? sid.replace(/^(\d{8})_(\d{6}).*$/, '$1_$2') : '',
+                  labelFields.serial, labelFields.name, labelFields.student_id, labelFields.department]
+                  .map((v) => v.trim()).filter(Boolean).join('-')}`
+              : '四项全空等于没标 —— 至少填一项,否则事后认不出这一场'}
+            description="这段预览只是给你当场看的;真正存下来的以服务端返回的那一个为准(拼法只允许有一处定义)。"
+          />
+        </div>
+      </Modal>
+
+      {/* ── 停止录制的二次确认(防呆)────────────────────────────────────────
+          停录不可逆:录像整场只在内存里,`stopCapture` 之后立刻上传那一份。 */}
+      <Modal
+        title="确定停止录制?"
+        open={confirmStopOpen}
+        onOk={confirmStopRecording}
+        onCancel={() => setConfirmStopOpen(false)}
+        okText="确定停止"
+        cancelText="继续录制"
+        okButtonProps={{ danger: true }}
+      >
+        <p style={{ marginBottom: '8px' }}>停止后本场原生录像会立刻上传留存,不能再往这一场里补录。</p>
+        <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>
+          本场：{savedLabel ?? '(没有标注)'}
+          <br />
+          session_id：{sid ?? '(没有会话号)'}
+        </p>
+      </Modal>
     </Content>
   );
 };
