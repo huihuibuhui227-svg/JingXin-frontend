@@ -179,40 +179,53 @@ const RealtimeAnalysis: React.FC = () => {
     }
   });
 
-  // ★ 铸号:进页面时向服务端要一个 session_id(M2:服务端铸号是**唯一来源**)。
+  // ★ 铸号:向服务端要一个 session_id(M2:服务端铸号是**唯一来源**)。
   //
   // 不起会话会怎样(这一页此前的状态):face / gesture 的请求不带 session_id
   // ⟹ 全部落进 `NONE` 桶 ⟹ 报告侧整体排除 NONE ⟹ **录了等于没录**。
-  // (交接日志 §7.2 限制 ③;NONE 桶涨到 514 行就是这个形态攒出来的。)
   //
-  // ⚠️ **只铸一次**。StrictMode 下 effect 会跑两遍,而"中途重铸"会把一场的数据劈成
-  //    两场 —— 三份日志按 id 分文件,报告只看其中一场。交接日志 §6 实测踩过:
+  // ⚠️ 铸号发生在**第一次点「开始录制」时**,不是进页面时。进页面就铸的话,
+  //    **光打开这一页看一眼**都会在盘上留下一个空壳场次目录(只有 `session.json`,
+  //    没有任何素材)—— 实测这一形态留下过 3 个(`203854_9fa0` / `204350_3791` /
+  //    `204507_3ca0`)。挪到点击那一刻,顺序照样是"号先到、帧后发"(下面 `await`
+  //    完才开弹窗、才开录),却不再有副作用。
+  // ⚠️ **只铸一次**。停一次再开一次**不能**再铸:那会把一场的数据劈成两场 ——
+  //    三份日志按 id 分文件,报告只看其中一场。交接日志 §6 实测踩过:
   //    `..._afb2`(299 帧)之后手滑重开得到 `..._e70e`(5 帧空壳),看报告时看到的是后者。
-  // ⚠️ 把 promise 存进 ref,`开始录制` 要 `await` 它 —— 否则号还在飞的路上就开始发帧了,
-  //    那几帧照样落 NONE。**"号先到、帧后发"要由顺序保证,不能靠祈祷。**
+  // ⚠️ promise 存进 ref:并发的第二次点击要 `await` **同一个** promise,不是再铸一个。
   const mintRef = useRef<Promise<void> | null>(null);
   // 失败原文另存一份 ref:`handleStartRecording` 里要把它念出来,而那里的闭包是
   // **点击那一刻**的渲染 —— 铸号刚刚失败时 state 还没传过去,读 state 会读到 null。
   const sessionErrorRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (mintRef.current) return;
-    mintRef.current = voiceApi.interview.start()
-      .then(() => {
-        const id = getSessionId();
-        setSid(id);
-        if (!id) {
-          // 服务端回了 200 但没有 id —— 不编一个出来(编了只会把数据写进 NONE 桶)。
-          throw new Error('服务端没有返回 session_id');
-        }
-        console.log('🆔 本场会话已开始:', id);
-      })
-      .catch((error) => {
-        const why = error?.response?.data?.detail || error?.message || '未知错误';
-        console.error('❌ 会话铸号失败:', error?.response?.data ?? error);
-        sessionErrorRef.current = why;
-        setSessionError(why);
-      });
-  }, []);
+
+  const ensureSession = async (): Promise<boolean> => {
+    if (!mintRef.current) {
+      mintRef.current = voiceApi.interview.start()
+        .then(() => {
+          const id = getSessionId();
+          setSid(id);
+          if (!id) {
+            // 服务端回了 200 但没有 id —— 不编一个出来(编了只会把数据写进 NONE 桶)。
+            throw new Error('服务端没有返回 session_id');
+          }
+          setSessionError(null);
+          console.log('🆔 本场会话已开始:', id);
+        })
+        .catch((error) => {
+          // 失败就**把 ref 清掉**:下一次点「开始录制」要能重试,而不是永远 await
+          // 一个已经 rejected 的 promise(那会变成"点了没反应"的死按钮)。
+          // ⚠️ 这里**不 rethrow** —— 外层 `await` 因此总是正常返回,失败与否由
+          //    `getSessionId()` 判定,只有一条判据。
+          mintRef.current = null;
+          const why = error?.response?.data?.detail || error?.message || '未知错误';
+          console.error('❌ 会话铸号失败:', error?.response?.data ?? error);
+          sessionErrorRef.current = why;
+          setSessionError(why);
+        });
+    }
+    await mintRef.current;
+    return !!getSessionId();
+  };
 
   // 五维雷达:五个量**都测到了**才画。
   //
@@ -267,9 +280,10 @@ const RealtimeAnalysis: React.FC = () => {
   };
 
   const handleStartRecording = async () => {
-    // 1) 先把号等回来。号没到就开始发帧 ⟹ 那几帧落 NONE 桶(报告侧整体排除)。
-    if (mintRef.current) await mintRef.current;
-    if (!getSessionId()) {
+    // 1) 铸号(**第一次点的时候**,见 ensureSession 上面那段)。
+    //    号没到就开始发帧 ⟹ 那几帧落 NONE 桶(报告侧整体排除)。
+    const ok = await ensureSession();
+    if (!ok) {
       // 不编一个 id —— 编了只会把数据写进 NONE 桶:看着成功、其实什么都没有。
       // 这是**整场作废**的条件(比"降级"严重),所以 duration 0 = 不自动消失。
       message.error(
@@ -331,7 +345,9 @@ const RealtimeAnalysis: React.FC = () => {
             {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的日志),
                 而它此前只活在 api.ts 的模块变量里 —— 页面上看不见,对不上号时无从查起。 */}
             <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? '#52c41a' : '#999' }}>
-              {sid ? `本场 session_id：${sid}` : sessionError ? `未铸到会话：${sessionError}` : '正在铸会话号…'}
+              {sid ? `本场 session_id：${sid}`
+                : sessionError ? `未铸到会话：${sessionError}`
+                : '尚未开始会话(点「开始录制」时铸号)'}
             </div>
             {/* 本场标注显示**服务端回的那一个**(不是本地拼的)。旁边留一个「改标签」——
                 端点本来就是 upsert,顺手防住"打错一个字就永久错了"。 */}
