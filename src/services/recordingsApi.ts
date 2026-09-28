@@ -89,7 +89,13 @@ export interface RecordingDetail extends RecordingSummary {
  */
 const withToken = (url: string): string => {
   const token = getAdminToken();
-  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+  if (!token) return url;
+  // ⚠️ 分隔符要**看 URL 里已经有没有 `?`**。第一版一律用 `?`,而 `fileUrl` 自带
+  //    `?name=…` ⟹ 拼出 `…?name=X?token=Y`:服务端把 name 读成 `X?token=Y`、
+  //    而且**收不到 token**(第二个 `?` 不是分隔符)⟹ 401 ⟹ 逐帧图**一张都不显示**。
+  //    而 `videoUrl` 没有前置 `?`,所以它是好的 —— 于是现场看起来是
+  //    "视频能预览、帧看不到",像一个跟模态有关的问题,其实只是拼接。
+  return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
 };
 
 export const recordingsApi = {
