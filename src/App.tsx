@@ -14,6 +14,7 @@ const ResearchAssessment = React.lazy(() => import('./pages/ResearchAssessment')
 const RealtimeAnalysis = React.lazy(() => import('./pages/RealtimeAnalysis'));
 const ReportPage = React.lazy(() => import('./pages/ReportPage'));
 const ReportsList = React.lazy(() => import('./pages/ReportsList'));
+const RecordingsPage = React.lazy(() => import('./pages/RecordingsPage'));
 
 const PageLoader: React.FC = () => <Loading tip="页面加载中..." />;
 
@@ -34,6 +35,7 @@ const App: React.FC = () => {
                   <Route path="/report/latest" element={<ReportPage />} />
                   <Route path="/report/:id" element={<ReportPage />} />
                   <Route path="/reports" element={<ReportsList />} />
+                  <Route path="/recordings" element={<RecordingsPage />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

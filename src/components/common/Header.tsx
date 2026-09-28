@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layout, Menu } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { HomeOutlined, VideoCameraOutlined, ExperimentOutlined, BarChartOutlined, FileTextOutlined } from '@ant-design/icons';
+import { HomeOutlined, VideoCameraOutlined, ExperimentOutlined, BarChartOutlined, FileTextOutlined, PlaySquareOutlined } from '@ant-design/icons';
 
 const { Header: AntHeader } = Layout;
 
@@ -14,7 +14,8 @@ const Header: React.FC = () => {
     { key: '/interview', icon: <VideoCameraOutlined />, label: '面试评估' },
     { key: '/research', icon: <ExperimentOutlined />, label: '科研评估' },
     { key: '/analysis', icon: <BarChartOutlined />, label: '实时分析' },
-    { key: '/reports', icon: <FileTextOutlined />, label: '报告列表' }
+    { key: '/reports', icon: <FileTextOutlined />, label: '报告列表' },
+    { key: '/recordings', icon: <PlaySquareOutlined />, label: '录制素材' }
   ];
 
   return (
