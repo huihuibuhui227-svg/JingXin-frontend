@@ -64,7 +64,10 @@ const ReportsList: React.FC = () => {
           <Button
             type="primary"
             icon={<BarChartOutlined />}
-            onClick={() => window.open('http://127.0.0.1:5000', '_blank')}
+            // 2026-09-27 修:原先写死 `http://127.0.0.1:5000` —— 部署到服务器后,
+            // 从别的电脑点这个按钮打开的是**那台电脑自己**的 5000 端口。
+            // 改成走应用内的报告页(`/report/latest`),它自己按当前 host 找后端。
+            onClick={() => navigate('/report/latest')}
           >
             最新结构化报告
           </Button>
