@@ -269,6 +269,12 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
         // 不造一个 0 字节的 blob 去上传 —— 服务端也会 400,而"看着像有、其实没有"
         // 正是本项目在杀的形态。
         console.warn('⚠️ 本场没有录到任何原生分片 —— 不上传(不编一份空录像出来)');
+        // ⚠️ **必须报给调用方**。此前这里只有一行 console.warn,于是"这一场压根没有
+        //    原生录像"这件事在界面上完全看不见 —— 而它正是本仓最贵的那类静默失效。
+        //    调用方据此知道"门禁永远不会开",不然会停在一条没有出口的路上。
+        onDegradedRef.current?.(
+          '本场没有录到任何原生录像 —— 摄像头可能没起来,或这条流在中途就断了'
+        );
         releaseBeforeUnload();     // 没有录像可丢,拦截就该撤
         return;
       }
