@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Row, Col, Card, message } from 'antd';
+import { Layout, Row, Col, Card, Alert, message } from 'antd';
 import { useCamera } from '@/hooks/useCamera';
-import { faceApi, gestureApi } from '@/services/api';
+import { useSessionRecording } from '@/hooks/useSessionRecording';
+import { faceApi, gestureApi, voiceApi, getSessionId } from '@/services/api';
 import { useAssessmentStore } from '@/store/assessmentStore';
 import RadarChart from '@/components/visualization/RadarChart';
 import TimelineChart from '@/components/visualization/TimelineChart';
 import CameraView from '@/components/assessment/CameraView';
+import {
+  AbandonConfirmModal, ConsentModal, DegradedBanner, LabelErrorBanner, LabelModal,
+  SaveGateModal, StopConfirmModal,
+} from '@/components/recording/RecordingDialogs';
+import type { ConsentMode } from '@/components/recording/RecordingDialogs';
+import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
 
 const { Content } = Layout;
 
@@ -17,17 +24,81 @@ const RADAR_LABELS = {
   cognitive_efficiency: '眼神稳定性',
 } as const;
 
+/** 抽帧之后还要再节流一层:每送一帧要发两个请求(face + gesture),
+ *  而**两个端点各自是同步推理**,各自还要把那帧原始字节留存一份。
+ *
+ *  取 `5` 的依据只有一个:**与 `AssessmentPage` 相同**。那一页是正式评估那条路,
+ *  也是本仓现有全部素材的来源;这一页此前用 `% 10`,在时钟上是
+ *  `frameRate / 10`(配 `frameRate: 5` ⟹ 每 2 秒一帧),比正式那条慢一倍。
+ *  没有依据把"记录"这条定得比"正式评估"那条还稀,所以就对齐它,不另取新数。
+ *
+ *  (实际到达率 **≤** 时钟值:视频未就绪的那些 tick 不发帧。真实值以服务端
+ *   `measured_fps()` 为准,别在这里手写一个。) */
+const SEND_EVERY_NTH_FRAME = 5;
+
 const RealtimeAnalysis: React.FC = () => {
   const frameCountRef = useRef(0);
-  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [timelineData, setTimelineData] = useState<Array<{ timestamp: string; value: number; metric: string }>>([]);
+  // 本场 session_id(服务端铸的)。显示出来是为了**:录完要知道跑报告时该给哪个 id** ——
+  // 此前它只活在模块变量里,页面上看不见,而"报告里什么都没有"往往就是这个号对不上。
+  const [sid, setSid] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [confirmStopOpen, setConfirmStopOpen] = useState(false);
+  // 本场征询结果(`audio_only` ⟹ 摄像头根本不打开)。
+  const [consent, setConsent] = useState<ConsentMode | null>(null);
+  const { selection: devices, update: setDevices } = useDeviceSelection();
+
+  /**
+   * 标注 / 保存门禁 / 降级 —— **与 `/interview`、`/research` 同一套**
+   * (`useSessionRecording`,一处定义)。
+   *
+   * ⚠️ **铸号挪到"标注确定之后"了。** 原先 `handleStartRecording` 是先铸号、
+   *    再弹标注窗 ⟹ "点了开始又取消"会在盘上留一个**空壳场次目录**。9-28 实测
+   *    留下过一个(有 `label.json`、没有 media),而它带着姓名/学号,比纯空壳
+   *    更像一场真素材。现在取消 = 干净地什么都没发生。
+   */
+  const recording = useSessionRecording({
+    onPrepareSession: async () => {
+      setSessionError(null);
+      try {
+        // 服务端铸号是**唯一来源**(spec M2);不自己造 id。
+        await voiceApi.interview.start();
+        const id = getSessionId();
+        if (!id) {
+          // 服务端回了 200 但没有 id —— 不编一个出来(编了只会把数据写进 NONE 桶)。
+          throw new Error('服务端没有返回 session_id');
+        }
+        setSid(id);
+        console.log('🆔 本场会话已开始:', id);
+        return true;
+      } catch (error: any) {
+        const why = error?.response?.data?.detail || error?.message || '未知错误';
+        console.error('❌ 会话铸号失败:', error?.response?.data ?? error);
+        setSessionError(why);
+        // 不编一个 id —— 编了只会把数据写进 NONE 桶:看着成功、其实什么都没有。
+        // 这是**整场作废**的条件(比"降级"严重),所以 duration 0 = 不自动消失。
+        message.error(
+          `会话没有铸成，这一场会录不进任何一场(报告侧排除 NONE 桶)：${why}`, 0);
+        return false;
+      }
+    },
+    // 惰性引用:`beginRecording` 在下面才定义(它要用 `useCamera` 的
+    // startCamera / startCapture),而这个箭头只在"标注确定之后"才被调用 ——
+    // 那时它早已初始化。直接写 `onRecordStart: beginRecording` 会撞上 TDZ。
+    onRecordStart: (mode) => { setConsent(mode); void beginRecording(); },
+  });
 
   const { realtimeMetrics, updateRealtimeMetrics } = useAssessmentStore();
   const { videoRef, canvasRef, startCamera, stopCamera, startCapture, stopCapture } = useCamera({
+    // 只同意声音 ⟹ **摄像头根本不打开**(见 useCamera 的说明)。
+    audioOnly: consent === 'audio_only',
+    videoDeviceId: devices.videoDeviceId,
+    audioDeviceId: devices.audioDeviceId,
     onFrame: async (frame) => {
-      // 每10帧发送一次分析请求（降低频率，避免过多请求）
+      // 再节流一层(见 SEND_EVERY_NTH_FRAME 的说明)
       frameCountRef.current += 1;
-      if (frameCountRef.current % 10 !== 0) return;
+      if (frameCountRef.current % SEND_EVERY_NTH_FRAME !== 0) return;
 
       try {
         console.log('📤 [实时监控] 发送第', frameCountRef.current, '帧...');
@@ -100,8 +171,79 @@ const RealtimeAnalysis: React.FC = () => {
         console.error('❌ 帧处理错误:', error);
       }
     },
-    frameRate: 5
+    frameRate: 5,
+
+    // M2.6:整场**原生音视频**录完 → 上传留存(spec §5.3/§5.4)。一场一个 `camera.webm`。
+    // ⚠️ 此前这一页**没传**这个参数,而 `useCamera` 只在有它时才挂 `MediaRecorder`
+    //    ⟹ 这一页录不出视频、录不出音频、也没有转写(交接日志 §7.2 限制 ①)。
+    // ⚠️ 视频与音频在**同一条流**里(R5 实测 `audio:live, video:live`),一个 blob 两样都有。
+    onVideoReady: (video) => {
+      console.log('🎥 本场原生录像收尾，准备上传:', video.size, 'bytes');
+      // ⚠️ **必须 return 这个 promise**:useCamera 拿它当"什么时候可以撤掉
+      //    「刷新会丢录像」拦截"的信号。录像整场只活在内存里,blob 到手 ≠ 存下了 ——
+      //    不 return 的话拦截在上传发出前就撤了,那几秒里刷新/关页 = 整场录像永久丢失。
+      // ⚠️ 这个 promise **只在留存确认(或使用者明确放弃)之后才落定**:失败时它继续
+      //    悬着,于是刷新拦截继续生效。理由与实现都在 `useSessionRecording` 里。
+      return recording.submitVideo(video);
+    },
+
+    // 降级不是失败,但**必须让录的人当场知道** —— 这一场留下的素材与"正常那一场"
+    // 不是一回事,事后只看文件是看不出来的(交接日志 §7.4 第 3 条)。
+    // 两处都要:toast 是当场看见,**横幅是留在页面上的凭证**(8 秒后溜走的提示
+    // 等于没有凭证 —— 转过头就分不清这场算不算数)。两样都在 hook 里。
+    onDegraded: recording.addDegraded,
   });
+
+  /** 真正开录。由标注弹窗的「确定」经 hook 调过来 —— 顺序是**先有标注、再开录**:
+   *  弹出弹窗那一刻什么都还没采,取消就是干净地什么都没发生。 */
+  const beginRecording = async () => {
+    setIsRecording(true);
+    message.success('开始录制');
+
+    // 摄像头没打开就别装作开始了。⚠️ 此前**不看**这个返回值 ⟹ 摄像头/麦克风
+    // 没打开时界面一切正常,却一帧都没有、也没有原生录像 —— 直到事后对账才发现。
+    // (与 `AssessmentPage` 同一处置;这是**整场作废**,所以不自动消失。)
+    const ok = await startCamera();
+    if (!ok) {
+      setIsRecording(false);
+      message.error('摄像头/麦克风没有打开 —— 这一场采不到任何画面与原生视频', 0);
+      return;
+    }
+    setTimeout(() => {
+      startCapture();
+    }, 500);
+  };
+
+  /** 点「开始录制」→ **先弹标注窗**。铸号由 hook 在"确定"之后调
+   *  `onPrepareSession`(理由见那里的说明:取消不留空壳场次目录)。 */
+  const handleStartRecording = () => {
+    // 保存门禁:上一场的录像还没确认留存 ⟹ 不许开新的一场。
+    // 使用者的裁定:素材没落定就不算"结束录制"。这条挡住的正是"上一场还在上传,
+    // 手已经点到下一场去了、然后刷新"这类把两场一起搞丢的操作。
+    if (recording.saveState !== 'idle') {
+      message.warning('上一场的录像还没确认留存 —— 先把它处理掉再开下一场', 0);
+      return;
+    }
+    // 把上一场留在页面上的东西清干净。不清的话:`frameCountRef` 会接着上一场数
+    // (节流点错位)、时间线会串场、上一场的标注会挂在新场上。
+    frameCountRef.current = 0;
+    setTimelineData([]);
+    recording.reset();
+    recording.openLabelModal(true);
+  };
+
+  /** 停录的二次确认。停录不可逆 —— 录像整场只在内存里,`stopCapture` 之后
+   *  立刻上传那一份,不能再往这一场里补录。 */
+  const handleStopRecording = () => setConfirmStopOpen(true);
+
+  const confirmStopRecording = () => {
+    setConfirmStopOpen(false);
+    setIsRecording(false);
+    stopCapture();
+    // 停完就**问留存 / 不留存** —— 不自动上传,也不自动丢。
+    setTimeout(() => recording.beginChoice(), 300);
+    message.info('已停止录制 —— 请确认本场怎么处理');
+  };
 
   // 五维雷达:五个量**都测到了**才画。
   //
@@ -135,45 +277,76 @@ const RealtimeAnalysis: React.FC = () => {
     };
   }, []);
 
-  const handleStartMonitoring = async () => {
-    setIsMonitoring(true);
-    message.success('开始实时监控');
-
-    await startCamera();
-    setTimeout(() => {
-      startCapture();
-    }, 500);
-  };
-
-  const handleStopMonitoring = () => {
-    setIsMonitoring(false);
-    stopCapture();
-    message.info('已停止监控');
-  };
 
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>实时分析</h2>
+          <div>
+            <h2 style={{ margin: 0 }}>实时分析</h2>
+            {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的日志),
+                而它此前只活在 api.ts 的模块变量里 —— 页面上看不见,对不上号时无从查起。 */}
+            <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? '#52c41a' : '#999' }}>
+              {sid ? `本场 session_id：${sid}`
+                : sessionError ? `未铸到会话：${sessionError}`
+                : '尚未开始会话(点「开始录制」时铸号)'}
+            </div>
+            {/* 本场标注显示**服务端回的那一个**(不是本地拼的)。旁边留一个「改标签」——
+                端点本来就是 upsert,顺手防住"打错一个字就永久错了"。 */}
+            {(recording.savedLabel || sid) && (
+              <div style={{ fontSize: '13px', marginTop: '4px', color: recording.savedLabel ? '#1890ff' : '#999' }}>
+                {recording.savedLabel
+                  ? <>本场标注：{recording.savedLabel}{' '}
+                      <a style={{ cursor: 'pointer' }} onClick={() => recording.openLabelModal(false)}>改标签</a>
+                    </>
+                  : <>本场还没有标注{' '}
+                      <a style={{ cursor: 'pointer' }} onClick={() => recording.openLabelModal(false)}>去填</a>
+                    </>}
+              </div>
+            )}
+          </div>
           <button
-            onClick={isMonitoring ? handleStopMonitoring : handleStartMonitoring}
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            disabled={!isRecording && recording.saveState !== 'idle'}
+            title={!isRecording && recording.saveState !== 'idle' ? '上一场的录像还没确认留存' : undefined}
             style={{
               padding: '8px 24px',
               fontSize: '14px',
-              background: isMonitoring ? '#ff4d4f' : '#1890ff',
+              background: isRecording ? '#ff4d4f' : recording.saveState !== 'idle' ? '#d9d9d9' : '#1890ff',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
-              cursor: 'pointer'
+              cursor: (!isRecording && recording.saveState !== 'idle') ? 'not-allowed' : 'pointer'
             }}
           >
-            {isMonitoring ? '停止监控' : '开始监控'}
+            {isRecording ? '停止录制'
+              : recording.saveState === 'saving' ? '正在保存…'
+              : recording.saveState === 'failed' ? '先处理上一场'
+              : '开始录制'}
           </button>
         </div>
 
+        {/* 采集状态的两条**持久**告示。它们都必须留在页面上,不能只弹一个几秒后
+            自己溜走的 toast —— 事后对着文件是看不出"这一场算不算数"的。 */}
+        {sessionError && (
+          <Alert
+            type="error" showIcon style={{ marginBottom: '16px' }}
+            message="本场没有会话号 —— 录下来的东西不属于任何一场"
+            description={`报告侧整体排除 NONE 桶,所以这一场进不了报告。原因：${sessionError}`}
+          />
+        )}
+        <LabelErrorBanner error={recording.labelError} />
+        {consent === 'audio_only' && (
+          <Alert
+            type="info" showIcon style={{ marginBottom: 16 }}
+            message="本场只采声音 —— 摄像头没有被打开"
+            description="这是征询时选定的范围,不是故障。面部与手势两个维度本场没有数据。"
+          />
+        )}
+        <DegradedBanner reasons={recording.degraded} />
+
         {/* 视频流 */}
-        {isMonitoring && (
+        {isRecording && (
           <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
             <Col span={24}>
               <CameraView
@@ -220,7 +393,7 @@ const RealtimeAnalysis: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                  {isMonitoring ? '等待数据...' : '点击"开始监控"'}
+                  {isRecording ? '等待数据...' : '点击"开始录制"'}
                 </div>
               )}
             </Card>
@@ -253,7 +426,7 @@ const RealtimeAnalysis: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                  {isMonitoring ? '等待数据...' : '点击"开始监控"'}
+                  {isRecording ? '等待数据...' : '点击"开始录制"'}
                 </div>
               )}
             </Card>
@@ -341,6 +514,57 @@ const RealtimeAnalysis: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* ── 四个弹窗全部来自 `RecordingDialogs`(与 `/interview`、`/research` 同一套)。
+          此前它们在这一页里手写了一遍,而那套纪律现在要在三个页面成立 ——
+          抄三遍的下场就是本仓反复栽过的"几处各自算一遍,然后静默分叉"。 */}
+      <LabelModal
+        open={recording.labelModalOpen}
+        thenRecord={recording.labelThenRecord}
+        fields={recording.labelFields}
+        onChange={recording.setLabelFields}
+        onOk={recording.submitLabel}
+        onCancel={() => recording.setLabelModalOpen(false)}
+        saving={recording.savingLabel}
+        sid={sid}
+        error={recording.labelError}
+      />
+
+      <ConsentModal
+        open={recording.consentModalOpen}
+        onOk={recording.confirmConsent}
+        onDecline={recording.declineConsent}
+        label={recording.savedLabel}
+        saving={recording.savingLabel}
+        devicePicker={<DevicePicker value={devices} onChange={setDevices} />}
+      />
+
+      <StopConfirmModal
+        open={confirmStopOpen}
+        onOk={confirmStopRecording}
+        onCancel={() => setConfirmStopOpen(false)}
+        label={recording.savedLabel}
+        sid={sid}
+      />
+
+      <SaveGateModal
+        saveState={recording.saveState}
+        savedInfo={recording.savedInfo}
+        saveError={recording.saveError}
+        onKeep={recording.chooseKeep}
+        onDiscard={recording.chooseDiscard}
+        onRetry={recording.retryLast}
+        onAbandon={() => recording.setConfirmAbandonOpen(true)}
+        onClose={() => recording.reset()}
+      />
+
+      <AbandonConfirmModal
+        open={recording.confirmAbandonOpen}
+        onOk={recording.abandonUpload}
+        onCancel={() => recording.setConfirmAbandonOpen(false)}
+        label={recording.savedLabel}
+        sid={sid}
+      />
     </Content>
   );
 };

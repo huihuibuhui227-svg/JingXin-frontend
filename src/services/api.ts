@@ -242,6 +242,32 @@ export const sessionApi = {
   },
 
   /**
+   * 记下本场的**标注**(场次序号 / 姓名 / 学号 / 院系)→ 服务端落 `label.json`。
+   *
+   * 为什么必须走服务端:标注得**存在服务器上** —— 换台电脑打开也查得到。那是
+   * localStorage 顶不了的事(那是"在这台电脑上记得",不是"记下来了")。
+   *
+   * ⚠️ 服务端会回**拼好的** `label`,界面显示它,别在本地再拼一遍:
+   *    拼法只允许有一处定义(`session_meta.compose_label`)。
+   * ⚠️ 标注**不进** `session_id`:报告侧只认 `_log_{日期}_{时刻}[_4位hex]` 这个
+   *    文件名形态,塞进去会让每份日志都匹配不上 ⟹ 报告一份都加载不到。
+   *    所以它是**另存的一份**,不碰 id、不碰目录名。
+   * ⚠️ 同一会话再调一次 = **覆盖**(打错一个字要能改)。
+   */
+  setLabel: async (fields: {
+    serial: string; name: string; student_id: string; department: string;
+    /** 本场征询结果。`"full"` = 全都同意;`"audio_only"` = 只同意声音。
+     *  它随标注一起落 `label.json` —— 同意与否是**证据**,不能只活在页面状态里。
+     *  ⚠️ 取值由服务端校验,未知值 400(不回落默认:把"没同意"当成"全同意"是
+     *     最坏的方向)。 */
+    consent?: 'full' | 'audio_only';
+  }) => {
+    const sid = requireSessionId('上报本场标注');
+    const response = await axios.post(`${VOICE_API_URL}/session/${sid}/label`, fields);
+    return response.data;
+  },
+
+  /**
    * 上报一道题的提问窗口 —— `response_latency` 只此一途(spec §3.9 / §5.6)。
    *
    * ⚠️ 时刻是**墙钟秒**。JS 的 `Date.now()` 是**毫秒**,直接发会被服务端的量程闸

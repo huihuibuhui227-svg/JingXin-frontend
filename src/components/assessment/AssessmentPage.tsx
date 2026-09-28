@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Progress, message } from 'antd';
+import { Layout, Progress, Alert, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useCamera } from '@/hooks/useCamera';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useAssessment } from '@/hooks/useAssessment';
+import { useSessionRecording } from '@/hooks/useSessionRecording';
 import { useAssessmentStore } from '@/store/assessmentStore';
-import { faceApi, gestureApi, voiceApi, sessionApi } from '@/services/api';
+import { faceApi, gestureApi, voiceApi, getSessionId } from '@/services/api';
 import CameraView from '@/components/assessment/CameraView';
 import RealtimeMetrics from '@/components/assessment/RealtimeMetrics';
 import QuestionCard from '@/components/assessment/QuestionCard';
 import AnswerInput from '@/components/assessment/AnswerInput';
 import Loading from '@/components/common/Loading';
+import {
+  AbandonConfirmModal, ConsentModal, DegradedBanner, LabelErrorBanner, LabelModal,
+  SaveGateModal, StopConfirmModal,
+} from '@/components/recording/RecordingDialogs';
+import type { ConsentMode } from '@/components/recording/RecordingDialogs';
+import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
 
 const { Content } = Layout;
 
@@ -53,10 +60,71 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   const config = CONFIG[assessmentType];
   const navigate = useNavigate();
   const [started, setStarted] = useState(false);
+  // 本场**已结束**(答完最后一题,或使用者主动停止)。它与 `started` 分开:
+  // `started` 管"摄像头开没开",这个管"这一场还能不能继续答"。
+  const [ended, setEnded] = useState(false);
+  const [confirmStopOpen, setConfirmStopOpen] = useState(false);
+  // 本场 session_id(服务端铸的)。显示出来是为了**录完要知道跑报告时给哪个 id**。
+  const [sid, setSid] = useState<string | null>(null);
+  // 停录后确认"这一场没有原生录像可存"(见下面那个 effect)。
+  const [nothingToSave, setNothingToSave] = useState(false);
+  // 本场征询结果。**这里是 UI 的依据** —— `audio_only` 时摄像头根本不打开。
+  // 真正落盘的依据是服务端 `label.json` 里的那一份(经 `setLabel` 带上送的)。
+  const [consent, setConsent] = useState<ConsentMode | null>(null);
+  const { selection: devices, update: setDevices } = useDeviceSelection();
   const frameCountRef = useRef(0);
 
-  const { realtimeMetrics, updateRealtimeMetrics } = useAssessmentStore();
+  const { realtimeMetrics, updateRealtimeMetrics, resetAssessment } = useAssessmentStore();
+
+  // ⚠️ 顺序有讲究:`useAssessment` 必须在前(下面要拿它的 `start`),而
+  //    `useCamera` 必须在 `useSessionRecording` 之后(它要 `submitVideo`)。
+  const {
+    loading,
+    currentQuestion,
+    currentQuestionIndex,
+    // 进度分母:服务端在 /interview/start 给的 total_questions(0 = 还不知道,不显示分母)
+    totalQuestions: questionTotal,
+    start,
+    submitAnswer,
+    playQuestion
+  } = useAssessment(config.type);
+
+  /**
+   * 标注 / 保存门禁 / 降级 —— 与 `/analysis` **同一套**(同一个 hook,一处定义)。
+   *
+   * 改之前这一页的做法:点「开始面试」就直接铸号开录,答完最后一题 **1.5 秒后
+   * 自动跳走**,而录像是在卸载时才上传的 —— **存没存下,当场没人知道**。
+   * 9-28 那场 2.1 GB 的丢失事故里,有一场 7.3 分钟的录像就是这么没的。
+   */
+  const recording = useSessionRecording({
+    // 铸号发生在**标注确定之后**:标注弹窗先收集,确定后才 `start()`
+    // (它铸号 + 拿题)。取消 = 盘上干干净净,不留空壳目录。
+    onPrepareSession: async () => {
+      const ok = await start();
+      if (!ok) {
+        // `useAssessment.start()` 已经喊过具体原因了,这里不重复喊。
+        message.error('这一场没有开始 —— 会话没有铸成,采不到任何素材', 0);
+        return false;
+      }
+      return true;
+    },
+    onRecordStart: (mode) => {
+      setConsent(mode);
+      frameCountRef.current = 0;
+      setEnded(false);
+      // 把服务端刚铸的号显示出来:录完要拿它去跑报告,而"报告里什么都没有"
+      // 往往就是这个号对不上。它只活在 api.ts 的模块变量里,页面不显示就无从查起。
+      setSid(getSessionId());
+      setTimeout(() => setStarted(true), 100);
+    },
+  });
+
   const { videoRef, canvasRef, startCamera, stopCamera, startCapture, stopCapture } = useCamera({
+    // 受试者只同意声音 ⟹ **摄像头根本不打开**(不是"开了不存" —— `media/face/*.jpg`
+    // 是逐帧落盘的正脸照,所以"不录肖像"必须意味着不开摄像头)。
+    audioOnly: consent === 'audio_only',
+    videoDeviceId: devices.videoDeviceId,
+    audioDeviceId: devices.audioDeviceId,
     onFrame: async (frame) => {
       frameCountRef.current += 1;
       if (frameCountRef.current % 5 !== 0) return;
@@ -134,44 +202,22 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     // 触发点在 `useCamera.stopCapture` 里(走 ref,卸载清理那条路也到得了)——
     // 挂到 `stopCamera` 的 `if (stream)` 里会**静默丢录像**,理由见 useCamera 顶部注释。
     onVideoReady: (video) => {
-      console.log('🎥 本场原生录像收尾，准备上传:', video.size, 'bytes');
-      // ⚠️ **必须 return 这个 promise**:useCamera 拿它当"什么时候可以撤掉
-      // 「刷新会丢录像」拦截"的信号。不 return 的话,上传还没发完拦截就撤了,
-      // 那几秒里刷新 = 整场录像没了。
-      return sessionApi.uploadMedia(video)
-        .then((result) => {
-          if (result?.stored === false) {
-            // 服务端**明说没存下**(留存被关 / 中途写失败)—— 不许当成功。
-            console.error('❌ 原生录像没有被留存:', result.reason);
-            message.error(`本场原生录像没存下：${result.reason}`);
-          } else {
-            console.log('✅ 原生录像已留存:', result);
-          }
-        })
-        .catch((error) => {
-          // 没有会话 id / 网络断 ⟹ 整场录像没留成。这是**不可逆**的损失,要说出来,
-          // 不能只进 console(本项目在杀的静默失效)。
-          console.error('❌ 原生录像上传失败:', error?.response?.data ?? error);
-          // 服务端的 detail 是有信息量的(413 会说清是多少字节撞了哪个上限),
-          // 原先它只进 console、用户只看到一句泛泛的"失败"。
-          const detail = error?.response?.data?.detail;
-          message.error(
-            detail
-              ? `本场原生录像没有留存:${detail}`
-              : '本场原生录像上传失败 —— 这一场的原生视频没有留存'
-          );
-        });
+      // ⚠️ **必须 return 这个 promise**。改之前这一页在这里只弹了个 8 秒 toast,
+      //    然后 handleSubmitAnswer 1.5 秒后就把页面**跳走**了 —— 上传还没落定人已经
+      //    在报告页了,存没存下无从得知。现在它交给保存门禁:promise 只在**留存确认**
+      //    (或使用者明确放弃)之后才落定,落定前 `useCamera` 的刷新拦截一直挂着。
+      return recording.submitVideo(video);
     },
 
     // 降级不是失败,但**必须让面试官当场知道** —— 这一场留下的素材与"正常那一场"
     // 不是一回事(camera.webm 没声音 / 可能不完整),事后只看文件是看不出来的。
-    onDegraded: (reason) => {
-      console.warn('⚠️ 采集降级:', reason);
-      message.warning(reason, 8);
-    }
+    // 改之前这里只有 `message.warning(reason, 8)`:8 秒后溜走,而"这一场算不算数"
+    // 是转过头还要再看一眼的问题 ⟹ 交给常驻横幅。
+    onDegraded: recording.addDegraded,
   });
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+    deviceId: devices.audioDeviceId,
     onAudioData: async (audioBlob) => {
       // ⚠️ 这里原先还塞了 fluency 80 / pitch_variation 0.5 / pause_duration 0.2 /
       // speech_ratio 0.8 —— 那四个是**写死的常数**,不是测出来的;只有 energy 是由
@@ -186,17 +232,6 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
       });
     }
   });
-
-  const {
-    loading,
-    currentQuestion,
-    currentQuestionIndex,
-    // 进度分母:服务端在 /interview/start 给的 total_questions(0 = 还不知道,不显示分母)
-    totalQuestions: questionTotal,
-    start,
-    submitAnswer,
-    playQuestion
-  } = useAssessment(config.type);
 
   useEffect(() => {
     return () => {
@@ -240,13 +275,71 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     };
   }, [started]);
 
-  const handleStart = async () => {
-    const success = await start();
-    if (success) {
-      setTimeout(() => {
-        setStarted(true);
-      }, 100);
+  /** 点「开始面试」→ **先弹标注窗**,不是直接开录。
+   *  标注的全部意义就是把这一场与别的场次分开;不填标注的一场在盘上是个裸 sid,
+   *  事后认不出是谁 —— 等于白采。所以「取消 = 不开始」。 */
+  const handleStart = () => {
+    recording.openLabelModal(true);
+  };
+
+  /** 结束本场:停帧捕获 → 触发原生录像收尾上传 → 交给保存门禁。
+   *  **从这里开始页面不再可交互**,直到素材确认落盘(或使用者明确放弃)。 */
+  const endSession = () => {
+    setConfirmStopOpen(false);
+    setEnded(true);
+    setNothingToSave(false);
+    stopCapture();
+    // 停完就**问留存 / 不留存** —— 不是自动上传,也不是自动丢。
+    // (`beginChoice` 会等在 `idle` 上,所以没有原生录像时也照常问:盘上还有帧和日志。)
+    setTimeout(() => recording.beginChoice(), 300);
+    message.info('本场已停止录制 —— 请确认本场怎么处理');
+  };
+
+  /**
+   * **兜底出口**:停录之后门禁迟迟不开,说明这一场**根本没有原生录像可存**。
+   *
+   * 为什么会有这条路:`useCamera` 在"一个分片都没录到"时**故意不调** `onVideoReady`
+   * (不编一份 0 字节的空录像出来),于是保存门禁永远不会开 —— 而本页在 `ended`
+   * 之后把答题框和按钮都禁用了 ⟹ **停在一条没有出口的路上,且不说为什么**。
+   * 那正是本仓在杀的那类静默失效,所以这里必须自己给出解释和出口。
+   */
+  // 「本场已结束」但**连选择都没弹出来**(极少:`beginChoice` 没赶上)—— 给个出口。
+  useEffect(() => {
+    if (!ended || recording.saveState !== 'idle') { setNothingToSave(false); return; }
+    const t = setTimeout(() => setNothingToSave(true), 2000);
+    return () => clearTimeout(t);
+  }, [ended, recording.saveState]);
+
+  const handleSubmitAnswer = async (answer: string, audioFile?: File) => {
+    const result = await submitAnswer(answer, audioFile);
+    if (!result.hasNext && !result.error) {
+      // ⚠️ 改之前这里是 `setTimeout(() => navigate('/reports'), 1500)`。
+      //    跳走之后录像才在卸载时上传,而**存没存下当场没人知道**。
+      //    现在停在保存门禁上,确认了才放行 —— 这也是使用者 9-28 的裁定。
+      endSession();
     }
+  };
+
+  /** 换下一场:**把上一场留在页面与 store 里的东西全部清干净**。
+   *
+   *  ⚠️ `resetAssessment()` 是**必须**的,不是清理癖好:store 的
+   *     `currentQuestionIndex` / `answers` / `realtimeMetrics` 都按"一个页面只做一场"
+   *     写的,连做两场时**不归零** —— `useAssessment` 的注释已经点名过这个反模式
+   *     (「同一个页面里连做两场时它从 10 接着数,不是本场第几题」)。
+   *     它的 `resetAssessment` 此前在仓库里**零调用方** = 死代码,这里就是它等的那个调用方。
+   *
+   *  ⚠️ 只在**换场**时调,**不能**在「去看报告」时调:`evaluationResult` 在 persist
+   *     白名单里,报告页靠它短路。
+   */
+  const handleNextSession = () => {
+    recording.reset();
+    resetAssessment();
+    stopCamera();
+    frameCountRef.current = 0;
+    setNothingToSave(false);
+    setSid(null);
+    setEnded(false);
+    setStarted(false);
   };
 
   const handleSpeechToText = async (audioBlob: Blob): Promise<string> => {
@@ -285,15 +378,6 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     }
   };
 
-  const handleSubmitAnswer = async (answer: string, audioFile?: File) => {
-    const result = await submitAnswer(answer, audioFile);
-    if (!result.hasNext && !result.error) {
-      setTimeout(() => {
-        navigate('/reports');
-      }, 1500);
-    }
-  };
-
   if (loading) {
     return <Loading fullScreen tip={config.loadingTip} />;
   }
@@ -320,30 +404,131 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
           >
             {config.startButtonText}
           </button>
+          <p style={{ marginTop: '20px', fontSize: '13px', color: '#999' }}>
+            点开始之后会先请你填本场标注(谁、哪个院系)—— 填完才开录。
+            没标注的一场事后认不出是谁,等于白采。
+          </p>
         </div>
+
+        <LabelModal
+          open={recording.labelModalOpen}
+          thenRecord={recording.labelThenRecord}
+          fields={recording.labelFields}
+          onChange={recording.setLabelFields}
+          onOk={recording.submitLabel}
+          onCancel={() => recording.setLabelModalOpen(false)}
+          saving={recording.savingLabel}
+          sid={null}
+          error={recording.labelError}
+        />
+
+        {/* 肖像 / 音频权的征询。**每场都弹** —— 每个受试者单独同意。
+            ⚠️ 它在**铸号之前**,所以「不同意」= 盘上连目录都不会建。 */}
+        <ConsentModal
+          open={recording.consentModalOpen}
+          onOk={recording.confirmConsent}
+          onDecline={recording.declineConsent}
+          label={recording.savedLabel}
+          saving={recording.savingLabel}
+          devicePicker={
+            <DevicePicker value={devices} onChange={setDevices} />
+          }
+        />
       </Content>
     );
   }
 
+  const busy = recording.saveState !== 'idle' || ended;
+
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>{config.inProgressTitle}</h2>
-          {/* ⚠️ 这里原先写 `currentQuestionIndex / 10`,而标题那处写 `currentIndex + 1`
-              —— 同一个数一处加一、一处没加,**永远差 1**(使用者 2026-09-26 当场看到
-              「我这边 7/10、那边 6/10」)。分母 10 也是写死的,题库只有 8 题,进度条
-              永远到不了 100%。现在两处同源,分母由服务端在 /interview/start 给出。 */}
-          <Progress
-            percent={questionTotal > 0
-              ? Math.round(((currentQuestionIndex + 1) / questionTotal) * 100)
-              : 0}
-            format={() => (questionTotal > 0
-              ? `进度 ${currentQuestionIndex + 1}/${questionTotal}`
-              : `进度 ${currentQuestionIndex + 1}`)}
-            style={{ width: '300px' }}
+        {consent === 'audio_only' && (
+          <Alert
+            type="info" showIcon style={{ marginBottom: 16 }}
+            message="本场只采声音 —— 摄像头没有被打开"
+            description="这是征询时选定的范围,不是故障。面部与手势两个维度本场没有数据,
+              报告里会如实标注「未采集」。"
           />
+        )}
+        <DegradedBanner reasons={recording.degraded} />
+        <LabelErrorBanner error={recording.labelError} />
+
+        <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>{config.inProgressTitle}</h2>
+            {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的
+                日志),而"报告里什么都没有"往往就是这个号对不上。 */}
+            <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? '#52c41a' : '#999' }}>
+              {sid ? `本场 session_id：${sid}` : '尚未铸到会话号'}
+            </div>
+            {recording.savedLabel && (
+              <div style={{ fontSize: '13px', marginTop: '4px', color: '#1890ff' }}>
+                本场标注：{recording.savedLabel}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* ⚠️ 这里原先写 `currentQuestionIndex / 10`,而标题那处写 `currentIndex + 1`
+                —— 同一个数一处加一、一处没加,**永远差 1**(使用者 2026-09-26 当场看到
+                「我这边 7/10、那边 6/10」)。分母 10 也是写死的,题库只有 8 题,进度条
+                永远到不了 100%。现在两处同源,分母由服务端在 /interview/start 给出。 */}
+            <Progress
+              percent={questionTotal > 0
+                ? Math.round(((currentQuestionIndex + 1) / questionTotal) * 100)
+                : 0}
+              format={() => (questionTotal > 0
+                ? `进度 ${currentQuestionIndex + 1}/${questionTotal}`
+                : `进度 ${currentQuestionIndex + 1}`)}
+              style={{ width: '300px' }}
+            />
+            <button
+              onClick={() => setConfirmStopOpen(true)}
+              disabled={busy}
+              title={busy ? '本场已经结束或正在保存' : undefined}
+              style={{
+                padding: '8px 20px', fontSize: '14px', borderRadius: '6px',
+                background: busy ? '#d9d9d9' : '#ff4d4f', color: '#fff',
+                border: 'none', cursor: busy ? 'not-allowed' : 'pointer'
+              }}
+            >
+              ⏹ 停止录制
+            </button>
+          </div>
         </div>
+
+        {ended && !nothingToSave && (
+          <p style={{ color: '#666', marginTop: '-12px', marginBottom: '16px' }}>
+            本场已结束 —— 等原生录像确认留存之后才能开始下一场。
+          </p>
+        )}
+
+        {/* 兜底出口。`useCamera` 在没有原生分片时**故意不调** onVideoReady(不编一份
+            空录像),于是门禁不会开 —— 若不给出口,这一页就停在没有解释的死路上。 */}
+        {nothingToSave && (
+          <Alert
+            type="warning" showIcon style={{ marginBottom: 16 }}
+            message="本场已结束，但没有原生录像可留存"
+            description={
+              <div>
+                <p style={{ margin: '0 0 10px' }}>
+                  帧与日志照常落了盘,但**这一场没有 `camera.webm`** ——
+                  摄像头可能没起来,或这条流在中途就断了。原因见下面的降级告警。
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => navigate('/reports')}
+                    style={{ padding: '6px 20px', background: '#fff', color: '#1890ff', border: '1px solid #1890ff', borderRadius: '6px', cursor: 'pointer' }}>
+                    去看报告
+                  </button>
+                  <button onClick={handleNextSession}
+                    style={{ padding: '6px 20px', background: '#52c41a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                    录下一场
+                  </button>
+                </div>
+              </div>
+            }
+          />
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
           <CameraView
@@ -370,8 +555,50 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
           isRecording={isRecording}
           onStartRecording={startRecording}
           onStopRecording={stopRecording}
+          disabled={busy}
         />
       </div>
+
+      <StopConfirmModal
+        open={confirmStopOpen}
+        onOk={endSession}
+        onCancel={() => setConfirmStopOpen(false)}
+        label={recording.savedLabel}
+        sid={sid}
+      />
+
+      {/* 保存门禁:`saved` 时额外给两个出口 —— 这一页录完一场通常还要录下一场。 */}
+      <SaveGateModal
+        saveState={recording.saveState}
+        savedInfo={recording.savedInfo}
+        saveError={recording.saveError}
+        onKeep={recording.chooseKeep}
+        onDiscard={recording.chooseDiscard}
+        onRetry={recording.retryLast}
+        onAbandon={() => recording.setConfirmAbandonOpen(true)}
+        onClose={() => recording.reset()}
+        hideDefaultOk
+        extraActions={
+          <>
+            <button onClick={() => navigate('/reports')}
+              style={{ padding: '6px 20px', background: '#fff', color: '#1890ff', border: '1px solid #1890ff', borderRadius: '6px', cursor: 'pointer' }}>
+              去看报告
+            </button>
+            <button onClick={handleNextSession}
+              style={{ padding: '6px 20px', background: '#52c41a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              录下一场
+            </button>
+          </>
+        }
+      />
+
+      <AbandonConfirmModal
+        open={recording.confirmAbandonOpen}
+        onOk={recording.abandonUpload}
+        onCancel={() => recording.setConfirmAbandonOpen(false)}
+        label={recording.savedLabel}
+        sid={sid}
+      />
     </Content>
   );
 };
