@@ -50,6 +50,19 @@ const RealtimeAnalysis: React.FC = () => {
   const [savingLabel, setSavingLabel] = useState(false);
   // 标注**没存下**的凭证(常驻,与降级同一个讲究:8 秒后溜走的提示不是凭证)。
   const [labelError, setLabelError] = useState<string | null>(null);
+
+  // ── 保存门禁:素材没确认留存,就不算"结束录制" ──────────────────────────
+  // 使用者 2026-09-28 的裁定。录像整场**只活在内存里**,没确认就结束 = 随时可能
+  // 白白丢一场(当晚实测丢过:有一场 7.3 分钟的录像就是这么没的)。
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [savedInfo, setSavedInfo] = useState<{ label: string | null; sid: string | null; bytes: number } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmAbandonOpen, setConfirmAbandonOpen] = useState(false);
+  // 待上传的 blob + 那个**故意悬着**的 promise 的 resolve。
+  // ⚠️ `useCamera` 拿 `onVideoReady` 返回的 promise 当"何时能撤掉「刷新会丢录像」
+  //    拦截"的信号 ⟹ 我们让它在**失败时继续悬着**(blob 还在内存里,拦截就该还在),
+  //    只有留存确认或使用者明确放弃时才落定。这就是"没确认就别想走"的实现方式。
+  const pendingRef = useRef<{ blob: Blob; resolve: () => void } | null>(null);
   const [confirmStopOpen, setConfirmStopOpen] = useState(false);
   // 这次弹窗是"开录前填标"(确定后开始录制)还是"录完改标"(确定后什么都不开始)。
   const [labelThenRecord, setLabelThenRecord] = useState(false);
@@ -143,29 +156,12 @@ const RealtimeAnalysis: React.FC = () => {
       // ⚠️ **必须 return 这个 promise**:useCamera 拿它当"什么时候可以撤掉
       //    「刷新会丢录像」拦截"的信号。录像整场只活在内存里,blob 到手 ≠ 存下了 ——
       //    不 return 的话拦截在上传发出前就撤了,那几秒里刷新/关页 = 整场录像永久丢失。
-      return sessionApi.uploadMedia(video)
-        .then((result) => {
-          if (result?.stored === false) {
-            // 服务端**明说没存下**(留存被关 / 中途写失败)—— 不许当成功。
-            console.error('❌ 原生录像没有被留存:', result.reason);
-            message.error(`本场原生录像没存下：${result.reason}`, 0);
-          } else {
-            console.log('✅ 原生录像已留存:', result);
-            message.success('本场原生录像已留存');
-          }
-        })
-        .catch((error) => {
-          // 没有会话 id / 网络断 ⟹ 整场录像没留成。这是**不可逆**的损失,必须说出来,
-          // 不能只进 console(本项目在杀的静默失效)。
-          console.error('❌ 原生录像上传失败:', error?.response?.data ?? error);
-          const detail = error?.response?.data?.detail;
-          message.error(
-            detail
-              ? `本场原生录像没有留存：${detail}`
-              : '本场原生录像上传失败 —— 这一场的原生视频没有留存',
-            0
-          );
-        });
+      // ⚠️ 这个 promise **只在留存确认(或使用者明确放弃)之后才落定**:失败时它继续
+      //    悬着,于是刷新拦截继续生效。见 `pendingRef` 那段说明。
+      return new Promise<void>((resolve) => {
+        pendingRef.current = { blob: video, resolve };
+        void doUpload(video);
+      });
     },
 
     // 降级不是失败,但**必须让录的人当场知道** —— 这一场留下的素材与"正常那一场"
@@ -184,47 +180,105 @@ const RealtimeAnalysis: React.FC = () => {
   // 不起会话会怎样(这一页此前的状态):face / gesture 的请求不带 session_id
   // ⟹ 全部落进 `NONE` 桶 ⟹ 报告侧整体排除 NONE ⟹ **录了等于没录**。
   //
-  // ⚠️ 铸号发生在**第一次点「开始录制」时**,不是进页面时。进页面就铸的话,
-  //    **光打开这一页看一眼**都会在盘上留下一个空壳场次目录(只有 `session.json`,
-  //    没有任何素材)—— 实测这一形态留下过 3 个(`203854_9fa0` / `204350_3791` /
-  //    `204507_3ca0`)。挪到点击那一刻,顺序照样是"号先到、帧后发"(下面 `await`
-  //    完才开弹窗、才开录),却不再有副作用。
-  // ⚠️ **只铸一次**。停一次再开一次**不能**再铸:那会把一场的数据劈成两场 ——
-  //    三份日志按 id 分文件,报告只看其中一场。交接日志 §6 实测踩过:
-  //    `..._afb2`(299 帧)之后手滑重开得到 `..._e70e`(5 帧空壳),看报告时看到的是后者。
-  // ⚠️ promise 存进 ref:并发的第二次点击要 `await` **同一个** promise,不是再铸一个。
-  const mintRef = useRef<Promise<void> | null>(null);
+  // ⚠️ 铸号发生在**点「开始录制」时**,不是进页面时。进页面就铸的话,**光打开这一页
+  //    看一眼**都会在盘上留下一个空壳场次目录(只有 `session.json`,没有素材)——
+  //    实测这一形态留下过 3 个(`203854_9fa0` / `204350_3791` / `204507_3ca0`)。
+  //
+  // ⚠️ **每次点都铸一个新的**(2026-09-28 改;改之前是"只铸一次",见 `startNewSession`)。
   // 失败原文另存一份 ref:`handleStartRecording` 里要把它念出来,而那里的闭包是
   // **点击那一刻**的渲染 —— 铸号刚刚失败时 state 还没传过去,读 state 会读到 null。
   const sessionErrorRef = useRef<string | null>(null);
 
-  const ensureSession = async (): Promise<boolean> => {
-    if (!mintRef.current) {
-      mintRef.current = voiceApi.interview.start()
-        .then(() => {
-          const id = getSessionId();
-          setSid(id);
-          if (!id) {
-            // 服务端回了 200 但没有 id —— 不编一个出来(编了只会把数据写进 NONE 桶)。
-            throw new Error('服务端没有返回 session_id');
-          }
-          setSessionError(null);
-          console.log('🆔 本场会话已开始:', id);
-        })
-        .catch((error) => {
-          // 失败就**把 ref 清掉**:下一次点「开始录制」要能重试,而不是永远 await
-          // 一个已经 rejected 的 promise(那会变成"点了没反应"的死按钮)。
-          // ⚠️ 这里**不 rethrow** —— 外层 `await` 因此总是正常返回,失败与否由
-          //    `getSessionId()` 判定,只有一条判据。
-          mintRef.current = null;
-          const why = error?.response?.data?.detail || error?.message || '未知错误';
-          console.error('❌ 会话铸号失败:', error?.response?.data ?? error);
-          sessionErrorRef.current = why;
-          setSessionError(why);
-        });
+  /** 铸一个**新的**本场号。**每次「开始录制」都调** —— 一次录制 = 一场会话。
+   *
+   * ★ 2026-09-28 改。改之前是"只铸一次"(`mintRef` 复用),理由是"停一次再开一次
+   *   不能再铸,否则会把一场的数据劈成两场"。**那个假设当天在实盘上被推翻了**:
+   *   使用者的用法是**一个页面连录很多个学生**,于是 9 次录制挤进同一个 session_id,
+   *   每次停止录制上传的 `camera.webm` 把上一次**覆盖**掉 —— 丢了 8 份原生录像、2.1 GB。
+   *   "劈成两场"与"覆盖掉 8 份"哪个更坏,那天有了答案。**一次录制 = 一场。**
+   */
+  const startNewSession = async (): Promise<boolean> => {
+    setSessionError(null);
+    try {
+      // 服务端铸号是**唯一来源**(spec M2);不自己造 id。
+      await voiceApi.interview.start();
+      const id = getSessionId();
+      if (!id) {
+        // 服务端回了 200 但没有 id —— 不编一个出来(编了只会把数据写进 NONE 桶)。
+        throw new Error('服务端没有返回 session_id');
+      }
+      setSid(id);
+      console.log('🆔 本场会话已开始:', id);
+      return true;
+    } catch (error: any) {
+      const why = error?.response?.data?.detail || error?.message || '未知错误';
+      console.error('❌ 会话铸号失败:', error?.response?.data ?? error);
+      sessionErrorRef.current = why;
+      setSessionError(why);
+      return false;
     }
-    await mintRef.current;
-    return !!getSessionId();
+  };
+
+  /** 开新一场之前,把上一场留在页面上的状态清干净。
+   *  不清的话:`frameCountRef` 会接着上一场数(节流点错位)、时间线与降级横幅会串场、
+   *  上一场的标注会挂在新场上。 */
+  const resetPerSessionState = () => {
+    frameCountRef.current = 0;
+    setTimelineData([]);
+    setDegraded([]);
+    setSavedLabel(null);
+    setLabelError(null);
+    setSaveState('idle');
+    setSavedInfo(null);
+    setSaveError(null);
+  };
+
+  /** 上传本场录像(spec §5.3)。**成功才把那个 promise 落定** —— 落定 = 撤掉刷新拦截。 */
+  const doUpload = async (blob: Blob) => {
+    setSaveState('saving');
+    setSaveError(null);
+    try {
+      const result = await sessionApi.uploadMedia(blob);
+      if (result?.stored === false) {
+        // 服务端**明说没存下**(留存被关 / 中途写失败)—— 不许当成功。
+        throw new Error(result.reason || '服务端明说没有留存');
+      }
+      console.log('✅ 原生录像已留存:', result);
+      setSavedInfo({ label: savedLabel, sid: getSessionId(), bytes: blob.size });
+      setSaveState('saved');
+      pendingRef.current?.resolve();      // ← 到这里才撤掉「刷新会丢录像」拦截
+      pendingRef.current = null;
+      message.success('本场原生录像已留存');
+    } catch (error: any) {
+      // 没有会话 id / 网络断 / 服务端 409 / 413 … ⟹ 整场录像没留成。
+      // 这是**不可逆**的损失,所以:① 常驻报错 ② **promise 继续悬着**(拦截还在)
+      // ③ 给出重试入口 —— 绝不静默结束。
+      const detail = error?.response?.data?.detail;
+      const why = detail || error?.message || '未知错误';
+      console.error('❌ 原生录像上传失败:', error?.response?.data ?? error);
+      setSaveError(why);
+      setSaveState('failed');
+      message.error('本场原生录像没有留存 —— 别刷新页面,点「重试上传」', 0);
+    }
+  };
+
+  const retryUpload = () => {
+    const p = pendingRef.current;
+    if (!p) { setSaveState('idle'); return; }
+    void doUpload(p.blob);
+  };
+
+  /** 放弃本场:放掉内存里那份 blob、撤掉拦截。**不可逆** ⟹ 走二次确认。
+   *  留这个出口是因为:否则服务器一断,使用者就被永远锁在"不能开始下一场"上 ——
+   *  而那时他至少该被允许**明说**"这场我不要了"。 */
+  const abandonUpload = () => {
+    setConfirmAbandonOpen(false);
+    pendingRef.current?.resolve();
+    pendingRef.current = null;
+    setSaveState('idle');
+    setSaveError(null);
+    setSavedInfo(null);
+    message.warning('已放弃本场录像(未留存)');
   };
 
   // 五维雷达:五个量**都测到了**才画。
@@ -280,9 +334,16 @@ const RealtimeAnalysis: React.FC = () => {
   };
 
   const handleStartRecording = async () => {
-    // 1) 铸号(**第一次点的时候**,见 ensureSession 上面那段)。
-    //    号没到就开始发帧 ⟹ 那几帧落 NONE 桶(报告侧整体排除)。
-    const ok = await ensureSession();
+    // 0) **保存门禁**:上一场的录像还没确认留存 ⟹ 不许开新的一场。
+    //    使用者的裁定:素材没落定就不算"结束录制"。这条挡住的正是"上一场还在上传,
+    //    手已经点到下一场去了、然后刷新"这类把两场一起搞丢的操作。
+    if (saveState !== 'idle') {
+      message.warning('上一场的录像还没确认留存 —— 先把它处理掉再开下一场', 0);
+      return;
+    }
+
+    // 1) 铸**新**号:一次录制 = 一场会话(见 startNewSession)。
+    const ok = await startNewSession();
     if (!ok) {
       // 不编一个 id —— 编了只会把数据写进 NONE 桶:看着成功、其实什么都没有。
       // 这是**整场作废**的条件(比"降级"严重),所以 duration 0 = 不自动消失。
@@ -292,6 +353,8 @@ const RealtimeAnalysis: React.FC = () => {
       );
       return;
     }
+    // 2) 把上一场留在页面上的状态清干净(帧计数 / 时间线 / 降级 / 标注)。
+    resetPerSessionState();
 
     // 2) 开录前先要标注。**取消 = 不录**,而不是"录一场没标的":
     //    标注的全部意义就是把这一场与别的场次分开,一场没标的录像事后认不出来,
@@ -365,17 +428,22 @@ const RealtimeAnalysis: React.FC = () => {
           </div>
           <button
             onClick={isRecording ? handleStopRecording : handleStartRecording}
+            disabled={!isRecording && saveState !== 'idle'}
+            title={!isRecording && saveState !== 'idle' ? '上一场的录像还没确认留存' : undefined}
             style={{
               padding: '8px 24px',
               fontSize: '14px',
-              background: isRecording ? '#ff4d4f' : '#1890ff',
+              background: isRecording ? '#ff4d4f' : saveState !== 'idle' ? '#d9d9d9' : '#1890ff',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
-              cursor: 'pointer'
+              cursor: (!isRecording && saveState !== 'idle') ? 'not-allowed' : 'pointer'
             }}
           >
-            {isRecording ? '停止录制' : '开始录制'}
+            {isRecording ? '停止录制'
+              : saveState === 'saving' ? '正在保存…'
+              : saveState === 'failed' ? '先处理上一场'
+              : '开始录制'}
           </button>
         </div>
 
@@ -642,6 +710,81 @@ const RealtimeAnalysis: React.FC = () => {
           本场：{savedLabel ?? '(没有标注)'}
           <br />
           session_id：{sid ?? '(没有会话号)'}
+        </p>
+      </Modal>
+
+      {/* ── 保存门禁:素材没确认留存,就不算"结束录制" ────────────────────────
+          使用者 2026-09-28 的裁定。录像整场**只活在内存里**,所以"停止录制"这个动作
+          必须一直悬在那里,直到素材真的落了盘 —— 或者使用者明确说不要了。
+          ⚠️ 遮罩不可关闭、不可点外面关:`maskClosable={false}` + `closable={false}`
+             + 只在 `saved` 时才给"确定"。这是刻意的 —— 它就是要拦住"手快"。 */}
+      <Modal
+        title={saveState === 'saving' ? '正在保存本场录像…'
+          : saveState === 'saved' ? '✅ 本场已留存'
+          : '❌ 本场录像没有留存'}
+        open={saveState !== 'idle'}
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        footer={
+          saveState === 'saved' ? [
+            <button key="ok" onClick={() => setSaveState('idle')}
+              style={{ padding: '6px 20px', background: '#1890ff', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              确定(现在可以录下一场了)
+            </button>,
+          ] : saveState === 'failed' ? [
+            <button key="retry" onClick={retryUpload}
+              style={{ padding: '6px 20px', marginRight: '10px', background: '#1890ff', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              重试上传
+            </button>,
+            <button key="drop" onClick={() => setConfirmAbandonOpen(true)}
+              style={{ padding: '6px 20px', background: '#fff', color: '#ff4d4f', border: '1px solid #ff4d4f', borderRadius: '6px', cursor: 'pointer' }}>
+              放弃本场
+            </button>,
+          ] : undefined
+        }
+      >
+        {saveState === 'saving' && (
+          <p style={{ margin: 0 }}>
+            录像正在上传留存 —— <strong>请不要刷新或关闭页面</strong>,传完会自动告诉你。
+          </p>
+        )}
+        {saveState === 'saved' && savedInfo && (
+          <div style={{ fontSize: '14px', lineHeight: 1.9 }}>
+            <div>本场：<strong>{savedInfo.label ?? '(没有标注)'}</strong></div>
+            <div>session_id：{savedInfo.sid ?? '(没有会话号)'}</div>
+            <div>素材：<strong>{(savedInfo.bytes / 1048576).toFixed(1)} MB</strong>(原生音视频,已落盘)</div>
+            <p style={{ margin: '10px 0 0', color: '#666', fontSize: '13px' }}>
+              确认之后才能开始下一场。现在刷新页面也安全了。
+            </p>
+          </div>
+        )}
+        {saveState === 'failed' && (
+          <div>
+            <p style={{ marginTop: 0 }}>
+              这份录像<strong>还在内存里,没有落盘</strong>。别刷新、别关页面 ——
+              刷新会让它<strong>永久丢失</strong>。
+            </p>
+            <p style={{ margin: 0, color: '#cf1322', fontSize: '13px' }}>原因：{saveError}</p>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── 放弃本场的二次确认(不可逆)──────────────────────────────────── */}
+      <Modal
+        title="确定放弃这一场的录像?"
+        open={confirmAbandonOpen}
+        onOk={abandonUpload}
+        onCancel={() => setConfirmAbandonOpen(false)}
+        okText="确定放弃"
+        cancelText="再试一次"
+        okButtonProps={{ danger: true }}
+      >
+        <p style={{ marginBottom: '8px' }}>
+          它<strong>只存在于内存里</strong>,放弃之后<strong>无法找回</strong>。
+        </p>
+        <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>
+          本场：{savedLabel ?? '(没有标注)'}　session_id：{sid ?? '(没有会话号)'}
         </p>
       </Modal>
     </Content>
