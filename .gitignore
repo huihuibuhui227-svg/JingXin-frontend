@@ -17,6 +17,8 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+# 本机 agent 的私有设置 —— 绑在这台机器上,进仓库只会互相打架
+.claude/
 .DS_Store
 *.suo
 *.ntvs*
