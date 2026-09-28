@@ -256,6 +256,11 @@ export const sessionApi = {
    */
   setLabel: async (fields: {
     serial: string; name: string; student_id: string; department: string;
+    /** 本场征询结果。`"full"` = 全都同意;`"audio_only"` = 只同意声音。
+     *  它随标注一起落 `label.json` —— 同意与否是**证据**,不能只活在页面状态里。
+     *  ⚠️ 取值由服务端校验,未知值 400(不回落默认:把"没同意"当成"全同意"是
+     *     最坏的方向)。 */
+    consent?: 'full' | 'audio_only';
   }) => {
     const sid = requireSessionId('上报本场标注');
     const response = await axios.post(`${VOICE_API_URL}/session/${sid}/label`, fields);

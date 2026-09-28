@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Drawer, Descriptions, Tabs, Button, Spin, Alert, Pagination, Empty, Space, Tag, Image } from 'antd';
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Drawer, Descriptions, Tabs, Button, Spin, Alert, Pagination, Empty, Space, Tag, Image, Typography } from 'antd';
+import { BarChartOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { recordingsApi, RecordingDetail as Detail } from '@/services/recordingsApi';
 import { API_BASE_URL } from '@/utils/constants';
 
@@ -26,6 +26,10 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
   const [page, setPage] = useState(1);
   const [frames, setFrames] = useState<{ total: number; frames: string[] }>({ total: 0, frames: [] });
   const [framesLoading, setFramesLoading] = useState(false);
+  // 「生成报告」。报告**从来不会自动生成**,必须有人按一下 —— 而没人会想到去面板
+  // 里按。所以按钮放在这一页:看素材的地方就是想起来"这场怎么没有报告"的地方。
+  const [generating, setGenerating] = useState(false);
+  const [genMsg, setGenMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sid) return;
@@ -49,6 +53,36 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
   }, [sid, modality, page]);
 
   const label = detail?.label;
+
+  const refreshDetail = useCallback(() => {
+    if (!sid) return;
+    recordingsApi.detail(sid).then(setDetail).catch(() => { /* 详情刷新失败不覆盖已有内容 */ });
+  }, [sid]);
+
+  /** 跑一次报告生成,轮询到结束。
+   *  ⚠️ 走的是**盘上那条批处理**(`report_generator --session-id`),不是
+   *     `report_live` —— 后者读的是服务进程内存里的数据,事后跑不了。 */
+  const generateReport = async () => {
+    if (!sid) return;
+    setGenerating(true);
+    setGenMsg('正在生成…');
+    try {
+      const t = await recordingsApi.generateReport(sid);
+      const taskId = t?.task_id;
+      if (!taskId) throw new Error(t?.message || '服务端没有返回 task_id');
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const st = await recordingsApi.taskStatus(taskId);
+        if (st.status === 'completed') { setGenMsg('已生成'); refreshDetail(); break; }
+        if (st.status === 'failed') throw new Error(st.error || '生成失败');
+        // `status` 还是 running —— 继续等
+      }
+    } catch (e: any) {
+      setGenMsg(e?.response?.data?.detail || e?.message || '生成失败');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <Drawer
@@ -90,6 +124,13 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
               {label
                 ? [label.serial, label.student_id, label.department].filter(Boolean).join(' · ') || '（只填了姓名）'
                 : '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="征询">
+              {label?.consent === 'audio_only'
+                ? <Tag color="blue">只同意声音 —— 摄像头未打开</Tag>
+                : label?.consent === 'full'
+                  ? <Tag color="green">全部同意(影像 + 声音)</Tag>
+                  : <Tag>未记录(征询上线之前的场次)</Tag>}
             </Descriptions.Item>
           </Descriptions>
 
@@ -181,12 +222,19 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                 label: `报告（${detail.reports.length}）`,
                 children: detail.reports.length === 0 ? (
                   // ⚠️ 报告**不自动生成**(§8.2.4)。说清楚"没有"是因为没跑过,
-                  //    而不是因为这一场没有数据。
-                  <Alert
-                    type="info" showIcon
-                    message="这一场还没有报告"
-                    description="报告不会自动生成 —— 要手动跑 report_generator，或在报告面板点一下。"
-                  />
+                  //    而不是因为这一场没有数据 —— 并**当场给一个按钮**。
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Alert
+                      type="info" showIcon
+                      message="这一场还没有报告"
+                      description="报告不会自动生成。点下面的按钮跑一次(按本场 session_id 从盘上的日志算)。"
+                    />
+                    <Button type="primary" icon={<BarChartOutlined />}
+                      loading={generating} onClick={generateReport}>
+                      生成报告
+                    </Button>
+                    {genMsg && <Typography.Text type="secondary">{genMsg}</Typography.Text>}
+                  </Space>
                 ) : (
                   <Space direction="vertical" style={{ width: '100%' }}>
                     {detail.reports.map((r) => (
@@ -200,6 +248,12 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                         </Button>
                       </div>
                     ))}
+                    <Space>
+                      <Button icon={<BarChartOutlined />} loading={generating} onClick={generateReport}>
+                        再生成一份
+                      </Button>
+                      {genMsg && <Typography.Text type="secondary">{genMsg}</Typography.Text>}
+                    </Space>
                     {detail.reports.length > 1 && (
                       <span style={{ color: '#888', fontSize: 12 }}>
                         同一场跑过多次就会有多个报告（报告名里是**生成时刻**，不含 session_id）

@@ -13,9 +13,11 @@ import QuestionCard from '@/components/assessment/QuestionCard';
 import AnswerInput from '@/components/assessment/AnswerInput';
 import Loading from '@/components/common/Loading';
 import {
-  AbandonConfirmModal, DegradedBanner, LabelErrorBanner, LabelModal, SaveGateModal,
-  StopConfirmModal,
+  AbandonConfirmModal, ConsentModal, DegradedBanner, LabelErrorBanner, LabelModal,
+  SaveGateModal, StopConfirmModal,
 } from '@/components/recording/RecordingDialogs';
+import type { ConsentMode } from '@/components/recording/RecordingDialogs';
+import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
 
 const { Content } = Layout;
 
@@ -66,6 +68,10 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   const [sid, setSid] = useState<string | null>(null);
   // 停录后确认"这一场没有原生录像可存"(见下面那个 effect)。
   const [nothingToSave, setNothingToSave] = useState(false);
+  // 本场征询结果。**这里是 UI 的依据** —— `audio_only` 时摄像头根本不打开。
+  // 真正落盘的依据是服务端 `label.json` 里的那一份(经 `setLabel` 带上送的)。
+  const [consent, setConsent] = useState<ConsentMode | null>(null);
+  const { selection: devices, update: setDevices } = useDeviceSelection();
   const frameCountRef = useRef(0);
 
   const { realtimeMetrics, updateRealtimeMetrics, resetAssessment } = useAssessmentStore();
@@ -102,7 +108,8 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
       }
       return true;
     },
-    onRecordStart: () => {
+    onRecordStart: (mode) => {
+      setConsent(mode);
       frameCountRef.current = 0;
       setEnded(false);
       // 把服务端刚铸的号显示出来:录完要拿它去跑报告,而"报告里什么都没有"
@@ -113,6 +120,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   });
 
   const { videoRef, canvasRef, startCamera, stopCamera, startCapture, stopCapture } = useCamera({
+    // 受试者只同意声音 ⟹ **摄像头根本不打开**(不是"开了不存" —— `media/face/*.jpg`
+    // 是逐帧落盘的正脸照,所以"不录肖像"必须意味着不开摄像头)。
+    audioOnly: consent === 'audio_only',
+    videoDeviceId: devices.videoDeviceId,
+    audioDeviceId: devices.audioDeviceId,
     onFrame: async (frame) => {
       frameCountRef.current += 1;
       if (frameCountRef.current % 5 !== 0) return;
@@ -205,6 +217,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   });
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+    deviceId: devices.audioDeviceId,
     onAudioData: async (audioBlob) => {
       // ⚠️ 这里原先还塞了 fluency 80 / pitch_variation 0.5 / pause_duration 0.2 /
       // speech_ratio 0.8 —— 那四个是**写死的常数**,不是测出来的;只有 energy 是由
@@ -276,7 +289,10 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     setEnded(true);
     setNothingToSave(false);
     stopCapture();
-    message.info('本场已停止录制 —— 正在保存原生录像');
+    // 停完就**问留存 / 不留存** —— 不是自动上传,也不是自动丢。
+    // (`beginChoice` 会等在 `idle` 上,所以没有原生录像时也照常问:盘上还有帧和日志。)
+    setTimeout(() => recording.beginChoice(), 300);
+    message.info('本场已停止录制 —— 请确认本场怎么处理');
   };
 
   /**
@@ -287,9 +303,10 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
    * 之后把答题框和按钮都禁用了 ⟹ **停在一条没有出口的路上,且不说为什么**。
    * 那正是本仓在杀的那类静默失效,所以这里必须自己给出解释和出口。
    */
+  // 「本场已结束」但**连选择都没弹出来**(极少:`beginChoice` 没赶上)—— 给个出口。
   useEffect(() => {
-    if (!ended || recording.saveState !== 'idle') return;
-    const t = setTimeout(() => setNothingToSave(true), 1500);
+    if (!ended || recording.saveState !== 'idle') { setNothingToSave(false); return; }
+    const t = setTimeout(() => setNothingToSave(true), 2000);
     return () => clearTimeout(t);
   }, [ended, recording.saveState]);
 
@@ -404,6 +421,19 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
           sid={null}
           error={recording.labelError}
         />
+
+        {/* 肖像 / 音频权的征询。**每场都弹** —— 每个受试者单独同意。
+            ⚠️ 它在**铸号之前**,所以「不同意」= 盘上连目录都不会建。 */}
+        <ConsentModal
+          open={recording.consentModalOpen}
+          onOk={recording.confirmConsent}
+          onDecline={recording.declineConsent}
+          label={recording.savedLabel}
+          saving={recording.savingLabel}
+          devicePicker={
+            <DevicePicker value={devices} onChange={setDevices} />
+          }
+        />
       </Content>
     );
   }
@@ -413,6 +443,14 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        {consent === 'audio_only' && (
+          <Alert
+            type="info" showIcon style={{ marginBottom: 16 }}
+            message="本场只采声音 —— 摄像头没有被打开"
+            description="这是征询时选定的范围,不是故障。面部与手势两个维度本场没有数据,
+              报告里会如实标注「未采集」。"
+          />
+        )}
         <DegradedBanner reasons={recording.degraded} />
         <LabelErrorBanner error={recording.labelError} />
 
@@ -534,7 +572,9 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         saveState={recording.saveState}
         savedInfo={recording.savedInfo}
         saveError={recording.saveError}
-        onRetry={recording.retryUpload}
+        onKeep={recording.chooseKeep}
+        onDiscard={recording.chooseDiscard}
+        onRetry={recording.retryLast}
         onAbandon={() => recording.setConfirmAbandonOpen(true)}
         onClose={() => recording.reset()}
         hideDefaultOk

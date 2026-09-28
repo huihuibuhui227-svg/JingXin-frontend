@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_BASE_URL } from '@/utils/constants';
+import { API_BASE_URL, VOICE_API_URL } from '@/utils/constants';
 
 /**
  * 素材浏览(服务端 `recordings_browser.py`)的前端契约点。
@@ -56,9 +56,15 @@ export interface RecordingSummary {
   frames: RecordingFrames;
   modified: number;
   degraded: number;
+  /** 有几份报告。**不是身份** ⟹ 未授权也给(哪几场还没出报告是排产问题)。 */
+  report_count: number;
   /** 下面三个只有管理员视图才有 —— 它们带身份。 */
   dir_name?: string;
-  label?: { name?: string; student_id?: string; department?: string; serial?: string } | null;
+  label?: {
+    name?: string; student_id?: string; department?: string; serial?: string;
+    /** 本场征询结果。老场次没有这个键(征询功能之前录的)。 */
+    consent?: 'full' | 'audio_only';
+  } | null;
   degraded_reasons?: string[];
 }
 
@@ -116,12 +122,58 @@ export const recordingsApi = {
     return r.data as { modality: string; total: number; page: number; per_page: number; frames: string[] };
   },
 
-  /** 移到回收站。`confirm` 必须是把这个 sid 原样抄一遍 —— 服务端会核。 */
+  /** 移到回收站。**可救** —— 素材页上「删除」走的永远是这条。 */
   trash: async (sid: string, confirm: string) => {
     const r = await axios.post(
       `${API_BASE_URL}/api/recordings/${encodeURIComponent(sid)}/trash`,
       { confirm }, { headers: authHeaders() });
     return r.data as { moved_to: string; sid: string };
+  },
+
+  /**
+   * **真删**,没有回收站。只给「不留存 / 不同意录制」那一条路用。
+   *
+   * ⚠️ 与 `trash` 的分工是刻意的:那条是"翻旧素材时手滑",这条是"刚录完、明确
+   *    说这是测试不要了"。语义不同 ⟹ 一个可救、一个不可救,由**明确的按钮**分开,
+   *    而不是靠人记得点哪个。
+   * ⚠️ 服务端删两处:场次目录 + `data/logs/` 里那三份 CSV。少删一处就会留下
+   *    "有日志没素材"的半截状态。
+   */
+  purge: async (sid: string) => {
+    const r = await axios.post(
+      `${API_BASE_URL}/api/recordings/${encodeURIComponent(sid)}/purge`,
+      { confirm: sid }, { headers: authHeaders() });
+    return r.data as { purged: string; session_dir: string | null; logs: string[] };
+  },
+
+  /**
+   * 跑报告生成。**走盘上那条批处理**(`report_generator --session-id`),
+   * 不是 `report_live` —— 后者读的是服务进程内存里的数据,事后跑不了。
+   * 返回 `task_id`,要轮询 `taskStatus`。
+   */
+  generateReport: async (sid: string) => {
+    const r = await axios.post(`${API_BASE_URL}/api/run/report`, null,
+      { headers: authHeaders(), params: { session_id: sid } });
+    return r.data as { task_id: string; status: string; message?: string };
+  },
+
+  /**
+   * **真删本场**,给录制页的「不留存 / 这是测试」那条路用。
+   *
+   * ⚠️ 它走的是**语音服务**(`VOICE_API_URL`),**不是**面板 —— 因为录制的时候没有
+   *    管理员 token(那是素材页的东西,而且 token 在 sessionStorage 里按标签页隔离)。
+   *    语音服务那条入口本来就没有密码,与它同组的 `/label`、`/question` 同一姿态。
+   *    实现在服务端是**同一份**(`session_purge.purge_session`)。
+   */
+  discard: async (sid: string) => {
+    const r = await axios.post(`${VOICE_API_URL}/session/${encodeURIComponent(sid)}/discard`);
+    return r.data as { status: string; session_id: string; session_dir: string | null; logs: string[] };
+  },
+
+  taskStatus: async (taskId: string) => {
+    const r = await axios.get(`${API_BASE_URL}/api/task/${encodeURIComponent(taskId)}`,
+      { headers: authHeaders() });
+    return r.data as { status: string; output?: string; error?: string };
   },
 
   videoUrl: (sid: string): string =>

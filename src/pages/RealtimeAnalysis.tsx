@@ -8,9 +8,11 @@ import RadarChart from '@/components/visualization/RadarChart';
 import TimelineChart from '@/components/visualization/TimelineChart';
 import CameraView from '@/components/assessment/CameraView';
 import {
-  AbandonConfirmModal, DegradedBanner, LabelErrorBanner, LabelModal, SaveGateModal,
-  StopConfirmModal,
+  AbandonConfirmModal, ConsentModal, DegradedBanner, LabelErrorBanner, LabelModal,
+  SaveGateModal, StopConfirmModal,
 } from '@/components/recording/RecordingDialogs';
+import type { ConsentMode } from '@/components/recording/RecordingDialogs';
+import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
 
 const { Content } = Layout;
 
@@ -43,6 +45,9 @@ const RealtimeAnalysis: React.FC = () => {
   const [sid, setSid] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [confirmStopOpen, setConfirmStopOpen] = useState(false);
+  // 本场征询结果(`audio_only` ⟹ 摄像头根本不打开)。
+  const [consent, setConsent] = useState<ConsentMode | null>(null);
+  const { selection: devices, update: setDevices } = useDeviceSelection();
 
   /**
    * 标注 / 保存门禁 / 降级 —— **与 `/interview`、`/research` 同一套**
@@ -81,11 +86,15 @@ const RealtimeAnalysis: React.FC = () => {
     // 惰性引用:`beginRecording` 在下面才定义(它要用 `useCamera` 的
     // startCamera / startCapture),而这个箭头只在"标注确定之后"才被调用 ——
     // 那时它早已初始化。直接写 `onRecordStart: beginRecording` 会撞上 TDZ。
-    onRecordStart: () => { void beginRecording(); },
+    onRecordStart: (mode) => { setConsent(mode); void beginRecording(); },
   });
 
   const { realtimeMetrics, updateRealtimeMetrics } = useAssessmentStore();
   const { videoRef, canvasRef, startCamera, stopCamera, startCapture, stopCapture } = useCamera({
+    // 只同意声音 ⟹ **摄像头根本不打开**(见 useCamera 的说明)。
+    audioOnly: consent === 'audio_only',
+    videoDeviceId: devices.videoDeviceId,
+    audioDeviceId: devices.audioDeviceId,
     onFrame: async (frame) => {
       // 再节流一层(见 SEND_EVERY_NTH_FRAME 的说明)
       frameCountRef.current += 1;
@@ -231,7 +240,9 @@ const RealtimeAnalysis: React.FC = () => {
     setConfirmStopOpen(false);
     setIsRecording(false);
     stopCapture();
-    message.info('已停止录制');
+    // 停完就**问留存 / 不留存** —— 不自动上传,也不自动丢。
+    setTimeout(() => recording.beginChoice(), 300);
+    message.info('已停止录制 —— 请确认本场怎么处理');
   };
 
   // 五维雷达:五个量**都测到了**才画。
@@ -325,6 +336,13 @@ const RealtimeAnalysis: React.FC = () => {
           />
         )}
         <LabelErrorBanner error={recording.labelError} />
+        {consent === 'audio_only' && (
+          <Alert
+            type="info" showIcon style={{ marginBottom: 16 }}
+            message="本场只采声音 —— 摄像头没有被打开"
+            description="这是征询时选定的范围,不是故障。面部与手势两个维度本场没有数据。"
+          />
+        )}
         <DegradedBanner reasons={recording.degraded} />
 
         {/* 视频流 */}
@@ -512,6 +530,15 @@ const RealtimeAnalysis: React.FC = () => {
         error={recording.labelError}
       />
 
+      <ConsentModal
+        open={recording.consentModalOpen}
+        onOk={recording.confirmConsent}
+        onDecline={recording.declineConsent}
+        label={recording.savedLabel}
+        saving={recording.savingLabel}
+        devicePicker={<DevicePicker value={devices} onChange={setDevices} />}
+      />
+
       <StopConfirmModal
         open={confirmStopOpen}
         onOk={confirmStopRecording}
@@ -524,7 +551,9 @@ const RealtimeAnalysis: React.FC = () => {
         saveState={recording.saveState}
         savedInfo={recording.savedInfo}
         saveError={recording.saveError}
-        onRetry={recording.retryUpload}
+        onKeep={recording.chooseKeep}
+        onDiscard={recording.chooseDiscard}
+        onRetry={recording.retryLast}
         onAbandon={() => recording.setConfirmAbandonOpen(true)}
         onClose={() => recording.reset()}
       />

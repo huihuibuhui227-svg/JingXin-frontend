@@ -16,6 +16,19 @@ interface UseCameraProps {
    *  原生录像中途出错。退化本身可以接受,但**必须说出来**:这一场留下的素材
    *  与"正常那一场"不是一回事,不能让它长得一样。 */
   onDegraded?: (reason: string) => void;
+  /** 受试者**只同意音频** ⟹ **根本不打开摄像头**:请求 `{audio, video:false}`,
+   *  不抽帧、不产生任何画面。face / gesture 两个模态因此完全没有数据。
+   *
+   *  ⚠️ 这是**选出来的模式,不是降级** —— 所以它**不报 `onDegraded`**。
+   *     报横幅会让人以为出了故障,而这是征询的结果。
+   *  ⚠️ 原生录像仍然开:得到一份**只有音轨**的 webm。逐题回答那条路
+   *     (`useAudioRecorder` → `/answer_audio`)另有一份音频;这一份是为了
+   *     `/analysis`(它没有逐题回答)。 */
+  audioOnly?: boolean;
+  /** 选定的设备。`null`/不传 = 让浏览器自己挑(老行为)。
+   *  ⚠️ 只在**开始时**生效:录到一半换设备要重开整条流。 */
+  videoDeviceId?: string | null;
+  audioDeviceId?: string | null;
 }
 
 /** 本场原生录像的容器。**写死**是定的设计(spec §5.4 / 裁定 R5):
@@ -24,7 +37,10 @@ interface UseCameraProps {
  *  自己挑编码,而下游要的是确定的 vp8+opus。 */
 const VIDEO_MIME = 'video/webm;codecs=vp8,opus';
 
-export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: UseCameraProps = {}) => {
+export const useCamera = ({
+  onFrame, frameRate = 1, onVideoReady, onDegraded,
+  audioOnly = false, videoDeviceId = null, audioDeviceId = null,
+}: UseCameraProps = {}) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -42,6 +58,12 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
   const videoChunksRef = useRef<Blob[]>([]);
   const onVideoReadyRef = useRef(onVideoReady);
   const onDegradedRef = useRef(onDegraded);
+  // 模式与设备也走 ref:`startCamera` 是 `useCallback(…, [])`,把这三个放进依赖
+  // 会让它的身份每次渲染都变,而调用方是在 effect 里按身份调它的。
+  const startNativeRecorderRef = useRef<() => void>(() => {});
+  const audioOnlyRef = useRef(audioOnly);
+  const videoDeviceIdRef = useRef(videoDeviceId);
+  const audioDeviceIdRef = useRef(audioDeviceId);
   // 录像是不是**我们主动**停的。见 `onstop` 里那段:不是主动停的,说明流在录制中途
   // 自己断了(摄像头被拔/被别的应用抢走),那份文件就是截断的,必须报出来。
   const stopRequestedRef = useRef(false);
@@ -56,6 +78,9 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
   useEffect(() => {
     onVideoReadyRef.current = onVideoReady;
     onDegradedRef.current = onDegraded;
+    audioOnlyRef.current = audioOnly;
+    videoDeviceIdRef.current = videoDeviceId;
+    audioDeviceIdRef.current = audioDeviceId;
   });
 
   const startCamera = useCallback(async () => {
@@ -65,14 +90,43 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
       // 于是同一个 mediaStream 上就能挂 MediaRecorder 录下原生音视频。
       // R5 实测:与 useAudioRecorder 另开的那一路麦克风**同时开不打架**,
       // 所以不必退回「另存一路 audio.webm」。
+      // 选定的设备:给了就用 `exact` 钉死(用户在下拉框里明确选的那一个),
+      // 没给就让浏览器自己挑。
+      const aDev = audioDeviceIdRef.current;
+      const vDev = videoDeviceIdRef.current;
+      const audioConstraint: MediaTrackConstraints | boolean =
+        aDev ? { deviceId: { exact: aDev } } : true;
+      const videoConstraint: MediaTrackConstraints = {
+        width: 1280, height: 720,
+        ...(vDev ? { deviceId: { exact: vDev } } : {}),
+      };
+
       let mediaStream: MediaStream;
+      if (audioOnlyRef.current) {
+        // **只采声音**:受试者只同意音频 ⟹ 摄像头**一个字节都不开**。
+        // 这里的"退化"没有意义(没有画面可退),所以失败就是失败。
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: audioConstraint, video: false,
+          });
+        } catch (error) {
+          console.error('❌ 只采声音模式:麦克风也没有拿到:', error);
+          onDegradedRef.current?.('麦克风没有打开 —— 本场采不到任何声音');
+          return false;
+        }
+        console.log('🎙️ 只采声音模式:摄像头未打开');
+        streamRef.current = mediaStream;
+        setStream(mediaStream);
+        return true;
+      }
+
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720 },
+          video: videoConstraint,
           // 只在**真的有人要这份录像**时才要麦克风。`RealtimeAnalysis` 也用了本 hook
           // 而没有任何录像消费者 —— 在那种纯视觉页面上要麦克风是白要,
           // 还会让"拒麦克风"变成"连画面也没有"。
-          audio: !!onVideoReadyRef.current
+          audio: onVideoReadyRef.current ? audioConstraint : false
         });
       } catch (error) {
         // ⚠️ 退一步只取摄像头。这一步**不是可有可无的**:`{video, audio: true}` 是
@@ -82,7 +136,7 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
         //    退化后的素材与正常那一场**不是一回事**,所以下面要报给调用方。
         console.warn('⚠️ 摄像头+麦克风一起取失败,退化为只要摄像头:', error);
         mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720 },
+          video: videoConstraint,
           audio: false
         });
         onDegradedRef.current?.(
@@ -126,14 +180,28 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
     console.log('  - videoRef.current:', !!videoRef.current);
     console.log('  - captureStartedRef.current:', captureStartedRef.current);
 
-    if (!canvasRef.current || !videoRef.current) {
-      console.warn('⚠️ Canvas 或 Video 元素未就绪');
-      return;
-    }
-
     // 防止重复启动
     if (captureStartedRef.current) {
       console.warn('⚠️ 视频帧捕获已在运行，跳过');
+      return;
+    }
+
+    // ── 只采声音:没有画面可抽 ────────────────────────────────────────────────
+    // 这条路要**绕开 canvas/video 那两个 ref**:只采声音时页面上根本没有摄像头
+    // 视图(`videoRef.current` 是 null),跟着老代码走会在上面那句直接 return ⟹
+    // **原生录音永远不开** ⟹ "只录声音"最后什么都没录到,而且不报任何错。
+    if ((streamRef.current?.getVideoTracks().length ?? 0) === 0) {
+      console.log('🎙️ 本场没有视频轨(只采声音)—— 直接开原生录音,不抽帧');
+      captureStartedRef.current = true;
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      // 间接引用:`startNativeRecorder` 在本函数**之后**才定义(TDZ)。
+      startNativeRecorderRef.current();
+      return;
+    }
+
+    if (!canvasRef.current || !videoRef.current) {
+      console.warn('⚠️ Canvas 或 Video 元素未就绪');
       return;
     }
 
@@ -328,6 +396,9 @@ export const useCamera = ({ onFrame, frameRate = 1, onVideoReady, onDegraded }: 
       console.log('🛡️ 已挂「刷新会丢录像」拦截(上传落定后自动撤)');
     }
   }, [releaseStream, releaseBeforeUnload]);
+
+  // 定义完就挂上,供上面 `startCapture` 的“只采声音”分支使用(见那里的 TDZ 说明)。
+  startNativeRecorderRef.current = startNativeRecorder;
 
   const beginCapture = useCallback((canvas: HTMLCanvasElement, video: HTMLVideoElement, ctx: CanvasRenderingContext2D) => {
     if (captureStartedRef.current) {

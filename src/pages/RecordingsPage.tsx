@@ -54,7 +54,6 @@ const RecordingsPage: React.FC = () => {
   const [detailSid, setDetailSid] = useState<string | null>(null);
 
   const [trashTarget, setTrashTarget] = useState<RecordingSummary | null>(null);
-  const [trashConfirm, setTrashConfirm] = useState('');
   const [trashing, setTrashing] = useState(false);
 
   const reload = useCallback(async () => {
@@ -106,10 +105,12 @@ const RecordingsPage: React.FC = () => {
     if (!trashTarget) return;
     setTrashing(true);
     try {
-      const r = await recordingsApi.trash(trashTarget.sid, trashConfirm);
+      // ⚠️ 前端把 sid 自动填上 —— 服务端那道校验**留着**(接口契约不变)。
+      //    抄写门槛挡的是手快,而这一步已经改成移进回收站(可救)
+      //    —— 门槛的收益不值它的麻烦(使用者 2026-09-28 裁定)。
+      const r = await recordingsApi.trash(trashTarget.sid, trashTarget.sid);
       message.success(`已移到回收站：${r.moved_to}`);
       setTrashTarget(null);
-      setTrashConfirm('');
       await reload();
     } catch (e: any) {
       message.error(e?.response?.data?.error || e?.message || '移动失败');
@@ -160,6 +161,13 @@ const RecordingsPage: React.FC = () => {
       sorter: (a, b) => (a.frames.face + a.frames.gesture) - (b.frames.face + b.frames.gesture),
     },
     {
+      title: '报告', dataIndex: 'report_count', width: 80,
+      render: (v: number) => (v > 0
+        ? <Tag color="processing">{v} 份</Tag>
+        : <Tooltip title="报告不会自动生成 —— 进详情点「生成报告」"><Tag>无</Tag></Tooltip>),
+      sorter: (a, b) => a.report_count - b.report_count,
+    },
+    {
       title: '留存', dataIndex: 'degraded', width: 90,
       render: (v: number) => (v > 0
         ? <Tooltip title="这一场有留存降级 —— 素材可能不完整。点「查看」看原因。">
@@ -176,7 +184,7 @@ const RecordingsPage: React.FC = () => {
             查看
           </Button>
           <Button size="small" type="link" danger icon={<DeleteOutlined />}
-            disabled={!admin} onClick={() => { setTrashTarget(r); setTrashConfirm(''); }}>
+            disabled={!admin} onClick={() => setTrashTarget(r)}>
             删除
           </Button>
         </Space>
@@ -251,7 +259,7 @@ const RecordingsPage: React.FC = () => {
           open={!!trashTarget}
           onOk={doTrash}
           okText="移到回收站"
-          okButtonProps={{ danger: true, disabled: trashConfirm.trim() !== trashTarget?.sid }}
+          okButtonProps={{ danger: true }}
           confirmLoading={trashing}
           cancelText="取消"
           onCancel={() => setTrashTarget(null)}
@@ -266,11 +274,9 @@ const RecordingsPage: React.FC = () => {
               {' · '}帧 {trashTarget.frames.face + trashTarget.frames.gesture}
             </Paragraph>
           )}
-          <Paragraph>请把 sid 抄一遍确认：</Paragraph>
-          <Input
-            value={trashConfirm} onChange={(e) => setTrashConfirm(e.target.value)}
-            placeholder={trashTarget?.sid} autoFocus
-          />
+          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            移进回收站**可以捞回来**,所以不再要求抄 sid。
+          </Paragraph>
         </Modal>
       </div>
     </Content>
