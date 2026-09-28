@@ -1,12 +1,38 @@
-import React from 'react';
-import { Button, Card, Row, Col, Typography } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Button, Card, Row, Col, Typography, Statistic, Skeleton } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { VideoCameraOutlined, ExperimentOutlined, FileTextOutlined } from '@ant-design/icons';
+import { VideoCameraOutlined, ExperimentOutlined, FileTextOutlined, PlaySquareOutlined } from '@ant-design/icons';
+import { dashboardApi } from '@/services/api';
+import { recordingsApi } from '@/services/recordingsApi';
 
 const { Title, Paragraph } = Typography;
 
+const fmtBytes = (n: number): string => {
+  if (!n) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
+  return `${(n / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
+};
+
 const Home: React.FC = () => {
   const navigate = useNavigate();
+
+  // ⚠️ 这里**不去显示"暂无"当作终态**:拿不到就说拿不到。此前这一块是写死的
+  //    「暂无历史报告，开始一次评估吧！」—— 于是"盘上其实有 48 份报告"和
+  //    "真的一份都没有"在页面上长得一模一样（正是本仓在杀的形态）。
+  const [reportCount, setReportCount] = useState<number | null>(null);
+  const [recStats, setRecStats] = useState<{ n: number; bytes: number } | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    dashboardApi.getFiles('reports')
+      .then((files: Array<{ name: string }>) =>
+        setReportCount(files.filter((f) => /Assessment_Report.*\.html$/i.test(f.name)).length))
+      .catch(() => setLoadError(true));
+    recordingsApi.list()
+      .then((r) => setRecStats({ n: r.recordings.length, bytes: r.total_video_bytes }))
+      .catch(() => setLoadError(true));
+  }, []);
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
@@ -140,14 +166,51 @@ const Home: React.FC = () => {
 
       <div>
         <Title level={2} style={{ marginBottom: '24px' }}>
-          📝 历史报告
+          📂 历史
         </Title>
-        <Card>
-          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-            <FileTextOutlined style={{ fontSize: '48px', marginBottom: '16px' }} />
-            <Paragraph>暂无历史报告，开始一次评估吧！</Paragraph>
-          </div>
-        </Card>
+        {loadError && (
+          <Paragraph type="warning">
+            有一项目录没读到（后端没起？）—— 下面的数字可能不完整。
+          </Paragraph>
+        )}
+        <Row gutter={[24, 24]}>
+          <Col xs={24} md={12}>
+            <Card hoverable onClick={() => navigate('/reports')}>
+              <Statistic
+                title="📝 历史报告"
+                prefix={<FileTextOutlined />}
+                value={reportCount ?? '—'}
+                suffix="份"
+              />
+              <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+                {reportCount === null
+                  ? '读取中…'
+                  : reportCount === 0
+                    ? '还没有生成过报告 —— 报告不会自动生成，要手动跑一次。'
+                    : '点击查看全部 →'}
+              </Paragraph>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card hoverable onClick={() => navigate('/recordings')}>
+              {recStats === null ? (
+                <Skeleton active paragraph={{ rows: 1 }} title={{ width: '40%' }} />
+              ) : (
+                <>
+                  <Statistic
+                    title="🎥 历史录制素材"
+                    prefix={<PlaySquareOutlined />}
+                    value={recStats.n}
+                    suffix="场"
+                  />
+                  <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+                    原生录像合计 {fmtBytes(recStats.bytes)} · 点击浏览回放与删除 →
+                  </Paragraph>
+                </>
+              )}
+            </Card>
+          </Col>
+        </Row>
       </div>
     </div>
   );
