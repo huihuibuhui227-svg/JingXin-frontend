@@ -1,22 +1,11 @@
-$primary-color: #2E86AB;
-$secondary-color: #667eea;
-$success-color: #52c41a;
-$warning-color: #faad14;
-$error-color: #ff4d4f;
-$text-color: #262626;
-$text-secondary: #666666;
-$text-tertiary: #999999;
-$border-color: #d9d9d9;
-$background-color: #f0f2f5;
-$card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-$card-hover-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-$border-radius: 8px;
-$transition-speed: 0.3s;
+// ⚠️ 已废弃（2026-09-29）—— 本文件不再被任何代码 import，保留仅为记录原因。
+//
+// 这里原本是本项目最初的设计令牌（$primary-color: #2E86AB 等）。后来 global.css
+// 里被写进了 `.ant-btn-primary { background: linear-gradient(#667eea, #764ba2) }`
+// —— 一个直接覆盖组件样式的写法，于是实际渲染出来的是紫蓝渐变，而这套 SCSS 变量
+// 再没参与过任何渲染，成了**两套互相矛盾的令牌并存、响亮的那套赢**的状态。
+//
+// 现已收敛为一套：见 src/styles/tokens.css（CSS 自定义属性）与 src/App.tsx 里的
+// antd ConfigProvider 主题。需要新色值时请加到 tokens.css，不要再新建 SCSS 变量。
 
-:export {
-  primaryColor: $primary-color;
-  secondaryColor: $secondary-color;
-  successColor: $success-color;
-  warningColor: $warning-color;
-  errorColor: $error-color;
-}
+$deprecated: true;
