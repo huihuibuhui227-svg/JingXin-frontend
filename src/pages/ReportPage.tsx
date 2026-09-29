@@ -107,7 +107,7 @@ const ReportPage: React.FC = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Button onClick={() => navigate('/reports')}>← 返回列表</Button>
-          <h2 style={{ margin: 0 }}>评估报告</h2>
+          <h1 style={{ margin: 0, fontSize: "var(--ax-display-md-size)", fontWeight: 600 }}>评估报告</h1>
           <DownloadButton />
         </div>
 
@@ -118,18 +118,18 @@ const ReportPage: React.FC = () => {
             呈现的是**覆盖事实 + 依据**,聚合只给区间与置信度上限。 */}
         <Card style={{ marginBottom: '24px' }}>
           <div style={{ textAlign: 'center', padding: '20px' }}>
-            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#2E86AB', marginBottom: '8px' }}>
+            <div style={{ fontSize: '48px', fontWeight: 'bold', color: 'var(--ax-primary)', marginBottom: '8px' }}>
               {coverage ? `${coverage.n_passed} / ${coverage.n_slots}` : '—'}
             </div>
-            <div style={{ fontSize: '20px', color: '#666', marginBottom: '8px' }}>
+            <div style={{ fontSize: '20px', color: 'var(--ax-text-secondary)', marginBottom: '8px' }}>
               个指标槽通过证据门
             </div>
             {coverage?.confidence_cap && (
-              <div style={{ color: '#2E86AB', fontWeight: 'bold' }}>
+              <div style={{ color: 'var(--ax-primary)', fontWeight: 'bold' }}>
                 置信度上限：{coverage.confidence_cap}
               </div>
             )}
-            <div style={{ color: '#999', marginTop: '8px' }}>
+            <div style={{ color: 'var(--ax-text-secondary)', marginTop: '8px' }}>
               评估时间: {new Date(report.model_metadata.timestamp).toLocaleString('zh-CN')}
             </div>
           </div>
@@ -137,7 +137,7 @@ const ReportPage: React.FC = () => {
 
         {report.summary_narrative && (
           <Card style={{ marginBottom: '24px' }}>
-            <h3 style={{ marginTop: 0 }}>📝 综合总结</h3>
+            <h2 style={{ marginTop: 0 }}>综合总结</h2>
             <p style={{ margin: 0 }}>{report.summary_narrative}</p>
           </Card>
         )}
@@ -149,12 +149,12 @@ const ReportPage: React.FC = () => {
             不知道就什么都不说,不编。 */}
         {sources !== null && (
         <Card size="small" style={{ marginBottom: '24px' }}>
-          <div style={{ color: '#666' }}>
+          <div style={{ color: 'var(--ax-text-secondary)' }}>
             <strong>本场会话：</strong>
             <code>{describedSession ?? '（无 —— 本场没有任何日志）'}</code>
           </div>
           {sources && (
-            <ul style={{ margin: '8px 0 0', paddingLeft: '20px', color: '#666', fontSize: '13px' }}>
+            <ul style={{ margin: '8px 0 0', paddingLeft: '20px', color: 'var(--ax-text-secondary)', fontSize: '13px' }}>
               {Object.entries(sources)
                 .filter(([k]) => k !== 'none_bucket')
                 .map(([k, v]: [string, any]) => (

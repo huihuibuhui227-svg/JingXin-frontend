@@ -57,7 +57,7 @@ export const LabelModal: React.FC<{
     >
       <div style={{ display: 'grid', gap: '12px', paddingTop: '8px' }}>
         <div>
-          <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>
             时间(取自本场 session_id,不可改)
           </div>
           {/* ⚠️ 开录前填标时**还不知道** sid —— 铸号发生在"确定"之后(见
@@ -68,7 +68,7 @@ export const LabelModal: React.FC<{
         </div>
         {LABEL_FIELDS.map(([key, title]) => (
           <div key={key}>
-            <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>{title}</div>
+            <div style={{ fontSize: '13px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>{title}</div>
             <Input
               value={fields[key]}
               maxLength={120}
@@ -140,13 +140,13 @@ export const ConsentModal: React.FC<{
           <Space direction="vertical" size={8}>
             <Radio value="full">
               <strong>全部同意</strong>
-              <div style={{ fontSize: 12, color: '#666' }}>
+              <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>
                 摄像头与麦克风全开。录像、逐帧画面、语音都留存。
               </div>
             </Radio>
             <Radio value="audio_only">
               <strong>只同意声音</strong>
-              <div style={{ fontSize: 12, color: '#666' }}>
+              <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>
                 <strong>摄像头不会被打开</strong> —— 本场不产生任何画面。代价是
                 面部与手势两个维度<strong>没有数据</strong>,报告里会如实标注「未采集」。
               </div>
@@ -193,7 +193,7 @@ export const StopConfirmModal: React.FC<{
     <p style={{ marginBottom: '8px' }}>
       停止后本场原生录像会立刻上传留存,不能再往这一场里补录。
     </p>
-    <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>
+    <p style={{ margin: 0, color: 'var(--ax-text-secondary)', fontSize: '13px' }}>
       本场：{label ?? '(没有标注)'}
       <br />
       session_id：{sid ?? '(没有会话号)'}
@@ -233,8 +233,8 @@ export const SaveGateModal: React.FC<{
   const footer = saveState === 'choosing' ? (
     <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
       {/* ⚠️ 两个按钮都写清**后果**,不写"确定/取消" —— 这一下点错是不可逆的。 */}
-      <button onClick={onKeep} style={btn('#1890ff', '#fff')}>留存本场</button>
-      <button onClick={onDiscard} style={btn('#fff', '#ff4d4f', '1px solid #ff4d4f')}>
+      <button onClick={onKeep} style={btn('var(--ax-primary)', '#fff')}>留存本场</button>
+      <button onClick={onDiscard} style={btn('#fff', 'var(--ax-error)', '1px solid var(--ax-error)')}>
         不留存(这是测试)
       </button>
     </div>
@@ -242,7 +242,7 @@ export const SaveGateModal: React.FC<{
     : saveState === 'saved' || saveState === 'purged' ? (
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         {!hideDefaultOk && (
-          <button onClick={onClose} style={btn('#1890ff', '#fff')}>
+          <button onClick={onClose} style={btn('var(--ax-primary)', '#fff')}>
             确定(现在可以录下一场了)
           </button>
         )}
@@ -250,8 +250,8 @@ export const SaveGateModal: React.FC<{
       </div>
     ) : (
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <button onClick={onRetry} style={btn('#1890ff', '#fff')}>重试</button>
-        <button onClick={onAbandon} style={btn('#fff', '#ff4d4f', '1px solid #ff4d4f')}>
+        <button onClick={onRetry} style={btn('var(--ax-primary)', '#fff')}>重试</button>
+        <button onClick={onAbandon} style={btn('#fff', 'var(--ax-error)', '1px solid var(--ax-error)')}>
           放弃本场
         </button>
       </div>
@@ -262,9 +262,9 @@ export const SaveGateModal: React.FC<{
       title={saveState === 'choosing' ? '本场怎么处理?'
         : saveState === 'saving' ? '正在保存本场录像…'
           : saveState === 'purging' ? '正在删除本场素材…'
-            : saveState === 'saved' ? '✅ 本场已留存'
-              : saveState === 'purged' ? '🗑️ 本场没有入盘'
-                : '❌ 本场没有处理成功'}
+            : saveState === 'saved' ? '本场已留存'
+              : saveState === 'purged' ? '本场没有入盘'
+                : '本场没有处理成功'}
       open={saveState !== 'idle'}
       closable={false}
       maskClosable={false}
@@ -276,7 +276,7 @@ export const SaveGateModal: React.FC<{
           <p style={{ marginTop: 0 }}>
             采集已经停了。请选本场怎么处理 —— <strong>这一下不可逆</strong>。
           </p>
-          <ul style={{ margin: '0 0 4px', paddingLeft: 18, color: '#666', fontSize: 13 }}>
+          <ul style={{ margin: '0 0 4px', paddingLeft: 18, color: 'var(--ax-text-secondary)', fontSize: 13 }}>
             <li><strong>留存</strong>:原生录像上传落盘,与帧、日志一起进素材库。</li>
             <li><strong>不留存</strong>:原生录像<strong>直接丢弃</strong>(它只在内存里),
               并让服务端把已落盘的场次目录与三份日志 CSV <strong>一起删掉</strong>。</li>
@@ -300,11 +300,11 @@ export const SaveGateModal: React.FC<{
               ? `${(savedInfo.bytes / 1048576).toFixed(1)} MB`
               : '(本场没有原生录像,盘上只有帧与日志)'}</strong></div>
           ) : (
-            <div style={{ color: '#cf1322' }}>
+            <div style={{ color: 'var(--ax-error)' }}>
               已删除 —— 场次目录与日志 CSV 都从盘上抹掉了,<strong>没有入盘</strong>。
             </div>
           )}
-          <p style={{ margin: '10px 0 0', color: '#666', fontSize: 13 }}>
+          <p style={{ margin: '10px 0 0', color: 'var(--ax-text-secondary)', fontSize: 13 }}>
             确认之后才能开始下一场。现在刷新页面也安全了。
           </p>
         </div>
@@ -316,7 +316,7 @@ export const SaveGateModal: React.FC<{
             刷新可能让内存里那份录像<strong>永久丢失</strong>,或让盘上的素材
             <strong>留在那里而你以为删了</strong>。
           </p>
-          <p style={{ margin: 0, color: '#cf1322', fontSize: 13 }}>原因：{saveError}</p>
+          <p style={{ margin: 0, color: 'var(--ax-error)', fontSize: 13 }}>原因：{saveError}</p>
         </div>
       )}
     </Modal>
@@ -342,7 +342,7 @@ export const AbandonConfirmModal: React.FC<{
     <p style={{ marginBottom: '8px' }}>
       它<strong>只存在于内存里</strong>,放弃之后<strong>无法找回</strong>。
     </p>
-    <p style={{ margin: 0, color: '#666', fontSize: '13px' }}>
+    <p style={{ margin: 0, color: 'var(--ax-text-secondary)', fontSize: '13px' }}>
       本场：{label ?? '(没有标注)'}　session_id：{sid ?? '(没有会话号)'}
     </p>
   </Modal>

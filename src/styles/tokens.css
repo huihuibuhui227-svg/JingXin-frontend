@@ -1,0 +1,180 @@
+/**
+ * JingXin 设计令牌 —— 严格按 DESIGN.md（Apple-design-analysis）实现。
+ *
+ * 规范来源：DESIGN.md（562 行设计系统文档）。所有取值从那里逐条搬运，
+ * 组件里**不要**再写裸色值 —— 用这里的变量。
+ *
+ * 三条不可破的边界（DESIGN.md「Iteration Guide」）：
+ *   1. 全站只有一个强调色：Action Blue #0066cc。没有第二个品牌色。
+ *   2. 正文是 17px / 400 / 1.47 / -0.374px，**不是 14px**（那是 SaaS 惯例，Apple 不这么干）。
+ *   3. 唯一的投影属于"产品图落在表面上"，**卡片/按钮/文字都不许有投影**。
+ *      层级靠**面色的切换**（浅 tile ↔ 深 tile）和毛玻璃，不靠阴影。
+ */
+
+:root {
+  /* ══ Colors · Brand & Accent ══════════════════════════════ */
+  --ax-primary: #0066cc; /* Action Blue —— 唯一的交互色 */
+  --ax-primary-focus: #0071e3; /* 键盘焦点环 */
+  --ax-primary-on-dark: #2997ff; /* 深色面上的链接（Action Blue 会消失在深底里） */
+  --ax-on-primary: #ffffff;
+
+  /* ══ Colors · Surface ═════════════════════════════════════ */
+  --ax-canvas: #ffffff;
+  --ax-parchment: #f5f5f7; /* 签名米白：交替浅 tile / 页脚 */
+  --ax-pearl: #fafafc; /* 次级"幽灵"按钮的底 */
+  --ax-tile-1: #272729; /* 深 tile 主色 */
+  --ax-tile-2: #2a2a2c; /* 微亮一档：两个深 tile 相邻时的极淡分隔 */
+  --ax-tile-3: #252527; /* 微暗一档：栈底、播放器框 */
+  --ax-black: #000000; /* 全局导航栏 / 视频底 */
+  --ax-chip-translucent: rgba(210, 210, 215, 0.64);
+
+  /* ══ Colors · Text ════════════════════════════════════════ */
+  --ax-ink: #1d1d1f; /* 标题、正文、深色工具按钮的底 */
+  --ax-on-dark: #ffffff;
+  --ax-body-muted: #cccccc; /* 深色面上的次级文字 */
+  --ax-ink-muted-80: #333333;
+  /* ⚠️ 规范里 ink-muted-48 = #7a7a7a 只用于"禁用态"和"法务小字"。
+     它作正文对比度只有 4.36:1（不到 4.5）—— 所以常规说明文字用下面这档，
+     禁用态才用 --ax-ink-muted-48。这样同时满足规范与 WCAG AA。 */
+  --ax-ink-muted-48: #7a7a7a;
+  --ax-text-secondary: #6e6e73; /* 5.07:1，作正文/说明合格 */
+
+  /* ══ Colors · Hairlines & Borders ═════════════════════════ */
+  --ax-divider-soft: #f0f0f0; /* 次级按钮的"环"，不是实线 */
+  --ax-hairline: #e0e0e0; /* 1px 描边：工具卡片、配置芯片 */
+
+  /* ⚠️ 以下状态色是**对 DESIGN.md 的扩展**。
+     规范只定义了一个强调色（Action Blue），没有 success/warning/error ——
+     因为它描述的是营销页，那里没有"校验失败""降级""未采集"这类状态。
+     本应用是测量工具，必须有状态语义，所以补这一组；全部按 4.5:1 校过。
+     用色纪律仍遵守规范：状态色**只用于真有状态含义处**，不当装饰。 */
+  --ax-success: #0a6b34;
+  --ax-success-soft: #e8f5ed;
+  --ax-warning: #8a5a10;
+  --ax-warning-soft: #fdf6e7;
+  --ax-error: #b03030;
+  --ax-error-soft: #fdecec;
+
+  /* ══ Rounded（语法互不混用） ══════════════════════════════ */
+  --ax-rounded-none: 0px; /* 全宽 tile：不圆角 */
+  --ax-rounded-xs: 5px;
+  --ax-rounded-sm: 8px; /* 深色工具按钮、内联配图 */
+  --ax-rounded-md: 11px; /* 珍珠按钮胶囊 */
+  --ax-rounded-lg: 18px; /* 工具卡片、商品网格 */
+  --ax-rounded-pill: 9999px; /* 主 CTA、搜索框、配置芯片 —— 签名胶囊 */
+  --ax-rounded-full: 9999px; /* 圆形控制片 */
+
+  /* ══ Spacing ══════════════════════════════════════════════ */
+  --ax-space-xxs: 4px;
+  --ax-space-xs: 8px;
+  --ax-space-sm: 12px;
+  --ax-space-md: 17px;
+  --ax-space-lg: 24px;
+  --ax-space-xl: 32px;
+  --ax-space-xxl: 48px;
+  --ax-space-section: 80px; /* tile 内的纵向留白 */
+
+  /* ══ 字体 ═════════════════════════════════════════════════
+     规范的替换顺序是 SF Pro → system-ui → -apple-system。
+     在 Apple 设备上这会解析到**真正的 SF Pro**；非 Apple 平台规范建议用 Inter。
+     本项目是中文界面且跑在 Linux 上：SF Pro 与 Inter 都不含汉字，
+     所以后面必须显式接中文字体，否则会掉到通用回退。
+     （按规范「Note on Font Substitutes」，非 Apple 平台可自托管 Inter 并把
+      display 字距再收紧 -0.01em。本项目未引入 Web 字体：内网工具不值得
+      为字体多一次网络往返，优先用系统字体。） */
+  --ax-font-display:
+    'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC',
+    'Noto Sans CJK SC', sans-serif;
+  --ax-font-text:
+    'SF Pro Text', system-ui, -apple-system, BlinkMacSystemFont,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC',
+    'Noto Sans CJK SC', sans-serif;
+  --ax-font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ══ Typography · Hierarchy（DESIGN.md 原表逐条搬运） ══════
+     字重阶梯只有 300 / 400 / 600 / 700 —— **500 是刻意缺席的**。 */
+  --ax-hero-display-size: 56px;
+  --ax-hero-display-weight: 600;
+  --ax-hero-display-lh: 1.07;
+  --ax-hero-display-ls: -0.28px;
+
+  --ax-display-lg-size: 40px;
+  --ax-display-lg-weight: 600;
+  --ax-display-lg-lh: 1.1;
+  --ax-display-lg-ls: 0;
+
+  --ax-display-md-size: 34px;
+  --ax-display-md-weight: 600;
+  --ax-display-md-lh: 1.47;
+  --ax-display-md-ls: -0.374px;
+
+  --ax-lead-size: 28px;
+  --ax-lead-weight: 400;
+  --ax-lead-lh: 1.14;
+  --ax-lead-ls: 0.196px;
+
+  --ax-lead-airy-size: 24px;
+  --ax-lead-airy-weight: 300;
+  --ax-lead-airy-lh: 1.5;
+
+  --ax-tagline-size: 21px;
+  --ax-tagline-weight: 600;
+  --ax-tagline-lh: 1.19;
+  --ax-tagline-ls: 0.231px;
+
+  --ax-body-strong-size: 17px;
+  --ax-body-strong-weight: 600;
+  --ax-body-strong-lh: 1.24;
+  --ax-body-strong-ls: -0.374px;
+
+  --ax-body-size: 17px; /* ⚠️ 17 而非 16 */
+  --ax-body-weight: 400;
+  --ax-body-lh: 1.47;
+  --ax-body-ls: -0.374px;
+
+  --ax-dense-link-size: 17px;
+  --ax-dense-link-weight: 400;
+  --ax-dense-link-lh: 2.41; /* 页脚密集链接列的松弛行高 */
+
+  --ax-caption-size: 14px;
+  --ax-caption-weight: 400;
+  --ax-caption-lh: 1.43;
+  --ax-caption-ls: -0.224px;
+
+  --ax-caption-strong-size: 14px;
+  --ax-caption-strong-weight: 600;
+  --ax-caption-strong-lh: 1.29;
+  --ax-caption-strong-ls: -0.224px;
+
+  --ax-button-large-size: 18px;
+  --ax-button-large-weight: 300; /* 罕见的 300 字重 */
+  --ax-button-utility-size: 14px;
+  --ax-button-utility-weight: 400;
+  --ax-button-utility-ls: -0.224px;
+
+  --ax-fine-print-size: 12px;
+  --ax-fine-print-lh: 1.0;
+  --ax-fine-print-ls: -0.12px;
+
+  --ax-micro-legal-size: 10px;
+
+  --ax-nav-link-size: 12px;
+  --ax-nav-link-lh: 1.0;
+  --ax-nav-link-ls: -0.12px;
+
+  /* ══ Elevation ════════════════════════════════════════════
+     全系统**只有这一个投影**，且只给"落在表面上的产品图/图表"。 */
+  --ax-shadow-product: rgba(0, 0, 0, 0.22) 3px 5px 30px 0;
+  --ax-hairline-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+
+  /* ══ 组件尺寸 ═════════════════════════════════════════════ */
+  --ax-nav-height: 44px;
+  --ax-subnav-height: 52px;
+  --ax-sticky-height: 64px;
+  /* ⚠️ 规范里文字密集段 ~980px、商品网格 ~1440px。
+     本应用是数据密度较高的工具，取 1120px 作折中：比 980 宽（表格要横向空间），
+     比 1440 收（宽屏上不会拉成一条）。 */
+  --ax-content-max: 1120px;
+}

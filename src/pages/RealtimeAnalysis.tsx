@@ -283,10 +283,10 @@ const RealtimeAnalysis: React.FC = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0 }}>实时分析</h2>
+            <h1 style={{ margin: 0, fontSize: "var(--ax-display-md-size)", fontWeight: 600 }}>实时分析</h1>
             {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的日志),
                 而它此前只活在 api.ts 的模块变量里 —— 页面上看不见,对不上号时无从查起。 */}
-            <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? '#52c41a' : '#999' }}>
+            <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? 'var(--ax-success)' : 'var(--ax-text-secondary)' }}>
               {sid ? `本场 session_id：${sid}`
                 : sessionError ? `未铸到会话：${sessionError}`
                 : '尚未开始会话(点「开始录制」时铸号)'}
@@ -294,7 +294,7 @@ const RealtimeAnalysis: React.FC = () => {
             {/* 本场标注显示**服务端回的那一个**(不是本地拼的)。旁边留一个「改标签」——
                 端点本来就是 upsert,顺手防住"打错一个字就永久错了"。 */}
             {(recording.savedLabel || sid) && (
-              <div style={{ fontSize: '13px', marginTop: '4px', color: recording.savedLabel ? '#1890ff' : '#999' }}>
+              <div style={{ fontSize: '13px', marginTop: '4px', color: recording.savedLabel ? 'var(--ax-primary)' : 'var(--ax-text-secondary)' }}>
                 {recording.savedLabel
                   ? <>本场标注：{recording.savedLabel}{' '}
                       <a style={{ cursor: 'pointer' }} onClick={() => recording.openLabelModal(false)}>改标签</a>
@@ -312,7 +312,7 @@ const RealtimeAnalysis: React.FC = () => {
             style={{
               padding: '8px 24px',
               fontSize: '14px',
-              background: isRecording ? '#ff4d4f' : recording.saveState !== 'idle' ? '#d9d9d9' : '#1890ff',
+              background: isRecording ? 'var(--ax-error)' : recording.saveState !== 'idle' ? 'var(--ax-hairline)' : 'var(--ax-primary)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -365,34 +365,34 @@ const RealtimeAnalysis: React.FC = () => {
               {realtimeMetrics.face ? (
                 <div style={{ padding: '16px' }}>
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>情绪状态</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1890ff' }}>
-                      {realtimeMetrics.face.emotion === 'happy' ? '😊 开心' :
-                       realtimeMetrics.face.emotion === 'sad' ? '😢 悲伤' :
-                       realtimeMetrics.face.emotion === 'angry' ? '😠 愤怒' :
-                       realtimeMetrics.face.emotion === 'surprised' ? '😲 惊讶' :
-                       realtimeMetrics.face.emotion === 'fearful' ? '😨 恐惧' :
-                       realtimeMetrics.face.emotion === 'disgusted' ? '🤢 厌恶' :
-                       '😐 中性'}
+                    <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>情绪状态</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--ax-primary)' }}>
+                      {realtimeMetrics.face.emotion === 'happy' ? '开心' :
+                       realtimeMetrics.face.emotion === 'sad' ? '悲伤' :
+                       realtimeMetrics.face.emotion === 'angry' ? '愤怒' :
+                       realtimeMetrics.face.emotion === 'surprised' ? '惊讶' :
+                       realtimeMetrics.face.emotion === 'fearful' ? '恐惧' :
+                       realtimeMetrics.face.emotion === 'disgusted' ? '厌恶' :
+                       '中性'}
                     </div>
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>专注度</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#52c41a' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>专注度</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--ax-success)' }}>
                       {Math.round((realtimeMetrics.face.focus_score || 0) * 100)}%
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>紧张度</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff4d4f' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>紧张度</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--ax-error)' }}>
                       {Math.round((realtimeMetrics.face.tension_score || 0) * 100)}%
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ax-text-secondary)' }}>
                   {isRecording ? '等待数据...' : '点击"开始录制"'}
                 </div>
               )}
@@ -404,28 +404,28 @@ const RealtimeAnalysis: React.FC = () => {
               {realtimeMetrics.gesture ? (
                 <div style={{ padding: '16px' }}>
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>检测到手部</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1890ff' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>检测到手部</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--ax-primary)' }}>
                       {realtimeMetrics.gesture.detected_hands} 只
                     </div>
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>手部姿态评分</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#52c41a' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>手部姿态评分</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--ax-success)' }}>
                       {realtimeMetrics.gesture.hand_score}/100
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>肩部稳定度</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#faad14' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>肩部稳定度</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--ax-warning)' }}>
                       {realtimeMetrics.gesture.shoulder_score}/100
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ax-text-secondary)' }}>
                   {isRecording ? '等待数据...' : '点击"开始录制"'}
                 </div>
               )}
@@ -438,7 +438,7 @@ const RealtimeAnalysis: React.FC = () => {
                   轨迹热力图。报告层早就按 spec §5.5 决定不生成眼动图(现有坐标支撑不了
                   "注视"这个构念),前端却在画随机点,两处自相矛盾。宁可空着。 */}
               <div style={{ height: '200px', display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', color: '#999', textAlign: 'center',
+                            justifyContent: 'center', color: 'var(--ax-text-secondary)', textAlign: 'center',
                             padding: '0 24px' }}>
                 待接入 —— 眼动图需要能支撑「注视」构念的坐标(现用的是画面坐标,是取景代理),
                 报告层同样不出这张图
@@ -458,7 +458,7 @@ const RealtimeAnalysis: React.FC = () => {
                   metricName="专注度"
                 />
               ) : (
-                <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ax-text-secondary)' }}>
                   等待数据采集...
                 </div>
               )}
@@ -471,7 +471,7 @@ const RealtimeAnalysis: React.FC = () => {
                 <RadarChart dimensions={radarData} />
               ) : (
                 <div style={{ height: '300px', display: 'flex', alignItems: 'center',
-                              justifyContent: 'center', color: '#999', textAlign: 'center',
+                              justifyContent: 'center', color: 'var(--ax-text-secondary)', textAlign: 'center',
                               padding: '0 24px' }}>
                   数据不足，暂不出图：还缺 {missingRadar.join('、')}
                 </div>
@@ -483,27 +483,27 @@ const RealtimeAnalysis: React.FC = () => {
         {/* 第三行：实时数据流 */}
         <Card title="实时数据流" variant="borderless">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-            <div style={{ padding: '16px', background: '#f0f5ff', borderRadius: '8px' }}>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>AU12 (微笑)</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#2E86AB' }}>
+            <div style={{ padding: '16px', background: 'var(--ax-parchment)', borderRadius: 'var(--ax-rounded-lg)' }}>
+              <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '8px' }}>AU12 (微笑)</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--ax-primary)' }}>
                 {(realtimeMetrics.face?.au_features?.au_12 || 0).toFixed(2)}
               </div>
             </div>
-            <div style={{ padding: '16px', background: '#fff1f0', borderRadius: '8px' }}>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>紧张度</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ff4d4f' }}>
+            <div style={{ padding: '16px', background: 'var(--ax-parchment)', borderRadius: 'var(--ax-rounded-lg)' }}>
+              <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '8px' }}>紧张度</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--ax-error)' }}>
                 {Math.round((realtimeMetrics.face?.tension_score || 0) * 100)}%
               </div>
             </div>
-            <div style={{ padding: '16px', background: '#f6ffed', borderRadius: '8px' }}>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>眼神稳定性</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#52c41a' }}>
+            <div style={{ padding: '16px', background: 'var(--ax-parchment)', borderRadius: 'var(--ax-rounded-lg)' }}>
+              <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '8px' }}>眼神稳定性</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--ax-success)' }}>
                 {Math.round((realtimeMetrics.face?.gaze_stability || 0) * 100)}%
               </div>
             </div>
-            <div style={{ padding: '16px', background: '#fff7e6', borderRadius: '8px' }}>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>动作抖动指数</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#faad14' }}>
+            <div style={{ padding: '16px', background: 'var(--ax-parchment)', borderRadius: 'var(--ax-rounded-lg)' }}>
+              <div style={{ fontSize: '14px', color: 'var(--ax-text-secondary)', marginBottom: '8px' }}>动作抖动指数</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--ax-warning)' }}>
                 {/* 同 RealtimeMetrics:判 "这一帧有没有手",不是判"有没有值" —— 
                     服务端没检测到手时仍回 0.0,那道判据等于没判 */}
                 {realtimeMetrics.gesture?.hand_valid && realtimeMetrics.gesture?.jitter !== undefined
