@@ -145,7 +145,7 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                 style={{ width: '100%', maxHeight: 420, background: '#000' }}
                 src={recordingsApi.videoUrl(detail.sid)}
               />
-              <div style={{ marginTop: 6, color: '#888', fontSize: 12 }}>
+              <div style={{ marginTop: 6, color: 'var(--ax-text-secondary)', fontSize: 12 }}>
                 {detail.preview_ready
                   ? '已备好索引 —— 进度条可以拖。'
                   : '首次打开要先做一份带索引的预览件（几秒），之后就能拖了；这份原始录像一个字节都不会被改动。'}
@@ -171,7 +171,7 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                         onClick={() => { setModality('gesture'); setPage(1); }}>
                         gesture {detail.frames.gesture}
                       </Button>
-                      <span style={{ color: '#888', fontSize: 12 }}>
+                      <span style={{ color: 'var(--ax-text-secondary)', fontSize: 12 }}>
                         画面冻住时这里会看到连续多张一模一样 —— 正是 §8.2.5 那个检查
                       </span>
                     </Space>
@@ -255,7 +255,7 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                       {genMsg && <Typography.Text type="secondary">{genMsg}</Typography.Text>}
                     </Space>
                     {detail.reports.length > 1 && (
-                      <span style={{ color: '#888', fontSize: 12 }}>
+                      <span style={{ color: 'var(--ax-text-secondary)', fontSize: 12 }}>
                         同一场跑过多次就会有多个报告（报告名里是**生成时刻**，不含 session_id）
                       </span>
                     )}

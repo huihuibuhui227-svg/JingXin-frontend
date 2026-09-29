@@ -38,7 +38,7 @@ const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
     subtitle: '系统将进行多维度分析，包括面部表情、手势姿态、语音内容等',
     inProgressTitle: '面试评估进行中',
     startButtonText: '开始面试',
-    startButtonColor: '#1890ff',
+    startButtonColor: 'var(--ax-primary)',
     loadingTip: '正在启动面试...',
   },
   research: {
@@ -47,7 +47,7 @@ const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
     subtitle: '系统将评估您的科研思维能力，包括逻辑推理、问题分析、创新思维等维度',
     inProgressTitle: '科研评估进行中',
     startButtonText: '开始评估',
-    startButtonColor: '#52c41a',
+    startButtonColor: 'var(--ax-success)',
     loadingTip: '正在启动科研评估...',
   },
 };
@@ -387,7 +387,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
       <Content style={{ padding: '40px', textAlign: 'center' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h1>{config.title}</h1>
-          <p style={{ fontSize: '16px', color: '#666', marginBottom: '40px' }}>
+          <p style={{ fontSize: '16px', color: 'var(--ax-text-secondary)', marginBottom: '40px' }}>
             {config.subtitle}
           </p>
           <button
@@ -404,7 +404,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
           >
             {config.startButtonText}
           </button>
-          <p style={{ marginTop: '20px', fontSize: '13px', color: '#999' }}>
+          <p style={{ marginTop: '20px', fontSize: '13px', color: 'var(--ax-text-secondary)' }}>
             点开始之后会先请你填本场标注(谁、哪个院系)—— 填完才开录。
             没标注的一场事后认不出是谁,等于白采。
           </p>
@@ -459,11 +459,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             <h2 style={{ margin: 0 }}>{config.inProgressTitle}</h2>
             {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的
                 日志),而"报告里什么都没有"往往就是这个号对不上。 */}
-            <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? '#52c41a' : '#999' }}>
+            <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? 'var(--ax-success)' : 'var(--ax-text-secondary)' }}>
               {sid ? `本场 session_id：${sid}` : '尚未铸到会话号'}
             </div>
             {recording.savedLabel && (
-              <div style={{ fontSize: '13px', marginTop: '4px', color: '#1890ff' }}>
+              <div style={{ fontSize: '13px', marginTop: '4px', color: 'var(--ax-primary)' }}>
                 本场标注：{recording.savedLabel}
               </div>
             )}
@@ -488,7 +488,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
               title={busy ? '本场已经结束或正在保存' : undefined}
               style={{
                 padding: '8px 20px', fontSize: '14px', borderRadius: '6px',
-                background: busy ? '#d9d9d9' : '#ff4d4f', color: '#fff',
+                background: busy ? 'var(--ax-hairline)' : 'var(--ax-error)', color: '#fff',
                 border: 'none', cursor: busy ? 'not-allowed' : 'pointer'
               }}
             >
@@ -498,7 +498,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         </div>
 
         {ended && !nothingToSave && (
-          <p style={{ color: '#666', marginTop: '-12px', marginBottom: '16px' }}>
+          <p style={{ color: 'var(--ax-text-secondary)', marginTop: '-12px', marginBottom: '16px' }}>
             本场已结束 —— 等原生录像确认留存之后才能开始下一场。
           </p>
         )}
@@ -517,11 +517,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
                 </p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => navigate('/reports')}
-                    style={{ padding: '6px 20px', background: '#fff', color: '#1890ff', border: '1px solid #1890ff', borderRadius: '6px', cursor: 'pointer' }}>
+                    style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
                     去看报告
                   </button>
                   <button onClick={handleNextSession}
-                    style={{ padding: '6px 20px', background: '#52c41a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                    style={{ padding: '6px 20px', background: 'var(--ax-success)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                     录下一场
                   </button>
                 </div>
@@ -581,11 +581,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         extraActions={
           <>
             <button onClick={() => navigate('/reports')}
-              style={{ padding: '6px 20px', background: '#fff', color: '#1890ff', border: '1px solid #1890ff', borderRadius: '6px', cursor: 'pointer' }}>
+              style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
               去看报告
             </button>
             <button onClick={handleNextSession}
-              style={{ padding: '6px 20px', background: '#52c41a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              style={{ padding: '6px 20px', background: 'var(--ax-success)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
               录下一场
             </button>
           </>

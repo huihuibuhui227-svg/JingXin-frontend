@@ -197,7 +197,7 @@ const RecordingsPage: React.FC = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <Typography.Title level={2} style={{ margin: 0 }}>🎥 录制素材</Typography.Title>
+            <Typography.Title level={1} style={{ margin: 0, fontSize: "var(--ax-display-md-size)" }}>录制素材</Typography.Title>
             <Paragraph type="secondary" style={{ margin: 0 }}>
               {data
                 ? `${data.recordings.length} 场 · 录像合计 ${fmtBytes(data.total_video_bytes)} · 帧合计 ${data.total_frames}`

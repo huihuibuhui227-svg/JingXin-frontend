@@ -1,5 +1,5 @@
 import React from 'react';
-import Plot from 'react-plotly.js';
+import Plot from '@/utils/plotlyBundle';
 
 interface GazeDataPoint {
   x: number;
@@ -35,12 +35,12 @@ const GazeHeatmap: React.FC<GazeHeatmapProps> = ({
           y: yValues,
           mode: 'lines+markers',
           line: {
-            color: 'rgba(46, 134, 171, 0.6)',
+            color: 'rgba(77, 107, 254, 0.6)',
             width: 2
           },
           marker: {
             size: 4,
-            color: '#2E86AB'
+            color: '#4d6bfe'
           },
           name: '眼动轨迹'
         }

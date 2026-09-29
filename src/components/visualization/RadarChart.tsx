@@ -1,5 +1,5 @@
 import React from 'react';
-import Plot from 'react-plotly.js';
+import Plot from '@/utils/plotlyBundle';
 
 interface RadarChartProps {
   dimensions: {
@@ -47,8 +47,8 @@ const RadarChart: React.FC<RadarChartProps> = ({
           theta: categories,
           fill: 'toself',
           name: '候选人得分',
-          line: { color: '#2E86AB' },
-          fillcolor: 'rgba(46, 134, 171, 0.4)'
+          line: { color: '#4d6bfe' },
+          fillcolor: 'rgba(77, 107, 254, 0.4)'
         }
       ]}
       layout={{

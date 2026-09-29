@@ -1,5 +1,5 @@
 import React from 'react';
-import Plot from 'react-plotly.js';
+import Plot from '@/utils/plotlyBundle';
 import { EvidenceItem } from '@/types/assessment';
 
 interface EvidenceBarProps {
@@ -14,9 +14,9 @@ const EvidenceBar: React.FC<EvidenceBarProps> = ({
   const features = evidenceChain.map(item => item.human_name);
   const scores = evidenceChain.map(item => item.normalized_score);
   const colors = evidenceChain.map(item => {
-    if (item.status === '强支撑') return '#52c41a';
-    if (item.status === '弱支撑') return '#faad14';
-    return '#d9d9d9';
+    if (item.status === '强支撑') return '#0a6b34';
+    if (item.status === '弱支撑') return '#8a5a10';
+    return '#e0e0e0';
   });
 
   return (

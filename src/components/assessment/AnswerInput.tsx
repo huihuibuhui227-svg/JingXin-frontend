@@ -117,7 +117,7 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
       </Space>
 
       {isProcessing && (
-        <div style={{ marginTop: '12px', color: '#999', fontSize: '12px' }}>
+        <div style={{ marginTop: '12px', color: 'var(--ax-text-secondary)', fontSize: '12px' }}>
           <LoadingOutlined /> 正在处理语音...
         </div>
       )}
