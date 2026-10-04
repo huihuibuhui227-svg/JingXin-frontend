@@ -10,12 +10,16 @@
  *     `stats` 只有 `{val}`;**而"人群百分位"正是 spec §5.5 禁止给的东西**
  *     (没有真实常模就没有位置)。留着它等于给下一个人一个已备好的错误出口。
  * 判据:类型要对得上**后端实际发的键**(见 `research_mapper.map_features_to_scores`)。
+ *
+ * ⚠️ 2026-10-04 **再对齐一次(第 3 条同类问题)**:评分类的键后端**整层摘除**了 ——
+ * `total_score` / `total_level` / 逐维度 `score` / `level` / `dimension_weights`
+ * 一个都不再发。理由不是"它们算错了",而是**它们不该存在**:那是未标定标尺上对人的
+ * 复合判定(见 `research_mapper` 返回处那段注释 + spec §5.4 :157-158 / §5.6)。
+ * ⟹ 本文件里那两个字段也一并删掉 —— **类型层是"悄悄加回来"的最后一道闸**:
+ * 只要 `EvaluationResult` 上还挂着 `score`,下一个人就会照着它渲染。
+ * 后端由 `tests/test_report_layer.py::test_the_payload_carries_no_scoring_keys_at_all` 守。
  */
 export interface EvaluationResult {
-  /** ⚠️ 可为 `null` —— 一个维度过门都没有时后端就是给 null(spec §6.1)。
-   *  且它是**未标定标尺上的复合点分**,报告层一个字都不渲染。 */
-  total_score: number | null;
-  total_level: string;
   dimensions: {
     logical_thinking: DimensionResult;
     stress_resilience: DimensionResult;
@@ -61,13 +65,10 @@ export interface DimensionResult {
   display_name: string;
   description: string;
   algorithm: string;
-  /** ⚠️ 可为 `null`(该维度没有槽过门)。**未标定标尺上的点分,报告层不渲染。** */
-  score: number | null;
-  /** 同上:五档评语,报告层不渲染。 */
-  level: string;
+  /** 该维度这次过了门的槽(原始值 + 本场观测区间 + 有效样本量 + 置信度)。
+   *  ⚠️ 这里曾有两个字段 `score: number | null` 与 `level: string` —— 2026-10-04 删除。
+   *  "该维度能说什么"改由 `matched_indicators`(过门 N/M)+ `confidence` + 本数组表达。 */
   evidence_chain: EvidenceItem[];
-  positive_factors: string[];
-  negative_factors: string[];
   /** 该维度**为什么薄** —— 逐槽一行(未采集到对应数据 / 本次会话内无变化 /
    *  该指标本轮停用 / 尚无产出方…)。这是使用者能据以行动的东西,报告要原样列出。 */
   evidence_gaps: string[];
@@ -78,15 +79,20 @@ export interface DimensionResult {
   stats: Record<string, { val: number }>;
 }
 
+/**
+ * 一个**过了证据门**的槽在证据链里的那一行。
+ *
+ * ⚠️ 2026-10-04 **字段集收窄**:删掉 `normalized_score` / `contribution` / `status`
+ * (`✅ 强支撑`/`⚠️ 弱支撑`/`➖ 中性`)/ `direction` / `weight`,以及维度上的
+ * `positive_factors` / `negative_factors` —— 它们都是**未标定标尺上的折算值与判定标签**
+ * (与档位同一类物种),随评分层一起摘除(见文件顶部说明)。
+ * 现在这一行只说**测到了什么**:原始值 + 本场观测区间 + 有效样本量。
+ * 后端由 `tests/test_report_layer.py` 里那条"字段集"断言守着。
+ */
 export interface EvidenceItem {
   feature: string;
   human_name: string;
   raw_value: number;
-  normalized_score: number;
-  contribution: number;
-  status: string;
-  direction: string;
-  weight: number;
   n_valid: number;
   std: number | null;
   /** 与 `raw_value` 同量纲的实测区间;无变异时后端给空数组。 */
