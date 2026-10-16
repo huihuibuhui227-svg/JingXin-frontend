@@ -1,6 +1,25 @@
+/**
+ * `/api/report/structured` 的返回体。
+ *
+ * ⚠️ 2026-10-03 对齐真实载荷。此前这份手写类型里有**后端根本不发的字段**,
+ * 前端照着它渲染,于是报告页与实时页各有一处"照着不存在的字段画"或"画了禁止画的东西":
+ *   · `DimensionResult.narrative` / `.simple_narrative` —— 后端**已随 spec §5.4 删除**
+ *     (`report_generator.py` 有明确注释:"该字段的产出方已随 spec §5.4 一并删除"),
+ *     而报告页还在渲染它 ⟹ 那三张卡片一直是**空的**;
+ *   · `DimensionResult.stats[].percentile` 与 `EvidenceItem.percentile` —— 真实载荷里
+ *     `stats` 只有 `{val}`;**而"人群百分位"正是 spec §5.5 禁止给的东西**
+ *     (没有真实常模就没有位置)。留着它等于给下一个人一个已备好的错误出口。
+ * 判据:类型要对得上**后端实际发的键**(见 `research_mapper.map_features_to_scores`)。
+ *
+ * ⚠️ 2026-10-04 **再对齐一次(第 3 条同类问题)**:评分类的键后端**整层摘除**了 ——
+ * `total_score` / `total_level` / 逐维度 `score` / `level` / `dimension_weights`
+ * 一个都不再发。理由不是"它们算错了",而是**它们不该存在**:那是未标定标尺上对人的
+ * 复合判定(见 `research_mapper` 返回处那段注释 + spec §5.4 :157-158 / §5.6)。
+ * ⟹ 本文件里那两个字段也一并删掉 —— **类型层是"悄悄加回来"的最后一道闸**:
+ * 只要 `EvaluationResult` 上还挂着 `score`,下一个人就会照着它渲染。
+ * 后端由 `tests/test_report_layer.py::test_the_payload_carries_no_scoring_keys_at_all` 守。
+ */
 export interface EvaluationResult {
-  total_score: number;
-  total_level: string;
   dimensions: {
     logical_thinking: DimensionResult;
     stress_resilience: DimensionResult;
@@ -8,42 +27,76 @@ export interface EvaluationResult {
     confidence_level: DimensionResult;
     cognitive_efficiency: DimensionResult;
   };
+  /** 「未产出综合评分,也不给评级」那类固定话术(spec §5.4)。 */
   summary_narrative: string;
+  /** ★ 聚合呈现的**权威来源**(spec §5.4/§5.6):覆盖事实 + 逐指标实测区间 + 置信度上限。
+   *  报告页此前只用了 `n_passed`/`n_slots`/`confidence_cap`,而 `passed_slots` 里
+   *  那批**合规的逐指标依据取了从没渲染**。 */
+  coverage?: Coverage;
   model_metadata: {
     version: string;
     timestamp: string;
   };
 }
 
+/** `coverage` —— 本次观测的覆盖事实。字段逐一对齐 `research_mapper._coverage()`。 */
+export interface Coverage {
+  n_slots: number;
+  n_passed: number;
+  /** 各维度置信度的**上限**(最乐观的那一个)。 */
+  confidence_cap: string;
+  passed_slots: CoverageSlot[];
+}
+
+/** 一个**过了证据门**的指标槽的实测依据 —— 与后端 HTML 报告渲染的是同一批字段。 */
+export interface CoverageSlot {
+  dimension: string;
+  display_name: string;
+  indicator: string;
+  feature: string;
+  raw_value: number;
+  /** 本场会话内的观测区间(`[下界, 上界]`),**与 `raw_value` 同量纲**;取不到时是空数组。 */
+  observed_interval: number[];
+  n_valid: number;
+  confidence: string;
+}
+
 export interface DimensionResult {
   display_name: string;
   description: string;
   algorithm: string;
-  score: number;
-  level: string;
-  narrative: string;
-  simple_narrative: string;
+  /** 该维度这次过了门的槽(原始值 + 本场观测区间 + 有效样本量 + 置信度)。
+   *  ⚠️ 这里曾有两个字段 `score: number | null` 与 `level: string` —— 2026-10-04 删除。
+   *  "该维度能说什么"改由 `matched_indicators`(过门 N/M)+ `confidence` + 本数组表达。 */
   evidence_chain: EvidenceItem[];
-  positive_factors: string[];
-  negative_factors: string[];
+  /** 该维度**为什么薄** —— 逐槽一行(未采集到对应数据 / 本次会话内无变化 /
+   *  该指标本轮停用 / 尚无产出方…)。这是使用者能据以行动的东西,报告要原样列出。 */
+  evidence_gaps: string[];
   confidence: string;
+  /** 形如 `"1/4"` —— 过门槽数 / 总槽数。 */
   matched_indicators: string;
-  stats: Record<string, {
-    val: number;
-    percentile: number;
-  }>;
+  /** `{<槽关键词>: {val}}`。**注意没有 `percentile`** —— 见文件顶部说明。 */
+  stats: Record<string, { val: number }>;
 }
 
+/**
+ * 一个**过了证据门**的槽在证据链里的那一行。
+ *
+ * ⚠️ 2026-10-04 **字段集收窄**:删掉 `normalized_score` / `contribution` / `status`
+ * (`✅ 强支撑`/`⚠️ 弱支撑`/`➖ 中性`)/ `direction` / `weight`,以及维度上的
+ * `positive_factors` / `negative_factors` —— 它们都是**未标定标尺上的折算值与判定标签**
+ * (与档位同一类物种),随评分层一起摘除(见文件顶部说明)。
+ * 现在这一行只说**测到了什么**:原始值 + 本场观测区间 + 有效样本量。
+ * 后端由 `tests/test_report_layer.py` 里那条"字段集"断言守着。
+ */
 export interface EvidenceItem {
   feature: string;
   human_name: string;
   raw_value: number;
-  normalized_score: number;
-  contribution: number;
-  status: string;
-  direction: string;
-  weight: number;
-  percentile: number;
+  n_valid: number;
+  std: number | null;
+  /** 与 `raw_value` 同量纲的实测区间;无变异时后端给空数组。 */
+  observed_interval: number[];
 }
 
 export interface RealtimeMetrics {

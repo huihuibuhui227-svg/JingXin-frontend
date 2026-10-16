@@ -9,12 +9,12 @@ import { dashboardApi } from '@/services/api';
 import { EvaluationResult } from '@/types/assessment';
 
 // 后端 `/api/report/structured` 的 `result.coverage` 是「本次观测覆盖」的权威呈现
-// (n_passed / n_slots / confidence_cap,spec §5.4/§5.6)。前端手写的 `EvaluationResult`
-// 里**没有这个字段** —— 那个类型文件工作树里有使用者未提交的改动,不混进本提交,
-// 所以在这里就地声明并断言。
-type ReportExtras = {
-  coverage?: { n_passed: number; n_slots: number; confidence_cap?: string };
-};
+// (n_passed / n_slots / confidence_cap / passed_slots,spec §5.4/§5.6)。
+//
+// ⚠️ 2026-10-03 收掉此前的就地声明:当时 `EvaluationResult` 里没有 `coverage`
+// (那个类型文件工作树里有使用者未提交的改动,不混进当时的提交),
+// 所以在这里 `as EvaluationResult & ReportExtras` 临时断言。现在前端仓干净、
+// `coverage` 已按真实载荷写进 `types/assessment.ts` ⟹ 直接用它,不再断言。
 
 const { Content } = Layout;
 
@@ -65,7 +65,7 @@ const ReportPage: React.FC = () => {
   }, [id]);
 
   // 「本次观测覆盖」:本系统不产出对候选人的评分,只报**过了几个门**。
-  const coverage = (report as (EvaluationResult & ReportExtras) | null)?.coverage;
+  const coverage = report?.coverage;
 
   if (loading) {
     return <Loading fullScreen tip="正在加载报告..." />;

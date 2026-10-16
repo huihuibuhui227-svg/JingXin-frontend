@@ -221,8 +221,10 @@ export const useAssessment = (type: 'interview' | 'research') => {
 
       // ★ 这里**刻意不**往 store 里塞一个合成的 evaluationResult。
       // 那个 store 会持久化(partialize 含 evaluationResult),而 ReportPage 有
-      // "store 有结果就不问服务端"的短路 —— 塞一个 total_score: 0 / dimensions: {} 的
+      // "store 有结果就不问服务端"的短路 —— 塞一个 `total_score: 0` / `dimensions: {}` 的
       // 合成结果进去,真实报告就**永远不会被取**,而且刷新后仍在。
+      // ⚠️ 2026-10-04:`total_score` 这个键**已从后端 payload 整层摘除**
+      //(见后端「甲、22」)。这里引它是**历史事故**的记录,不是可用的字段。
       // 正确路径:报告页自己去 /api/report/structured 取(M2.1 已让该端点自报场次);
       // 也不在这里 fire-and-forget 调 runModule('report') —— 那正是账本跟进项 22
       // 要收口的东西,而它的失败只进 console.warn 属于本项目在杀的静默失效。
