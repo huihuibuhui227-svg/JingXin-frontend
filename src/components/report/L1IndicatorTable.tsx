@@ -169,6 +169,45 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
     };
   }, [l1.timebase]);
 
+  /**
+   * 窗口口径 —— 这场是"整场一个窗口"还是"每回答一个窗口"。
+   *
+   * 这两个口径的 F/G 值**不能直接比**:整场口径的分母含提问期与场后,
+   * 逐题口径只含回答帧。载荷里一直有 `windows`,而前端**零命中** ——
+   * 读者看到两个不同的数,无从判断是不是同一件事。
+   *
+   * `frames_outside` 一并显示:有台账时首个 `ask_end` 之前的帧不属于任何窗口,
+   * 这是唯一能看出"分母被排除了多少"的数。
+   */
+  const windowSummary = useMemo(() => {
+    const w = l1.windows;
+    if (!w?.granularity) return null;
+    const isAnswer = w.granularity === 'answer';
+    const outside = Object.entries(w.frames_outside ?? {})
+      .filter(([, n]) => typeof n === 'number' && n > 0)
+      .map(([m, n]) => `${MODALITY_LABEL[m] ?? m} ${n} 帧`);
+    return {
+      isAnswer,
+      text: isAnswer
+        ? `逐回答窗口（${w.n_windows ?? '?'} 个）`
+        : '整场一个窗口',
+      outside,
+    };
+  }, [l1.windows]);
+
+  /**
+   * 逐题离散度 —— 逐题值**不冒充会话级值**,它只回答"题与题之间稳不稳"。
+   *
+   * ⚠️ 只在本场内有意义:不同场次的题目不同,离散度**不可跨场相减**。
+   * 少于 2 题的指标不进载荷,所以这里出现的一律是 ≥2 题。
+   */
+  const dispersionRows = useMemo(() => {
+    const d = l1.dispersion ?? {};
+    return Object.entries(d)
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.iqr - a.iqr);
+  }, [l1.dispersion]);
+
   /** 族 → 计数,给表头的筛选器用。**不隐藏任何族** —— 哪怕整族不可出。 */
   const familyFilters = useMemo(() => {
     const seen = new Map<string, number>();
@@ -370,6 +409,82 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
         >
           观察窗口：{windowRow}
           {windowMismatch && '（各族覆盖的时间段不同，跨族对比前先看这一行）'}
+        </div>
+      )}
+
+      {/*
+        ★ 窗口口径 + 被排除的帧数。
+
+        载荷里 `l1.windows` 一直有、前端**零命中** ⟹ "被排除的帧要报数"
+        只进了 JSON,没人看得见。而整场口径与逐题口径的 F/G 值不可直接比,
+        读者不知道是哪种口径,就会把两个数当成同一件事。
+      */}
+      {windowSummary && (
+        <div
+          style={{
+            marginBottom: 12,
+            fontSize: 13,
+            color: 'var(--ax-text-secondary)',
+          }}
+        >
+          统计口径：{windowSummary.text}
+          {windowSummary.outside.length > 0 && (
+            <>
+              {'；不在任何回答窗口内的帧：'}
+              {windowSummary.outside.join(' · ')}
+              {'（这些帧不计入 F/G 的分母）'}
+            </>
+          )}
+        </div>
+      )}
+
+      {/*
+        ★ 逐题离散度 —— 裁定① 的离散度层。
+
+        逐题值同名多份,直接进 `indicators` 会被 `l1_mapper` 按名字覆盖成最后一题。
+        所以它们只在这里:回答"这场在题与题之间稳不稳",不冒充会话级值。
+        **只在本场内有意义**,跨场相减没有含义 —— 这句话必须跟着数一起出现。
+      */}
+      {dispersionRows.length > 0 && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '8px 12px',
+            borderRadius: 'var(--ax-rounded-sm)',
+            background: 'var(--ax-parchment)',
+            fontSize: 13,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--ax-text-primary)' }}>
+            题间离散度（{dispersionRows.length} 条指标有 ≥2 题可算）
+          </div>
+          <div style={{ color: 'var(--ax-text-secondary)', marginBottom: 6 }}>
+            {plain(l1.dispersion_note ?? '逐题值的题间离散度，只在本场内有意义。')}
+          </div>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ color: 'var(--ax-text-secondary)', textAlign: 'right' }}>
+                <th style={{ textAlign: 'left', fontWeight: 500 }}>指标</th>
+                <th style={{ fontWeight: 500 }}>题数</th>
+                <th style={{ fontWeight: 500 }}>中位</th>
+                <th style={{ fontWeight: 500 }}>IQR</th>
+                <th style={{ fontWeight: 500 }}>最小</th>
+                <th style={{ fontWeight: 500 }}>最大</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dispersionRows.map((r) => (
+                <tr key={r.name} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  <td style={{ fontFamily: 'var(--ax-font-mono)' }}>{r.name}</td>
+                  <td style={{ textAlign: 'right' }}>{r.n_questions}</td>
+                  <td style={{ textAlign: 'right' }}>{fmtValue(r.median)}</td>
+                  <td style={{ textAlign: 'right' }}>{fmtValue(r.iqr)}</td>
+                  <td style={{ textAlign: 'right' }}>{fmtValue(r.min)}</td>
+                  <td style={{ textAlign: 'right' }}>{fmtValue(r.max)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

@@ -114,6 +114,30 @@ export interface L1Audit {
    *  两边的数相减没有含义。来自 `l1_mapper.comparability_notes()`。 */
   comparability_notes?: string[];
   gaps: string[];
+  /** ★ 窗口口径 —— 这场是"整场一个窗口"还是"每回答一个窗口"。
+   *  `granularity="session"` ⟹ 本场没有提问台账,F/G 按整场算,不能与逐题场比。
+   *  `frames_outside` = 落在所有窗口之外的帧数(模态 → 计数):有台账时首个 `ask_end`
+   *  之前的帧不属于任何窗口,这是唯一能看出"分母被排除了多少"的数。 */
+  windows?: {
+    granularity?: string;
+    n_windows?: number;
+    n_questions?: number;
+    n_answer_segments?: number;
+    wall_reliable?: boolean;
+    frames_outside?: Record<string, number>;
+  };
+  /** ★ 逐题值的**题间离散度**(裁定① 的离散度层)。
+   *  逐题值不冒充会话级值 —— 它只回答"这一场的表现在题与题之间稳不稳"。
+   *  ⚠️ **只在本场内有意义**:不同场次的题目不同,离散度不可跨场相减。
+   *  少于 2 题的指标不出现(单题没有"题间"可言)。 */
+  dispersion?: Record<string, {
+    n_questions: number;
+    median: number;
+    iqr: number;
+    min: number;
+    max: number;
+  }>;
+  dispersion_note?: string;
   /** 各模态时间基。`span_sec` = 该模态**覆盖到的时间范围**(秒,含重启空档)。
    *  ⚠️ 与 `n_frames` 不是一回事:1 Hz 的 6968 帧可跨 7427 秒,而 31.25 Hz 的
    *  13585 帧只跨 434.7 秒 —— 判断"两族看的是不是同一段时间"只能比 `span_sec`。 */
