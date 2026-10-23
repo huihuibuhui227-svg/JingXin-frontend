@@ -67,6 +67,11 @@ const GAP_LABEL: Record<string, { text: string; hint: string; tone: 'warn' | 'er
     hint: '这一层的粒度上游没落盘。补救:补产出方或补缓存。',
     tone: 'warn',
   },
+  not_extracted: {
+    text: '素材在,还没提取',
+    hint: '原始录音就在盘上,只是派生序列还没算过。补救:跑一次提取即可,**不用重录**。',
+    tone: 'warn',
+  },
   time_unusable: {
     text: '时间轴不可重建',
     hint: '墙钟与帧时间对不上,按时间切窗口会切错。',
