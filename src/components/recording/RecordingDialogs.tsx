@@ -304,6 +304,40 @@ export const SaveGateModal: React.FC<{
               已删除 —— 场次目录与日志 CSV 都从盘上抹掉了,<strong>没有入盘</strong>。
             </div>
           )}
+          {/* 录完当场体检:字节存下了 ≠ 存下的东西是好的。两者必须分开说,
+              否则"已留存"会让人以为这一场能进素材库。 */}
+          {saveState === 'saved' && savedInfo.health && (
+            <div style={{
+              marginTop: 8, padding: '6px 10px', borderRadius: 6,
+              // 只用 tokens.css 里**已经定义**的语义色。随手编一个 `--ax-bg-*`
+              // 在 CSS 里不会报错,只会静默退成无色 —— 那种"看着没样式"最难查。
+              background: savedInfo.health.status === 'ok'
+                ? 'var(--ax-success-soft)'
+                : savedInfo.health.status === 'warn'
+                  ? 'var(--ax-warning-soft)'
+                  : 'var(--ax-canvas)',
+              border: '1px solid var(--ax-hairline)',
+              fontSize: 13, lineHeight: 1.7,
+            }}>
+              {savedInfo.health.status === 'ok' && (
+                <span>✓ 录制体检通过(视频 {savedInfo.health.video_sec}s /
+                  音频 {savedInfo.health.audio_sec}s)</span>
+              )}
+              {savedInfo.health.status === 'warn' && (
+                <>
+                  <strong>⚠️ 录制体检有告警 —— 这一场可能进不了素材库:</strong>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+                    {savedInfo.health.findings.map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </>
+              )}
+              {savedInfo.health.status === 'unknown' && (
+                <span style={{ color: 'var(--ax-text-secondary)' }}>
+                  录制体检没跑成(不是录坏了):{savedInfo.health.findings.join('；')}
+                </span>
+              )}
+            </div>
+          )}
           <p style={{ margin: '10px 0 0', color: 'var(--ax-text-secondary)', fontSize: 13 }}>
             确认之后才能开始下一场。现在刷新页面也安全了。
           </p>

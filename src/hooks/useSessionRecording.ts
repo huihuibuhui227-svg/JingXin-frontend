@@ -3,6 +3,7 @@ import { message } from 'antd';
 import { sessionApi, getSessionId } from '@/services/api';
 import { recordingsApi } from '@/services/recordingsApi';
 import { ConsentMode } from '@/components/recording/RecordingDialogs';
+import type { CaptureHealth } from '@/types/api';
 
 /**
  * 「一场录制」的四件共用物:**本场标注**、**肖像/音频征询**、**留存处置**、**降级凭证**。
@@ -47,6 +48,8 @@ export interface SavedInfo {
   label: string | null;
   sid: string | null;
   bytes: number;
+  /** 录完当场体检。`null` = 没跑(关掉了 / 探针炸了),**不是**"录坏了"。 */
+  health?: CaptureHealth | null;
 }
 
 interface Options {
@@ -163,11 +166,22 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart }: Options
         throw new Error(result.reason || '服务端明说没有留存');
       }
       console.log('✅ 原生录像已留存:', result);
-      setSavedInfo({ label: savedLabelRef.current, sid: getSessionId(), bytes: blob.size });
+      const health: CaptureHealth | null = result?.capture_health ?? null;
+      setSavedInfo({
+        label: savedLabelRef.current, sid: getSessionId(), bytes: blob.size, health,
+      });
       setSaveState('saved');
       pendingRef.current?.resolve();
       pendingRef.current = null;
-      message.success('本场原生录像已留存');
+      // ⚠️ 成功提示**不掩盖**体检告警:两者说的是不同的事 ——
+      //    "字节存下了"与"存下的东西录坏了"。盘上就有这样的场次:文件完整、
+      //    音频完整,只是**没有视频轨**。只说"已留存"等于让人以为一切正常。
+      if (health?.status === 'warn') {
+        message.warning(
+          `本场原生录像已留存,但**录制体检有告警**:${health.findings.join('；')}`, 0);
+      } else {
+        message.success('本场原生录像已留存');
+      }
     } catch (error: any) {
       const detail = error?.response?.data?.detail;
       const why = detail || error?.message || '未知错误';
