@@ -27,6 +27,7 @@
 import React from 'react';
 import { Card, Empty, Tag } from 'antd';
 import { EvaluationResult } from '@/types/assessment';
+import L1IndicatorTable from './L1IndicatorTable';
 
 /** 固定顺序只为版面稳定;名字一律用载荷里的 `display_name`。 */
 const DIMENSION_ORDER: (keyof EvaluationResult['dimensions'])[] = [
@@ -47,9 +48,42 @@ export interface ReportViewerProps {
 
 const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
   const slots = report.coverage?.passed_slots ?? [];
+  const vanished = report.vanished_dimensions ?? [];
+  const l1 = report.l1;
 
   return (
     <div>
+      {/*
+        ★ 2026-10-18:整维消失必须**渲染**出来。
+        L1 的构念对账发现 `行为表现活跃度` 的三个槽(手掌张开度 / 肩部放松度 /
+        眼神接触)**没有同构念的 L1 指标** —— 不是"这一场没测到",是那个维度量的
+        东西当前管线都不测。它因此不进 `dimensions`。
+        不渲染的话报告会**悄悄少一块**,而少的那块恰好是"测不到的东西" ——
+        那是最该说出来的部分。
+      */}
+      {vanished.length > 0 && (
+        <Card title="整维未出（当前管线没有对应的可测量）" style={{ marginBottom: '24px' }}>
+          <ul style={{ paddingLeft: '20px', margin: 0 }}>
+            {vanished.map((v) => (
+              <li key={v.key} style={{ marginBottom: '8px' }}>
+                <strong>{v.display_name}</strong>
+                <Tag style={{ marginLeft: '8px' }}>{v.n_slots} 个槽</Tag>
+                <div style={{ color: 'var(--ax-text-secondary)', marginTop: '4px' }}>
+                  {v.dropped.map((d) => `${d.slot}：${d.reason}`).join('；')}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {/*
+        ★ 2026-10-18:L1 全表**放在旧槽之前**。
+        旧槽是"14 个历史槽里过了几个门",L1 全表才是这一场真正算出来的东西
+        (38 条,含 4 条算不出来的及原因)。顺序反了的话,读者先看到 7/14
+        会以为"只算了 7 条",而那 31 条被算出来的根本没露过面。
+      */}
+      {l1 && <L1IndicatorTable l1={l1} />}
+
       <Card title="本次观测通过证据门的指标" style={{ marginBottom: '24px' }}>
         {slots.length > 0 ? (
           <ul style={{ paddingLeft: '20px', margin: 0 }}>

@@ -20,13 +20,31 @@
  * 后端由 `tests/test_report_layer.py::test_the_payload_carries_no_scoring_keys_at_all` 守。
  */
 export interface EvaluationResult {
-  dimensions: {
-    logical_thinking: DimensionResult;
-    stress_resilience: DimensionResult;
-    communication_fluency: DimensionResult;
-    confidence_level: DimensionResult;
-    cognitive_efficiency: DimensionResult;
-  };
+  /**
+   * ⚠️ 2026-10-18 **五维变可选**。`/api/report/structured` 默认引擎已切到 L1
+   * (`?engine=l1`),而 L1 的构念对账发现:`行为表现活跃度` 的三个槽
+   * (手掌张开度 / 肩部放松度 / 眼神接触)**没有同构念的 L1 指标** ——
+   * 不是"这一场没测到",是那个维度量的东西当前管线都不测。
+   *
+   * ⟹ 它会**整个不出现在** `dimensions` 里,而进 `vanished_dimensions` 并带理由。
+   * `ReportViewer` 对缺失维度是 `if (!dim) return null`,所以少键是安全的;
+   * 但**类型层必须允许它少** —— 否则下一个人会以为五个键一定都在,
+   * 然后在 `report.dimensions.confidence_level.confidence` 上取到一个 undefined 崩掉。
+   *
+   * 旧引擎(`?engine=legacy`)仍然给满五个。
+   */
+  dimensions: Partial<Record<DimensionKey, DimensionResult>>;
+  /** 本次用的是哪个引擎。`l1` = M4.5 起的默认;`legacy` = 旧的 14 槽模糊匹配。 */
+  engine?: 'l1' | 'legacy';
+  /**
+   * **消失的维度** —— 全部槽都没有同构念 L1 指标、因此整维不进 `dimensions`。
+   *
+   * 必须渲染:读者要能看出"这一维为什么不见了"。不渲染的话,报告会悄悄少一块,
+   * 而少的那块恰好是"当前管线测不到的东西" —— 那是最该说出来的部分。
+   */
+  vanished_dimensions?: VanishedDimension[];
+  /** L1 的完整审计链(逐条指标状态 + 模态覆盖率 + gap 计数)。复核用,不必渲染。 */
+  l1?: L1Audit;
   /** 「未产出综合评分,也不给评级」那类固定话术(spec §5.4)。 */
   summary_narrative: string;
   /** ★ 聚合呈现的**权威来源**(spec §5.4/§5.6):覆盖事实 + 逐指标实测区间 + 置信度上限。
@@ -39,10 +57,84 @@ export interface EvaluationResult {
   };
 }
 
+export type DimensionKey =
+  | 'logical_thinking'
+  | 'stress_resilience'
+  | 'communication_fluency'
+  | 'confidence_level'
+  | 'cognitive_efficiency';
+
+/** 一个**整维消失**的原因(L1 引擎)。 */
+export interface VanishedDimension {
+  key: DimensionKey;
+  display_name: string;
+  /** 该维原有的槽数(仍计入 `coverage.n_slots`)。 */
+  n_slots: number;
+  dropped: { slot: string; reason: string }[];
+  reason: string;
+}
+
+/** L1 的审计链 —— 一条一条能对得上规格,报告层不渲染。 */
+/** 一条 L1 指标的**实测记录**(后端 `L1Indicator.to_dict()` 的逐字段镜像)。
+ *  `gap` 非空 ⟺ `value` 为 `null` —— 二者必须一致,后端有硬校验。 */
+export interface L1IndicatorRow {
+  name: string;
+  /** 族:`F1_smile` / `G2_posture` / `V…` / `T1_lexical` 这类,首字母即模态。 */
+  family: string;
+  /** 公式串。**含阈值来源与口径限制**(例如"全场混音,含面试官")。 */
+  formula: string;
+  /** 这条指标依赖的 L0 列 / 数据源。 */
+  required_l0: string[];
+  window: string;
+  value: number | null;
+  unit: string;
+  n_valid: number;
+  n_total: number;
+  confidence: string;
+  gap: string | null;
+}
+
+export interface L1Audit {
+  n_total: number;
+  n_measured: number;
+  by_confidence: Record<string, number>;
+  by_gap: Record<string, number>;
+  modality_coverage: Record<string, {
+    rows: number;
+    usable_rows: number;
+    usable_ratio: number;
+    provided: boolean;
+  }>;
+  indicators: L1IndicatorRow[];
+  /** 「置信低**为什么**低」的逐条说明(后端 `explain_confidence()`)。
+   *  置信度只说"有多信",不回答"为什么只有这么信" —— 后者才是读者要的那句话。
+   *  ⚠️ 后端曾把这张表写好却**没有调用点**,所以字段可能缺失:前端按可选处理。 */
+  low_confidence_notes?: string[];
+  /** ★ 与旧引擎报告对比时的提醒:这些槽**保留了下来但统计量换了**,
+   *  两边的数相减没有含义。来自 `l1_mapper.comparability_notes()`。 */
+  comparability_notes?: string[];
+  gaps: string[];
+  /** 各模态时间基。`span_sec` = 该模态**覆盖到的时间范围**(秒,含重启空档)。
+   *  ⚠️ 与 `n_frames` 不是一回事:1 Hz 的 6968 帧可跨 7427 秒,而 31.25 Hz 的
+   *  13585 帧只跨 434.7 秒 —— 判断"两族看的是不是同一段时间"只能比 `span_sec`。 */
+  timebase?: Record<string, {
+    provided?: boolean;
+    usable?: boolean;
+    status?: string;
+    n_frames?: number;
+    span_sec?: number | null;
+    drift_sec?: number | null;
+    wall_back_steps?: number;
+  }>;
+}
+
 /** `coverage` —— 本次观测的覆盖事实。字段逐一对齐 `research_mapper._coverage()`。 */
 export interface Coverage {
+  /** 分母是**声明的全部旧槽数**(14),包含已消失维度的那几个槽。 */
   n_slots: number;
   n_passed: number;
+  /** 没有同构念 L1 指标、已删掉的槽数(仍计入 `n_slots`)。仅 L1 引擎给。 */
+  n_dropped?: number;
   /** 各维度置信度的**上限**(最乐观的那一个)。 */
   confidence_cap: string;
   passed_slots: CoverageSlot[];
