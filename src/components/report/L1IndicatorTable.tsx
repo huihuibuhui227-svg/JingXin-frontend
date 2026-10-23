@@ -72,6 +72,11 @@ const GAP_LABEL: Record<string, { text: string; hint: string; tone: 'warn' | 'er
     hint: '原始录音就在盘上,只是派生序列还没算过。补救:跑一次提取即可,**不用重录**。',
     tone: 'warn',
   },
+  not_produced: {
+    text: '本层不产出',
+    hint: '这条**故意不算** —— 它与另一条指标是恒等变换(实测 r = 0.9990),多报一条等于把同一份证据数两遍。',
+    tone: 'muted',
+  },
   time_unusable: {
     text: '时间轴不可重建',
     hint: '墙钟与帧时间对不上,按时间切窗口会切错。',
