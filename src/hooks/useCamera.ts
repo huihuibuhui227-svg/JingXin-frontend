@@ -187,10 +187,18 @@ export const useCamera = ({
         console.log('📹 摄像头已启动，等待视频加载...');
         return true;
       } else {
+        // ⚠️ **必须返回 false**,不能像原先那样 `console.error` 之后 `return true`。
+        //    两个调用方(`AssessmentPage`、`RealtimeAnalysis`)把 `false` 当成
+        //    「整场作废」并弹一条不自动消失的错误;而这里原先报 `true` ⟹ 调用方以为
+        //    摄像头起来了,往下走 `startCapture()`,后者在**同一个 null** 上只
+        //    `console.warn` 就 return。结果:没有帧、没有原生录像,界面一切正常。
+        //    (2026-10-25 修;钉子见 `__tests__/useCamera.silent-failures.test.mjs`。)
         console.error('❌ videoRef.current 为 null');
+        onDegradedRef.current?.(
+          '摄像头已打开但页面上没有预览视图 —— 本场采不到任何画面'
+        );
+        return false;
       }
-
-      return true;
     } catch (error) {
       console.error('❌ 摄像头启动失败:', error);
       return false;

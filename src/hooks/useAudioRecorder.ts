@@ -48,17 +48,37 @@ export const useAudioRecorder = ({ onAudioData, deviceId = null }: UseAudioRecor
     }
   }, [onAudioData]);
 
-  const stopRecording = useCallback((): Blob | null => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
+  /**
+   * 停止录音,返回**完整**的音频 Blob。
+   *
+   * ⚠️ 为什么是 `Promise` 而不是直接返回 `Blob`:`MediaRecorder.stop()` 是**异步**的
+   * —— 规范里它先排一个最终的 `dataavailable`,再发 `stop`。原先这里三行全是同步的
+   * (`rec.stop()` → `new Blob(chunksRef.current)` → `chunksRef.current = []`),
+   * 于是**最终那一块永远赶不上这次拼接**。
+   *
+   * 实测(2026-10-25,同一段 2.82 秒录音):走 `stop()` 收尾只拿到 30904 字节 /
+   * 2.34 秒,少掉的那 0.48 秒正是尾巴。而尾巴丢了**不报错**:ASR 照样识别、
+   * 界面照样报成功,只是最后一个字没了。
+   *
+   * 现在等 `stop` 事件到了才拼。调用方必须 `await`(见 `AnswerInput` 里
+   * `handleStopRecording`)—— 不 await 就会把 `[object Promise]` 当成音频发出去。
+   * 钉子:`src/hooks/__tests__/useCamera.silent-failures.test.mjs`。
+   */
+  const stopRecording = useCallback((): Promise<Blob | null> => {
+    const rec = mediaRecorderRef.current;
+    if (!rec) return Promise.resolve(null);
+    mediaRecorderRef.current = null;
 
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      chunksRef.current = [];
-      return blob;
-    }
-    return null;
+    return new Promise<Blob>((resolve) => {
+      rec.addEventListener('stop', () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        chunksRef.current = [];
+        resolve(blob);
+      });
+      rec.stop();
+      rec.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    });
   }, []);
 
   return {

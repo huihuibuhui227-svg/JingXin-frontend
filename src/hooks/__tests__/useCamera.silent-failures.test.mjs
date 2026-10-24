@@ -128,6 +128,113 @@ describe('原生录像的容器按实际轨道选', () => {
   });
 });
 
+describe('startCamera 的返回值', () => {
+  /** 取 `startCamera` 这个 useCallback 的函数体源码。 */
+  function cameraBody() {
+    const src = source();
+    const start = src.indexOf('const startCamera = useCallback(');
+    assert.ok(start > 0, '找不到 startCamera —— 函数被改名了?本测试要跟着改');
+    const end = src.indexOf('const startCapture = useCallback(', start);
+    assert.ok(end > start, '找不到 startCamera 的结尾');
+    return src.slice(start, end);
+  }
+
+  test('「videoRef.current 为 null」必须返回 false,不能返回 true', () => {
+    // ⚠️ 这条是本文件里最贵的一条:两个调用方(`AssessmentPage`、`RealtimeAnalysis`)
+    //    都把 `false` 当成「整场作废」并弹一条不会自动消失的错误。
+    //    而这里原先打一句 `console.error('❌ videoRef.current 为 null')` 之后
+    //    **`return true`** —— 调用方以为摄像头起来了,于是往下走 `startCapture()`,
+    //    而 `startCapture` 在同一个 null 上只 `console.warn` 就 return。
+    //    结果:没有帧、没有原生录像,界面一切正常。正是那两个调用方被修好要防的事。
+    const body = cameraBody();
+    const i = body.indexOf('videoRef.current 为 null');
+    assert.ok(i > 0, '「videoRef.current 为 null」这个分支被删/改写了?本测试要跟着改');
+    // 取这个分支到它所在 if 的收尾(下一个 `return true;` 之前的那一段)
+    const after = body.slice(i);
+    const ret = after.indexOf('return');
+    assert.ok(ret > 0, '这个分支后面没有 return?源码变了,先修测试');
+    const segment = after.slice(0, ret + 40);
+    assert.doesNotMatch(
+      segment,
+      /return true/,
+      'videoRef 为 null 时仍返回 true —— 调用方会以为摄像头起来了,实际一帧都采不到',
+    );
+    assert.match(
+      segment,
+      /return false/,
+      'videoRef 为 null 时没有返回 false —— 那正是「整场作废」的信号',
+    );
+    assert.match(
+      segment,
+      /onDegradedRef\.current\?\./,
+      'videoRef 为 null 时没报降级 —— 用户看不到任何提示',
+    );
+  });
+});
+
+describe('useAudioRecorder 收尾不丢最后一段', () => {
+  const AUDIO_SRC = resolve(HERE, '../../hooks/useAudioRecorder.ts');
+
+  function audioSource() {
+    return readFileSync(AUDIO_SRC, 'utf8');
+  }
+
+  function stopBody() {
+    const src = audioSource();
+    const start = src.indexOf('const stopRecording = useCallback(');
+    assert.ok(start > 0, '找不到 stopRecording —— 函数被改名了?本测试要跟着改');
+    const end = src.indexOf('}, []);', start);
+    assert.ok(end > start, '找不到 stopRecording 的结尾');
+    return src.slice(start, end);
+  }
+
+  test('stop() 之后不许同步拼 blob —— 最后一块要等 stop 事件', () => {
+    // ⚠️ `MediaRecorder.stop()` 是**异步**的:规范里它先排一个最终的
+    //    `dataavailable`,再发 `stop`。而原先的写法是
+    //        rec.stop(); rec.stream.getTracks().forEach(t => t.stop());
+    //        const blob = new Blob(chunksRef.current, ...); chunksRef.current = [];
+    //    —— 三行全是同步的,于是**最终那一块永远赶不上**这次拼接。
+    //    实测(2026-10-25):同样 2.82 秒的录音,走 `stop()` 收尾只拿到
+    //    30904 字节 / 2.34 秒,少掉的那 0.48 秒正是尾巴。
+    //    尾巴丢了不会报错:ASR 照样识别、界面照样报成功,只是最后一个字没了。
+    const body = stopBody();
+    const listener = body.search(/addEventListener\(\s*['"]stop['"]|onstop\s*=/);
+    assert.ok(listener > 0, 'stopRecording 没有等 `stop` 事件 —— 最后一块 dataavailable 永远赶不上这次拼接');
+    assert.ok(body.indexOf('.stop()') > 0, '找不到 rec.stop()');
+
+    // 拼接与清空必须在 **stop 事件的回调体里**。取回调体的做法:从监听器注册处
+    // 到它自己的收尾 `});` 为止 —— 而不是"`rec.stop()` 之后",因为监听器本来就
+    // 注册在 `rec.stop()` **之前**(先挂后调,否则事件可能已经发过去了)。
+    // ⚠️ 第一版写的是「`rec.stop()` 之后找监听器」,于是改对了实现仍然红 ——
+    //    红的是测试,不是代码。
+    const tail = body.slice(listener);
+    // ⚠️ 别用第一个 `});` 当回调的收尾:`new Blob(chunksRef.current, { type: 'audio/webm' });`
+    //    里就有一个 `});`。用 `resolve(` 当收尾标记 —— 它一定在回调体的末尾。
+    const close = tail.indexOf('resolve(');
+    assert.ok(close > 0, '找不到 stop 回调的 resolve');
+    const callback = tail.slice(0, close);
+    assert.match(callback, /new Blob\(/, 'blob 不是在 stop 事件回调里拼的');
+    assert.match(callback, /chunksRef\.current\s*=\s*\[\]/, 'chunks 不是在 stop 事件回调里清空的');
+  });
+
+  test('stopRecording 返回 Promise(调用方要 await)', () => {
+    const body = stopBody();
+    assert.match(body, /Promise</, 'stopRecording 仍然同步返回 Blob —— 调用方拿不到最后一块');
+  });
+
+  test('调用方确实 await 了它', () => {
+    // 改了签名不改调用方 ⟹ 拿到的是 Promise 对象,`if (!audioBlob)` 恒假,
+    // 于是把 `[object Promise]` 当成音频发出去。这比丢尾巴更坏。
+    const src = readFileSync(
+      resolve(HERE, '../../components/assessment/AnswerInput.tsx'), 'utf8');
+    assert.match(
+      src,
+      /await\s+onStopRecording\(\)/,
+      'AnswerInput 没有 await onStopRecording() —— 它拿到的是 Promise,不是 Blob',
+    );
+  });
+});
+
 describe('摄像头轨中途死亡', () => {
   test('给视频轨挂了 ended/mute 监听', () => {
     const src = source();

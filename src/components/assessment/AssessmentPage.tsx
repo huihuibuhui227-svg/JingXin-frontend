@@ -18,6 +18,7 @@ import {
 } from '@/components/recording/RecordingDialogs';
 import type { ConsentMode } from '@/components/recording/RecordingDialogs';
 import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
+import { createAnalysisHealth } from '@/utils/analysisHealth';
 
 const { Content } = Layout;
 
@@ -154,8 +155,9 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
                 }
               });
             }
-          }).catch(err => {
+          }).then(() => analysisHealthRef.current.ok()).catch(err => {
             console.warn('⚠️ 面部分析失败:', err.message);
+            analysisHealthRef.current.fail('面部');
           }),
 
           gestureApi.analyzeGesture(frame).then(result => {
@@ -186,8 +188,9 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
                 }
               });
             }
-          }).catch(err => {
+          }).then(() => analysisHealthRef.current.ok()).catch(err => {
             console.warn('⚠️ 手势分析失败:', err.message);
+            analysisHealthRef.current.fail('手势');
           })
         ]).then(() => {
           console.log('✅ 本轮分析完成');
@@ -215,6 +218,10 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     // 是转过头还要再看一眼的问题 ⟹ 交给常驻横幅。
     onDegraded: recording.addDegraded,
   });
+
+  // 帧分析连续失败的判据。`onFrame` 里那两句 `.catch(console.warn)` 只进控制台,
+  // 于是后端挂了 ⟹ 面板显示上一帧成功时的值 ⟹ 看起来一切正常而这一场一行日志没有。
+  const analysisHealthRef = useRef(createAnalysisHealth(recording.addDegraded));
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     deviceId: devices.audioDeviceId,

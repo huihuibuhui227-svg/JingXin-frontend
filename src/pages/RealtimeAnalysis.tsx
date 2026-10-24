@@ -13,6 +13,7 @@ import {
 } from '@/components/recording/RecordingDialogs';
 import type { ConsentMode } from '@/components/recording/RecordingDialogs';
 import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
+import { createAnalysisHealth } from '@/utils/analysisHealth';
 
 const { Content } = Layout;
 
@@ -136,8 +137,9 @@ const RealtimeAnalysis: React.FC = () => {
                 return newData.slice(-20);
               });
             }
-          }).catch(err => {
+          }).then(() => analysisHealthRef.current.ok()).catch(err => {
             console.warn('⚠️ 面部分析失败:', err.message);
+            analysisHealthRef.current.fail('面部');
           }),
 
           // 手势分析
@@ -163,8 +165,9 @@ const RealtimeAnalysis: React.FC = () => {
                 }
               });
             }
-          }).catch(err => {
+          }).then(() => analysisHealthRef.current.ok()).catch(err => {
             console.warn('⚠️ 手势分析失败:', err.message);
+            analysisHealthRef.current.fail('手势');
           })
         ]);
       } catch (error) {
@@ -193,6 +196,10 @@ const RealtimeAnalysis: React.FC = () => {
     // 等于没有凭证 —— 转过头就分不清这场算不算数)。两样都在 hook 里。
     onDegraded: recording.addDegraded,
   });
+
+  // 帧分析连续失败的判据 —— 与 `AssessmentPage` 同一处置。
+  // 那两句 `.catch(console.warn)` 只进控制台,后端挂了 ⟹ 面板显示上一帧的值。
+  const analysisHealthRef = useRef(createAnalysisHealth(recording.addDegraded));
 
   /** 真正开录。由标注弹窗的「确定」经 hook 调过来 —— 顺序是**先有标注、再开录**:
    *  弹出弹窗那一刻什么都还没采,取消就是干净地什么都没发生。 */

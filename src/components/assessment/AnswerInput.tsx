@@ -10,7 +10,8 @@ interface AnswerInputProps {
   onSpeechToText?: (audioBlob: Blob) => Promise<string>;
   isRecording: boolean;
   onStartRecording: () => void;
-  onStopRecording: () => Blob | null;
+  /** 返回 Promise:最终那一块 `dataavailable` 要等 `stop` 事件(见 hook 里的说明)。 */
+  onStopRecording: () => Promise<Blob | null>;
   disabled?: boolean;
 }
 
@@ -46,7 +47,7 @@ const AnswerInput: React.FC<AnswerInputProps> = ({
     // 没有 onSpeechToText 时录音按钮根本不渲染,这里只是把类型收口
     if (!onSpeechToText) return;
 
-    const audioBlob = onStopRecording();
+    const audioBlob = await onStopRecording();
 
     if (!audioBlob) {
       message.error('录音失败，请重试');
