@@ -34,8 +34,29 @@ interface UseCameraProps {
 /** 本场原生录像的容器。**写死**是定的设计(spec §5.4 / 裁定 R5):
  *  R5 在 Windows Edge 153 上实测这一串是 `audio:live, video:live`、回放有画有声,
  *  所以不退回「另存一路 audio.webm」。别改成 `video/webm` 裸串 —— 那会让浏览器
- *  自己挑编码,而下游要的是确定的 vp8+opus。 */
+ *  自己挑编码,而下游要的是确定的 vp8+opus。
+ *
+ *  ⚠️ **但只在流里真有视频轨时成立。**「只同意声音」那条流只有音轨,硬塞 vp8
+ *  是拿一个和轨道不匹配的容器去开录 —— 规范允许这时抛 `NotSupportedError`,
+ *  Chromium 选择宽容接受(2026-10-25 实测 Chrome 155:不抛,`recorder.mimeType`
+ *  照报 `video/webm;codecs=vp8,opus`,实际分片是 `video/webm;codecs=opus`)。
+ *  **抛不抛取决于浏览器**,而一旦抛了,落进 `startNativeRecorder` 的 catch 就是
+ *  "这一场一音一画都没有,而界面上什么都没说"。所以按轨道选容器
+ *  (见 `pickRecorderMime`),不赌 UA 行为。 */
 const VIDEO_MIME = 'video/webm;codecs=vp8,opus';
+
+/** 纯音频流的容器。与 `VIDEO_MIME` 同理写死:下游要的是确定的 opus。 */
+const AUDIO_ONLY_MIME = 'audio/webm;codecs=opus';
+
+/** 按流里**实际有没有视频轨**选容器。
+ *
+ *  为什么不看 `audioOnly` 这个入参:它是 React state 经 ref 同步过来的,
+ *  与 `startCamera` 之间存在时序窗口(见 `audioOnlyRef` 的注释)。轨是**当下的事实**,
+ *  入参是**可能还没同步的意图** —— 容器该跟着事实走。
+ */
+function pickRecorderMime(stream: MediaStream): string {
+  return stream.getVideoTracks().length > 0 ? VIDEO_MIME : AUDIO_ONLY_MIME;
+}
 
 export const useCamera = ({
   onFrame, frameRate = 1, onVideoReady, onDegraded,
@@ -69,6 +90,8 @@ export const useCamera = ({
   const stopRequestedRef = useRef(false);
   // 「刷新/关页会丢整场录像」的拦截句柄。见 onVideoReady 的契约说明。
   const beforeUnloadRef = useRef<((e: BeforeUnloadEvent) => void) | null>(null);
+  // 视频轨死亡监听的拆除函数。见 `beginCapture` 里那段"两条路都要挂"。
+  const trackCleanupRef = useRef<(() => void) | null>(null);
 
   const releaseBeforeUnload = useCallback(() => {
     if (!beforeUnloadRef.current) return;
@@ -280,6 +303,11 @@ export const useCamera = ({
     const mediaStream = streamRef.current;
     if (!mediaStream) {
       console.error('❌ 没有 mediaStream,原生录像无法开始 —— 本场将没有 camera.webm');
+      // ⚠️ **必须报给调用方**。只打 console 的话,用户看到的是「本场已确认留存」
+      //    的绿色提示,而盘上什么都没有 —— 本仓最贵的那类静默失效。
+      onDegradedRef.current?.(
+        '原生录像没能启动(没有可用的媒体流)—— 本场盘上不会有 camera.webm'
+      );
       return;
     }
     if (mediaRecorderRef.current) {
@@ -288,16 +316,24 @@ export const useCamera = ({
     }
     if (typeof MediaRecorder === 'undefined') {
       console.error('❌ 该浏览器没有 MediaRecorder —— 本场将没有 camera.webm');
+      onDegradedRef.current?.(
+        '这个浏览器没有 MediaRecorder —— 本场盘上不会有 camera.webm(帧与日志照常保存)'
+      );
       return;
     }
 
+    const mime = pickRecorderMime(mediaStream);
     let recorder: MediaRecorder;
     try {
-      recorder = new MediaRecorder(mediaStream, { mimeType: VIDEO_MIME });
+      recorder = new MediaRecorder(mediaStream, { mimeType: mime });
     } catch (error) {
-      // 不退回别的容器:设计把编码钉死在 vp8+opus。宁可这一场没有录像
-      //(收尾对账会点出来),也不要一份编码不明的文件冒充"原始素材"。
-      console.error(`❌ 无法以 ${VIDEO_MIME} 开录(本场将没有 camera.webm):`, error);
+      // 不退回别的容器:设计把编码钉死在 vp8+opus(纯音频时是 opus)。
+      // 宁可这一场没有录像(收尾对账会点出来),也不要一份编码不明的文件
+      // 冒充"原始素材"。
+      console.error(`❌ 无法以 ${mime} 开录(本场将没有 camera.webm):`, error);
+      onDegradedRef.current?.(
+        `原生录像开不起来(浏览器不接受 ${mime})—— 本场盘上不会有 camera.webm`
+      );
       return;
     }
 
@@ -378,10 +414,13 @@ export const useCamera = ({
       recorder.start(1000);
     } catch (error) {
       console.error('❌ 原生录像启动失败(本场将没有 camera.webm):', error);
+      onDegradedRef.current?.(
+        '原生录像启动失败(摄像头可能已被拔走或被其他应用占用)—— 本场盘上不会有 camera.webm'
+      );
       return;                     // ref 保持 null ⟹ 收尾那条路照常放掉轨道
     }
     mediaRecorderRef.current = recorder;
-    console.log('🎥 原生录像已开始，容器:', VIDEO_MIME);
+    console.log('🎥 原生录像已开始，容器:', mime);
 
     // 从这一刻起,整场录像**只活在内存里** —— 一次 F5 就永久没了(spec 的"录完就补不回来"
     // 在这里是字面意思)。所以挂一个拦截,直到上传落定才撤(见 onstop)。
@@ -410,6 +449,33 @@ export const useCamera = ({
     isRecordingRef.current = true;
     setIsRecording(true);
 
+    // ── 摄像头轨中途死亡:两条路都要挂 ──────────────────────────────────────
+    // ① 事件:`ended`(外部原因拔掉/被抢)、`mute`(被静音/被别的应用占)。
+    // ② **逐帧比对**:`track.stop()`(脚本停、部分异常路径)**不触发 `ended`** ——
+    //    2026-10-25 实测 Chrome 155:停轨之后 `video.readyState` 恒为 4,
+    //    `drawImage` 出来的像素哈希每一帧完全相同,而帧循环照旧把同一张图发出去。
+    //    后果不只是"图冻住":后端 `retain_frame` 会把同一张 jpg 反复落成
+    //    000001.jpg / 000002.jpg…,face/gesture 面板还会继续显示看起来正常的分数。
+    //    只挂事件抓不住这条,所以下面那个"连续 N 帧一模一样"的判据是必需的。
+    const vTrack = streamRef.current?.getVideoTracks()[0];
+    if (vTrack) {
+      const onTrackDead = (ev: Event) => {
+        if (!isRecordingRef.current) return;
+        console.error(`❌ 摄像头视频轨死了(${ev.type})—— 画面已冻住`);
+        onDegradedRef.current?.(
+          `摄像头在录制中途断开(${ev.type === 'mute' ? '被静音/被其他应用占用' : '被拔掉或被其他应用抢走'})`
+          + ' —— 之后的画面与帧都是重复的最后一帧'
+        );
+      };
+      vTrack.addEventListener('ended', onTrackDead);
+      vTrack.addEventListener('mute', onTrackDead);
+      trackCleanupRef.current = () => {
+        vTrack.removeEventListener('ended', onTrackDead);
+        vTrack.removeEventListener('mute', onTrackDead);
+        trackCleanupRef.current = null;
+      };
+    }
+
     console.log('📹 开始视频帧捕获，帧率:', frameRate, 'fps');
     console.log('  - Canvas 尺寸:', canvas.width, 'x', canvas.height);
     console.log('  - Video 尺寸:', video.videoWidth, 'x', video.videoHeight);
@@ -417,6 +483,13 @@ export const useCamera = ({
     startNativeRecorder();
 
     let frameCount = 0;
+    // 冻帧判据的状态。连续 FREEZE_FRAMES_TO_REPORT 帧逐字节相同 ⟹ 判冻住。
+    // 取 10 帧:1fps 下是 10 秒 —— 短到能在一场里发现,长到不会被"人真的没动"
+    // 误报(静坐 10 秒完全可能)。**只报一次**,不然降级横幅会被刷屏。
+    let lastFrameKey = '';
+    let sameCount = 0;
+    let freezeReported = false;
+
     intervalRef.current = setInterval(() => {
       if (!isRecordingRef.current) return;
 
@@ -427,6 +500,32 @@ export const useCamera = ({
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
+
+      // 像素指纹:抽一行像素拼成字符串。比"整帧哈希"便宜得多(逐帧算全图哈希
+      // 在 1280x720 上会成为这个循环的主要开销),而"整帧完全一样"一定意味着
+      // "这一行也一样" —— 对"冻住"这个判据来说够用。
+      let frameKey = '';
+      try {
+        const row = ctx.getImageData(0, Math.floor(canvas.height / 2), canvas.width, 1).data;
+        // 每 16 个像素取一个,避免长字符串比较
+        for (let i = 0; i < row.length; i += 64) frameKey += String.fromCharCode(row[i]);
+      } catch {
+        // 取不到像素(跨域/上下文丢失)就不做冻帧判断 —— 宁可漏报,不可误报
+        frameKey = '';
+      }
+      if (frameKey && frameKey === lastFrameKey) {
+        sameCount++;
+        if (sameCount >= 10 && !freezeReported) {
+          freezeReported = true;
+          console.error('❌ 连续 10 帧画面完全相同 —— 摄像头画面已冻住');
+          onDegradedRef.current?.(
+            '摄像头画面已冻住(连续 10 帧完全相同)—— 这之后采到的帧都是重复的最后一帧'
+          );
+        }
+      } else {
+        if (frameKey) sameCount = 0;
+        lastFrameKey = frameKey;
+      }
 
       canvas.toBlob((blob) => {
         if (blob && onFrame) {
@@ -445,6 +544,9 @@ export const useCamera = ({
     captureStartedRef.current = false;
     isRecordingRef.current = false;
     setIsRecording(false);
+    // 撤掉视频轨的死亡监听:轨道对象由 `releaseStream` 放,但监听器是挂在
+    // 那个 track 上的闭包 —— 不撤的话它会连着这个组件一起活着。
+    trackCleanupRef.current?.();
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
