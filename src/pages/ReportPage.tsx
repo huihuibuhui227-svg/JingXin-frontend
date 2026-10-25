@@ -26,6 +26,12 @@ const STATUS_LABELS: Record<string, string> = {
   loaded: '已读入', unreadable: '未读到数据', missing: '缺失',
 };
 
+/** 日志键 → L1 的族模态名(后端 `l1_quality.FAMILY_MODALITY` 用后者)。
+ *  两者不同名:日志按「面试 / 科研」分文件,而 V 族不分 —— 同一套指标。 */
+const LOG_KEY_TO_MODALITY: Record<string, string> = {
+  voice_interview: 'voice', voice_research: 'voice',
+};
+
 const ReportPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -157,12 +163,28 @@ const ReportPage: React.FC = () => {
             <ul style={{ margin: '8px 0 0', paddingLeft: '20px', color: 'var(--ax-text-secondary)', fontSize: '13px' }}>
               {Object.entries(sources)
                 .filter(([k]) => k !== 'none_bucket')
-                .map(([k, v]: [string, any]) => (
-                  <li key={k}>
-                    {MODALITY_LABELS[k] ?? k} · {STATUS_LABELS[v.status] ?? v.status}
-                    {v.status === 'loaded' ? `（${v.rows} 行）` : ''}
-                  </li>
-                ))}
+                .map(([k, v]: [string, any]) => {
+                  /* ⚠️ 三态**只描述日志文件**。语音还有第二个数据源(整场录音重算),
+                     日志 0 行时 V 族照样可能算出 10 条 —— 那时印「未读到数据」会与
+                     同一份载荷里的指标明细打架(2026-10-25 实测)。
+                     条数由载荷给(`modality_summary`),前端不自己数。 */
+                  const got = report?.l1?.modality_summary?.[LOG_KEY_TO_MODALITY[k] ?? k];
+                  if (v.status !== 'loaded' && got && got.n_measured > 0) {
+                    return (
+                      <li key={k}>
+                        <strong>{MODALITY_LABELS[k] ?? k} · 日志没有数据，但这个模态算出了{' '}
+                        {got.n_measured} / {got.n_total} 条指标</strong>
+                        {got.source_note ? `（${got.source_note}）` : ''}
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={k}>
+                      {MODALITY_LABELS[k] ?? k} · {STATUS_LABELS[v.status] ?? v.status}
+                      {v.status === 'loaded' ? `（${v.rows} 行）` : ''}
+                    </li>
+                  );
+                })}
               {sources.none_bucket && (
                 <li>
                   <em>另有 NONE 桶 {sources.none_bucket.rows} 行 —— 那些请求没带 session_id，不属于本场</em>

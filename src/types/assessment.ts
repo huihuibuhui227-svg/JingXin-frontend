@@ -120,6 +120,20 @@ export interface L1Audit {
     usable_ratio: number;
     provided: boolean;
   }>;
+  /** ★ 每个模态**到底算出了几条**指标(后端 `l1_quality.modality_summary()`)。
+   *
+   *  为什么需要:`sources` 的三态**只描述日志文件**,而语音还有第二个数据源
+   *  —— 整场录音逐帧重算(`voice_series`),不经日志。实测场
+   *  `20260928_180131_8102`:语音日志 0 行、`sources` 报 `unreadable`,
+   *  而 V 族 12 条有 10 条有值。只看三态就会印「未读到数据」,
+   *  与同一份载荷里的指标明细互相打架(2026-10-25 实测)。
+   *
+   *  `source_note` 只在"值不是从日志来的"时非空 —— 它回答"日志都没有,这些数哪来的"。 */
+  modality_summary?: Record<string, {
+    n_total: number;
+    n_measured: number;
+    source_note: string;
+  }>;
   indicators: L1IndicatorRow[];
   /** 「置信低**为什么**低」的逐条说明(后端 `explain_confidence()`)。
    *  置信度只说"有多信",不回答"为什么只有这么信" —— 后者才是读者要的那句话。
