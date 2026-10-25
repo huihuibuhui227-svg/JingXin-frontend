@@ -374,13 +374,19 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
         读者无从判断该不该用这个数。这里把每条的理由印出来 ——
         例如"整场只有一次测量 ⟹ 报不出跨样本一致性",那是素材限制,不是算错。
       */}
-      {(l1.low_confidence_notes?.length ?? 0) > 0 && (
+      {/*
+        ⚠️ 印**人话版**:审计版是 `{指标名}:{理由}`,而指标名是内部键 ——
+        实测交付物正文里印出过 `speech_rate:` / `pause_rate_per_min:` 等 5 个键,
+        而维度表里同一个指标印的是中文槽名,读者会以为是两个东西。
+        载荷没发人话版时退回审计版(宁可露英文,不许把这一段吞掉)。
+      */}
+      {((l1.low_confidence_notes_plain ?? l1.low_confidence_notes)?.length ?? 0) > 0 && (
         <div style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.75 }}>
           <div style={{ color: 'var(--ax-text-secondary)', marginBottom: 2 }}>
             置信度为「低」的原因（素材限制，不是算错）：
           </div>
           <ul style={{ paddingLeft: 20, margin: 0, color: 'var(--ax-ink-muted-80)' }}>
-            {l1.low_confidence_notes!.map((note, i) => {
+            {(l1.low_confidence_notes_plain ?? l1.low_confidence_notes)!.map((note, i) => {
               // 后端拼的是半角冒号 `name:reason`;这里两种冒号都认,
               // 免得哪天后端换了全角就整条不再分行。
               const cut = note.search(/[：:]/);

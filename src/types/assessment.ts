@@ -139,6 +139,12 @@ export interface L1Audit {
    *  置信度只说"有多信",不回答"为什么只有这么信" —— 后者才是读者要的那句话。
    *  ⚠️ 后端曾把这张表写好却**没有调用点**,所以字段可能缺失:前端按可选处理。 */
   low_confidence_notes?: string[];
+  /** ★ 同一批理由的**给人读版**(后端 `explain_confidence(quality, plain=True)`)。
+   *  审计版每条形如 `speech_rate:理由`,指标名是内部键 —— 实测交付物正文里印出过
+   *  5 个键,而维度表里同一个指标印的是中文槽名,读者会以为是两个东西。
+   *  可选是因为旧载荷没有它:渲染时退回 `low_confidence_notes`,
+   *  宁可露出英文,也不许把这一段吞掉。 */
+  low_confidence_notes_plain?: string[];
   /** ★ 与旧引擎报告对比时的提醒:这些槽**保留了下来但统计量换了**,
    *  两边的数相减没有含义。来自 `l1_mapper.comparability_notes()`。
    *
