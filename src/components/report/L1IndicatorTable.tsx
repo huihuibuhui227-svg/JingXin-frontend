@@ -537,8 +537,13 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
         (绝对量 → 相对本人基线的偏离;均值 → 中位数;单列 → 多列合计;
         presence-once → 出现次数)。名字相近,读者会自然相减 —— 而那个差没有含义。
         放在表格上方而不是折叠里:折叠的东西没人看,而这是"会用错数"的风险。
+
+        ⚠️ 印的是 `comparability_notes_plain`(人话版),不是 `comparability_notes`。
+        审计版每条形如 `旧槽键 → L1指标名：理由`,直接印会把 6 个内部指标名
+        带上界面(2026-10-25 实测,交付物与界面同时漏)。
+        载荷没发人话版时退回审计版 —— 宁可露出英文,也不许把这一段吞掉。
       */}
-      {(l1.comparability_notes?.length ?? 0) > 0 && (
+      {((l1.comparability_notes_plain ?? l1.comparability_notes)?.length ?? 0) > 0 && (
         <div
           style={{
             marginBottom: 12,
@@ -554,7 +559,7 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
             与旧引擎报告对比时注意：下列槽名相近，但统计量已更换，两边的数不可相减
           </div>
           <ul style={{ paddingLeft: 20, margin: 0 }}>
-            {l1.comparability_notes!.map((n, i) => (
+            {(l1.comparability_notes_plain ?? l1.comparability_notes)!.map((n, i) => (
               <li key={i}>{plain(n)}</li>
             ))}
           </ul>

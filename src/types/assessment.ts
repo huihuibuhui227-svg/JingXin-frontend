@@ -126,8 +126,17 @@ export interface L1Audit {
    *  ⚠️ 后端曾把这张表写好却**没有调用点**,所以字段可能缺失:前端按可选处理。 */
   low_confidence_notes?: string[];
   /** ★ 与旧引擎报告对比时的提醒:这些槽**保留了下来但统计量换了**,
-   *  两边的数相减没有含义。来自 `l1_mapper.comparability_notes()`。 */
+   *  两边的数相减没有含义。来自 `l1_mapper.comparability_notes()`。
+   *
+   *  ⚠️ 这是**审计版**:每条形如 `旧槽键 → L1指标名：理由`,带 6 个内部指标名。
+   *  核对口径的人要查它,但**不该渲染**(2026-10-25 实测:界面与交付物都漏了)。
+   *  渲染用下面的 `comparability_notes_plain`。 */
   comparability_notes?: string[];
+  /** ★ 同一批比较陷阱的**给人读版**,来自 `l1_mapper.comparability_notes_plain()`。
+   *  形如「连接词密度：旧报告数的是……,新报告数的是……」—— 没有槽键、没有指标名。
+   *  可选是因为旧载荷没有它:渲染时退回 `comparability_notes`,
+   *  宁可露出英文,也不许把这一整段吞掉。 */
+  comparability_notes_plain?: string[];
   gaps: string[];
   /** ★ 窗口口径 —— 这场是"整场一个窗口"还是"每回答一个窗口"。
    *  `granularity="session"` ⟹ 本场没有提问台账,F/G 按整场算,不能与逐题场比。
