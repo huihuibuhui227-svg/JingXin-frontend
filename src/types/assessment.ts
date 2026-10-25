@@ -70,7 +70,22 @@ export interface VanishedDimension {
   display_name: string;
   /** 该维原有的槽数(仍计入 `coverage.n_slots`)。 */
   n_slots: number;
-  dropped: { slot: string; reason: string }[];
+  /**
+   * 逐槽的删除理由。**两组字段各有各的读者**,别混:
+   *  · `slot` / `reason` —— 审计细节。`reason` 必须点名真实 L1 指标
+   *    (后端 `test_m4_l1_mapper` 要求),里面还带 markdown 星号。
+   *    核对口径的人要查得到,但**不该渲染**。
+   *  · `human_name` / `plain_reason` —— 交付物印的这两样(2026-10-25 起后端逐槽补上)。
+   *    前端没有、也不该有槽名对照表:两张表迟早分叉。
+   *  `human_name` 可选是因为**旧载荷没有它** —— 渲染时要退回 `slot`,
+   *  宁可露出英文,也不许把这一条吞掉(本仓反复栽的形态:失败被降级成"看不见")。
+   */
+  dropped: {
+    slot: string;
+    reason: string;
+    human_name?: string;
+    plain_reason?: string;
+  }[];
   reason: string;
 }
 

@@ -60,16 +60,31 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
         东西当前管线都不测。它因此不进 `dimensions`。
         不渲染的话报告会**悄悄少一块**,而少的那块恰好是"测不到的东西" ——
         那是最该说出来的部分。
+
+        ⚠️ 2026-10-25:这里原来印的是 `d.slot` / `d.reason`,那是**审计细节**
+        (内部槽键 + 内部指标名 + markdown 星号),读者一次撞上三样。
+        后端 HTML 报告早已改走人话那层(`l1_mapper.slot_label` / `drop_reason`),
+        报告页是同一个载荷的另一个出口,不该有两套口径。
+        前端没有、也不该有槽名对照表 ⟹ 人话由载荷给(`human_name` /
+        `plain_reason`)。字段缺席时**退回**内部字段:宁可露出英文,
+        也不许把这一条吞掉。
+        钉子:`__tests__/vanishedDimensions.test.mjs`。
       */}
       {vanished.length > 0 && (
         <Card title="整维未出（当前管线没有对应的可测量）" style={{ marginBottom: '24px' }}>
+          <p style={{ color: 'var(--ax-text-secondary)', marginTop: 0 }}>
+            下面这一维<strong>不是本场没测到</strong>,是它要量的东西当前管线都不测 ——
+            再采一百次也不会有,别等它。
+          </p>
           <ul style={{ paddingLeft: '20px', margin: 0 }}>
             {vanished.map((v) => (
               <li key={v.key} style={{ marginBottom: '8px' }}>
                 <strong>{v.display_name}</strong>
                 <Tag style={{ marginLeft: '8px' }}>{v.n_slots} 个槽</Tag>
                 <div style={{ color: 'var(--ax-text-secondary)', marginTop: '4px' }}>
-                  {v.dropped.map((d) => `${d.slot}：${d.reason}`).join('；')}
+                  {v.dropped
+                    .map((d) => `${d.human_name ?? d.slot}：本层不测这一条 —— ${d.plain_reason ?? d.reason}`)
+                    .join('；')}
                 </div>
               </li>
             ))}
