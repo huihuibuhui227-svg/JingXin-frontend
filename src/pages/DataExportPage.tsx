@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Layout, Card, Select, Button, Checkbox, Space, Typography, message,
-  Alert, Spin, Tag, Divider, Empty
+  Alert, Spin, Tag, Divider, Empty, Modal, Input
 } from 'antd';
 import {
   DownloadOutlined, LineChartOutlined, FileTextOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import { API_BASE_URL } from '@/utils/constants';
+import { getAdminToken, recordingsApi } from '@/services/recordingsApi';
 
 const { Content } = Layout;
 const { Text, Title, Paragraph } = Typography;
@@ -76,11 +77,41 @@ const fmtBytes = (n: number): string => {
 const api = (sid: string, path: string): string =>
   `${API_BASE_URL}/api/export/${encodeURIComponent(sid)}${path}`;
 
+/**
+ * 鉴权头。**与素材页同一份 token**(`sessionStorage` 里的 `jx_admin_token`)——
+ * 两页共用一次登录,不各存一份。
+ */
+const authHeaders = (): Record<string, string> => {
+  const token = getAdminToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+/**
+ * 给**下载链接**用的 URL:token 走 query。
+ *
+ * `<a href download>` 与 `<img src>` 发不了自定义头(浏览器限制,不是选择)——
+ * 服务端对这三条(csv / transcript / chart)开了 `allow_query=True`,与素材页的
+ * `/video`、`/file` 同一口径、同一代价(token 会进浏览器历史与访问日志)。
+ * ⚠️ 分隔符要看 URL 里**已经有没有** `?` —— 一律用 `?` 会让 `?format=txt?token=…`
+ *    里的 token 收不到(素材页踩过一次,这里同样防着)。
+ */
+const downloadUrl = (url: string): string => {
+  const token = getAdminToken();
+  if (!token) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+};
+
 const DataExportPage: React.FC = () => {
   const [sessions, setSessions] = useState<ExportSession[]>([]);
   const [sid, setSid] = useState<string>('');
   const [files, setFiles] = useState<ExportFiles | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  /** 401 ⟹ 服务端要求管理员。不给入口的话页面只会空着,人会以为"坏了"。 */
+  const [needLogin, setNeedLogin] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [modules, setModules] = useState<string[]>(['face', 'gesture', 'voice']);
   const [charts, setCharts] = useState<Record<string, { url?: string; error?: string; loading?: boolean }>>({});
@@ -94,14 +125,17 @@ const DataExportPage: React.FC = () => {
 
   useEffect(() => {
     // 会话列表**带个人信息**（姓名/学号/院系/场次）—— 只有一串 sid 的列表没法按人对号。
-    fetch(`${API_BASE_URL}/api/export/sessions`)
+    setLoadingSessions(true);
+    fetch(`${API_BASE_URL}/api/export/sessions`, { headers: authHeaders() })
       .then(async (r) => {
-        const body = await r.json();
+        const body = await r.json().catch(() => ({}));
+        if (r.status === 401) { setNeedLogin(true); return; }
         if (!r.ok) throw new Error(body?.error || `读取失败(${r.status})`);
+        setNeedLogin(false);
         const list: ExportSession[] = (body.sessions || [])
           .sort((a: ExportSession, b: ExportSession) => b.modified - a.modified);
         setSessions(list);
-        if (list.length) setSid(list[0].sid);
+        if (list.length) setSid((prev) => prev || list[0].sid);
       })
       .catch((e) => message.error(e?.message || '读不到会话列表'))
       .finally(() => setLoadingSessions(false));
@@ -113,15 +147,58 @@ const DataExportPage: React.FC = () => {
     if (!sid) return;
     setLoadingFiles(true);
     setFiles(null);
-    fetch(api(sid, '/files'))
+    fetch(api(sid, '/files'), { headers: authHeaders() })
       .then(async (r) => {
-        const body = await r.json();
+        const body = await r.json().catch(() => ({}));
+        if (r.status === 401) { setNeedLogin(true); return; }
         if (!r.ok) throw new Error(body?.error || `读取失败(${r.status})`);
         setFiles(body as ExportFiles);
       })
       .catch((e) => message.error(e?.message || '读取这一场的数据失败'))
       .finally(() => setLoadingFiles(false));
   }, [sid]);
+
+  /** 登录成功后**重新拉一遍**列表与清单 —— 否则界面还停在 401 时的空状态。 */
+  const reloadAll = async () => {
+    setLoadingSessions(true);
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/export/sessions`, { headers: authHeaders() });
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 401) { setNeedLogin(true); return; }
+      if (!r.ok) throw new Error(body?.error || `读取失败(${r.status})`);
+      setNeedLogin(false);
+      const list: ExportSession[] = (body.sessions || [])
+        .sort((a: ExportSession, b: ExportSession) => b.modified - a.modified);
+      setSessions(list);
+      if (list.length) setSid((prev) => prev || list[0].sid);
+    } catch (e: any) {
+      message.error(e?.message || '读不到会话列表');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const doLogin = async () => {
+    setLoggingIn(true);
+    setLoginError(null);
+    try {
+      await recordingsApi.login(password);
+      setLoginOpen(false);
+      setPassword('');
+      message.success('已进入管理员视图');
+      await reloadAll();
+    } catch (e: any) {
+      // 503 与 401 要分开说:前者是"这台机器没配密码",后者才是"密码不对"。
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.error;
+      setLoginError(
+        status === 503 ? `服务端还没配管理员密码：${detail}`
+          : status === 401 ? '密码不对'
+            : detail || e?.message || '登录失败');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
 
   const loadCharts = async () => {
     if (!sid) return;
@@ -132,7 +209,8 @@ const DataExportPage: React.FC = () => {
 
     await Promise.all(modules.map(async (m) => {
       try {
-        const r = await fetch(api(sid, `/chart?module=${m}&t=${Date.now()}`));
+        const r = await fetch(api(sid, `/chart?module=${m}&t=${Date.now()}`),
+          { headers: authHeaders() });
         if (!r.ok) {
           let msg = `生成失败(${r.status})`;
           try { const j = await r.json(); msg = j?.error || msg; } catch { /* 非 JSON */ }
@@ -176,6 +254,15 @@ const DataExportPage: React.FC = () => {
             采集时的原始表与语音转写都在这里 —— 报告只印过了证据门的指标，复核与换算法用这些原件。
           </Paragraph>
         </div>
+
+        {needLogin && (
+          <Alert
+            type="warning" showIcon style={{ marginBottom: 16 }}
+            message="这一页要管理员密码"
+            description="导出的是受试者的原始数据（转写原文、身份、三份行为表），与素材页同一道门。"
+            action={<Button size="small" type="primary" onClick={() => setLoginOpen(true)}>输入密码</Button>}
+          />
+        )}
 
         <Card size="small" style={{ marginBottom: 20 }}>
           <Space wrap size={16} align="center">
@@ -225,7 +312,7 @@ const DataExportPage: React.FC = () => {
                 {files.logs.filter((l) => l.exists).map((l) => (
                   <Button
                     key={l.key}
-                    href={api(sid, `/csv/${l.key}`)}
+                    href={downloadUrl(api(sid, `/csv/${l.key}`))}
                     icon={<DownloadOutlined />}
                   >
                     {l.label}
@@ -257,15 +344,15 @@ const DataExportPage: React.FC = () => {
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   <Space wrap>
                     <Button type="primary" icon={<DownloadOutlined />}
-                      href={api(sid, '/transcript?format=txt')}>
+                      href={downloadUrl(api(sid, '/transcript?format=txt'))}>
                       下载 TXT（人读）
                     </Button>
                     <Button icon={<DownloadOutlined />}
-                      href={api(sid, '/transcript?format=csv')}>
+                      href={downloadUrl(api(sid, '/transcript?format=csv'))}>
                       下载 CSV（题干 + 回答）
                     </Button>
                     <Button icon={<DownloadOutlined />}
-                      href={api(sid, '/transcript?format=json')}>
+                      href={downloadUrl(api(sid, '/transcript?format=json'))}>
                       下载 JSON（原始）
                     </Button>
                   </Space>
@@ -314,7 +401,7 @@ const DataExportPage: React.FC = () => {
                         <Tag color="blue">{label}</Tag>
                         {c.url && (
                           <Button size="small" icon={<DownloadOutlined />}
-                            href={api(sid, `/chart?module=${m}`)}>
+                            href={downloadUrl(api(sid, `/chart?module=${m}`))}>
                             下载 PNG
                           </Button>
                         )}
@@ -340,6 +427,22 @@ const DataExportPage: React.FC = () => {
           </Space>
         )}
       </div>
+
+      <Modal
+        title="管理员密码"
+        open={loginOpen}
+        onOk={doLogin}
+        confirmLoading={loggingIn}
+        okText="进入"
+        cancelText="取消"
+        onCancel={() => { setLoginOpen(false); setPassword(''); }}
+      >
+        <Input.Password
+          value={password} onChange={(e) => setPassword(e.target.value)}
+          onPressEnter={doLogin} placeholder="管理员密码" autoFocus
+        />
+        {loginError && <Alert style={{ marginTop: 12 }} type="error" showIcon message={loginError} />}
+      </Modal>
     </Content>
   );
 };
