@@ -70,12 +70,24 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
       const t = await recordingsApi.generateReport(sid);
       const taskId = t?.task_id;
       if (!taskId) throw new Error(t?.message || '服务端没有返回 task_id');
+      let done = false;
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 1000));
         const st = await recordingsApi.taskStatus(taskId);
-        if (st.status === 'completed') { setGenMsg('已生成'); refreshDetail(); break; }
-        if (st.status === 'failed') throw new Error(st.error || '生成失败');
-        // `status` 还是 running —— 继续等
+        // ⚠️ 服务端的任务状态只有 pending / running / **success** / **error**
+        //    (app.py 的 run_script 落的就是这两个词)。此前这里等的是
+        //    `completed`/`failed` —— 两个永远不成立的字符串,于是报告其实
+        //    一两秒就生成好了,界面却空转到拨满 60 次(远端延迟下 ≈2 分钟),
+        //    既不报"已生成",也不刷新报告列表。2026-10-26 实盘踩到。
+        if (st.status === 'success') { setGenMsg('已生成'); refreshDetail(); done = true; break; }
+        if (st.status === 'error') throw new Error(st.message || '生成失败');
+        // `status` 还是 pending/running —— 继续等
+      }
+      // 拨满 60 次还没结束 = 超时。**不许**把界面留在"正在生成…"上(那正是
+      // 这次修的那个观感);说清没等到,并把列表刷新一次再让人自己看。
+      if (!done) {
+        setGenMsg('还没跑完 —— 已刷新列表，稍后到「报告」页签查看');
+        refreshDetail();
       }
     } catch (e: any) {
       setGenMsg(e?.response?.data?.detail || e?.message || '生成失败');

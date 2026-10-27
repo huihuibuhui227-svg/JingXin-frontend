@@ -156,7 +156,7 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
   /**
    * 各族观察窗口 —— "两族看的不是同一段时间"的直接证据。
    *
-   * 只比 `n_frames` 看不出来(王语桐 6968 vs 13585 反而像语音更多),
+   * 只比 `n_frames` 看不出来(候选B 6968 vs 13585 反而像语音更多),
    * 必须比 `span_sec`(7427 vs 434.7)。三族一致时**不显示**,不加噪音。
    */
   const { windowRow, windowMismatch } = useMemo(() => {
@@ -410,7 +410,7 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
         ★ 各族的**观察窗口**。
 
         这一行是"两族看的不是同一段时间"的直接证据。13 场里 12 场三族一致,
-        王语桐一场是 面部/手势 2:03:47、语音 0:07:14(视频只剩最后一段)。
+        候选B一场是 面部/手势 2:03:47、语音 0:07:14(视频只剩最后一段)。
         只比 `n_frames` 看不出来(6968 vs 13585 反而像语音更多),
         必须比 `span_sec`。窗口不一致才显示,一致时不加噪音。
       */}

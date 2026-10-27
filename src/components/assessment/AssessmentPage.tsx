@@ -18,6 +18,7 @@ import {
 } from '@/components/recording/RecordingDialogs';
 import type { ConsentMode } from '@/components/recording/RecordingDialogs';
 import DevicePicker, { useDeviceSelection } from '@/components/recording/DevicePicker';
+import PreflightGate from '@/components/assessment/PreflightGate';
 import { createAnalysisHealth } from '@/utils/analysisHealth';
 
 const { Content } = Layout;
@@ -97,7 +98,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
    * 自动跳走**,而录像是在卸载时才上传的 —— **存没存下,当场没人知道**。
    * 9-28 那场 2.1 GB 的丢失事故里,有一场 7.3 分钟的录像就是这么没的。
    */
+  // 设备自检回调走 ref:它在 useCamera 之前就要交给 hook,而 startCamera 在 hook 之后才有。
+  const onBeforeRecordRef = useRef<((mode: ConsentMode) => Promise<boolean>) | null>(null);
   const recording = useSessionRecording({
+    // 开录前的**设备自检**(脸 + 手 + 麦都采得到)。铸号在它之后 —— 没过就什么都不留。
+    onBeforeRecord: (mode) => onBeforeRecordRef.current?.(mode) ?? true,
     // 铸号发生在**标注确定之后**:标注弹窗先收集,确定后才 `start()`
     // (它铸号 + 拿题)。取消 = 盘上干干净净,不留空壳目录。
     onPrepareSession: async () => {
@@ -282,6 +287,32 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     };
   }, [started]);
 
+  // ── 开录前的设备自检(2026-10-26)─────────────────────────────────────────
+  // 离摄像头太远 ⟹ 人脸检出率与 AU 精度会掉,而系统此前照常开录。现在:
+  // 征询确定后、**铸号之前**先开相机探几帧;脸/手/麦没全过就不铸号(盘上什么都不留)。
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const preflightResolveRef = useRef<((ok: boolean) => void) | null>(null);
+
+  onBeforeRecordRef.current = async (mode: ConsentMode) => {
+    if (mode === 'audio_only') return true;      // 只采声音:不开摄像头,没有画面可检
+    const ok = await startCamera();
+    if (!ok) {
+      message.error('摄像头/麦克风没有打开 —— 无法进行设备自检', 0);
+      return false;
+    }
+    return new Promise<boolean>((resolve) => {
+      preflightResolveRef.current = resolve;
+      setPreflightOpen(true);
+    });
+  };
+
+  const finishPreflight = (ok: boolean) => {
+    setPreflightOpen(false);
+    preflightResolveRef.current?.(ok);
+    preflightResolveRef.current = null;
+    if (!ok) stopCamera();     // 没过就把相机放掉,回到"还没开始"
+  };
+
   /** 点「开始面试」→ **先弹标注窗**,不是直接开录。
    *  标注的全部意义就是把这一场与别的场次分开;不填标注的一场在盘上是个裸 sid,
    *  事后认不出是谁 —— 等于白采。所以「取消 = 不开始」。 */
@@ -416,6 +447,17 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             没标注的一场事后认不出是谁,等于白采。
           </p>
         </div>
+
+        {/* 开录前也要有一个 <video>:设备自检要从它抓帧。隐藏起来不占版面 ——
+            用户看到的取景画面在自检窗里(同一路流)。 */}
+        <video ref={videoRef} autoPlay muted playsInline style={{ display: 'none' }} />
+
+        <PreflightGate
+          open={preflightOpen}
+          videoRef={videoRef}
+          onReady={() => finishPreflight(true)}
+          onCancel={() => finishPreflight(false)}
+        />
 
         <LabelModal
           open={recording.labelModalOpen}

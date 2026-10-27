@@ -107,6 +107,19 @@ export const useCamera = ({
   });
 
   const startCamera = useCallback(async () => {
+    // 幂等:设备自检会先开一次相机,开录时再调一次。已经有一路活着的流就复用 ——
+    // 不再向浏览器要第二路(那会重复弹权限/多占一个摄像头,部分设备直接失败)。
+    const live = streamRef.current;
+    if (live && live.getTracks().some((t) => t.readyState === 'live')) {
+      console.log('📷 摄像头已在运行,复用现有流');
+      // 自检窗与正式录制页是两个不同的 <video> 元素(前者在开录前,后者在开录后)。
+      // 复用流时必须把它接到**当前**这个元素上,否则正式页黑屏、帧也采不到。
+      if (videoRef.current && videoRef.current.srcObject !== live) {
+        videoRef.current.srcObject = live;
+        videoRef.current.play().catch(() => { /* 自动播放被拦:用户点一下即可 */ });
+      }
+      return true;
+    }
     try {
       console.log('📷 请求摄像头权限...');
       // M2.6(R5):`audio: false` → `true`。在这一路里**同时**取麦克风,

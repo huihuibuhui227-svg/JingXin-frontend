@@ -24,7 +24,10 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/research', label: '科研评估' },
   { key: '/analysis', label: '实时分析' },
   { key: '/reports', label: '报告列表' },
-  { key: '/recordings', label: '录制素材' }
+  { key: '/recordings', label: '录制素材' },
+  // 2026-10-26:报告之外的两个工作口 —— 导出原始表/转写、换题库。
+  { key: '/export', label: '数据导出' },
+  { key: '/question-bank', label: '题库' }
 ];
 
 /** 子导航左侧显示的板块名 —— 取当前路由对应的标签。 */

@@ -43,6 +43,13 @@ const ReportPage: React.FC = () => {
   // M2.1(第 18 条):这份报告描述的是哪一场、每个模态进来了没有
   const [describedSession, setDescribedSession] = useState<string | null>(null);
   const [sources, setSources] = useState<Record<string, any> | null>(null);
+  // 报告头：这一场是谁的、什么时候测的。与 HTML 报告头同一块（2026-10-26）——
+  // 此前页面只有会话号，同一批报告在列表里、在页面上都分不出谁是谁。
+  const [subject, setSubject] = useState<Record<string, string> | null>(null);
+  const [headerTimes, setHeaderTimes] = useState<{
+    tested_at?: string | null;
+    generated_at?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (storeResult) {
@@ -59,6 +66,8 @@ const ReportPage: React.FC = () => {
           setReport(data.result);
           setDescribedSession(data.session_id ?? null);
           setSources(data.sources ?? null);
+          setSubject(data.subject ?? {});
+          setHeaderTimes({ tested_at: data.tested_at ?? null, generated_at: data.generated_at ?? null });
         } else {
           setError(data.message || '无法获取报告数据');
         }
@@ -108,6 +117,14 @@ const ReportPage: React.FC = () => {
     );
   }
 
+  // 只印真有的字段：空字段整段不出现（不留孤零零的「院系」）。
+  const subjectPairs: Array<[string, string]> = subject
+    ? ([['被测者', subject.name], ['学号', subject.student_id],
+        ['院系', subject.department], ['场次', subject.serial]] as Array<[string, string | undefined]>)
+        .filter(([, v]) => !!v)
+        .map(([k, v]) => [k, v as string])
+    : [];
+
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -116,6 +133,35 @@ const ReportPage: React.FC = () => {
           <h1 style={{ margin: 0, fontSize: "var(--ax-display-md-size)", fontWeight: 600 }}>评估报告</h1>
           <DownloadButton />
         </div>
+
+        {/* 报告头：这一场是谁的、什么时候测的。与 HTML 报告头同一块（2026-10-26）——
+            此前这里只有会话号，同一批报告在列表里、在页面上都分不出谁是谁。
+            服务端没回 subject（老会话/短路走 store）时整块不渲染，不编。 */}
+        {subject !== null && (
+          <Card size="small" style={{ marginBottom: '24px' }} data-testid="report-subject">
+            {subjectPairs.length === 0 ? (
+              <div style={{ color: 'var(--ax-text-secondary)' }}>
+                被测者：<strong>未标注</strong>（录制时没有填写姓名 / 学号 / 院系 —— 这份报告没法按人对号）
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 18px' }}>
+                {subjectPairs.map(([k, v]) => (
+                  <span key={k} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ color: 'var(--ax-text-secondary)', fontSize: 13 }}>{k}</span>
+                    <strong>{v}</strong>
+                  </span>
+                ))}
+              </div>
+            )}
+            {(headerTimes?.tested_at || headerTimes?.generated_at) && (
+              <div style={{ color: 'var(--ax-text-secondary)', fontSize: 13, marginTop: 8 }}>
+                {headerTimes?.tested_at && <>测试时间 {headerTimes.tested_at}</>}
+                {headerTimes?.tested_at && headerTimes?.generated_at && ' · '}
+                {headerTimes?.generated_at && <>报告生成时间 {headerTimes.generated_at}</>}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* spec §5.4/§5.6:本系统**不产出对候选人的评分与评级** —— 未标定标尺上的复合点分
             与五档评语一律不渲染(HTML 报告早已如此,这里跟上:同一份载荷的

@@ -179,7 +179,9 @@ export const recordingsApi = {
   taskStatus: async (taskId: string) => {
     const r = await axios.get(`${API_BASE_URL}/api/task/${encodeURIComponent(taskId)}`,
       { headers: authHeaders() });
-    return r.data as { status: string; output?: string; error?: string };
+    // 服务端字段见 app.py 的 task_status:status / message / logs / module。
+    // 不要把 message 写成 error —— 服务端从来没有 error 这个键。
+    return r.data as { status: string; message?: string; logs?: string; output?: string };
   },
 
   videoUrl: (sid: string): string =>

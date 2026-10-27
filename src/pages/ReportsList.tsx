@@ -19,6 +19,7 @@ interface ReportRow {
   name: string;
   url: string;
   kind: string; // 「科研评估报告」/「面试评估报告」…
+  subject: string | null; // 文件名里带的被测者姓名（没有标注就没有）
   ts: number | null; // 毫秒时间戳，用于排序；解析失败为 null
   tsText: string; // 展示用「2026-09-28 23:25:20」，解析失败为空串
 }
@@ -35,6 +36,26 @@ const parseKind = (filename: string): string => {
   if (/^research_/i.test(filename)) return '科研评估报告';
   if (/^interview_/i.test(filename)) return '面试评估报告';
   return '评估报告';
+};
+
+/** 文件名里的被测者姓名：`..._20261026_114732-候选Y.html` → `候选Y`。
+ *
+ *  后端约定（2026-10-26）：报告文件名 = `Research_Assessment_Report_<生成时刻>[-<姓名>].html`；
+ *  同一秒连跑多场撞名时，会在**姓名之后**再加会话 id 末四位（`...-候选Y-cb79.html`），
+ *  没有姓名的场次撞名则是 `...-cb79.html`（末段纯 4 位十六进制）。
+ *  所以：末段是 4 位十六进制且前面还有一段，取中间那段；只有末段且是 4 位十六进制
+ *  ⟹ 那是会话号后缀，不是人。解析不出就返回 null —— 不拿机器号冒充姓名。
+ */
+const parseSubject = (filename: string): string | null => {
+  const segs = filename.replace(/\.html?$/i, '').split('-');
+  if (segs.length < 2) return null;
+  const last = segs[segs.length - 1].trim();
+  let tail = last;
+  if (/^[0-9a-f]{4}$/i.test(last)) {
+    if (segs.length < 3) return null;
+    tail = segs[segs.length - 2].trim();
+  }
+  return tail || null;
 };
 
 /** 解析 `20260928_232520` 为时间戳与展示文本。解析不出来就返回 null（不编造日期）。 */
@@ -90,6 +111,7 @@ const ReportsList: React.FC = () => {
           name: item.name,
           url: item.url,
           kind: parseKind(item.name),
+          subject: parseSubject(item.name),
           ts,
           tsText: text
         };
@@ -108,9 +130,21 @@ const ReportsList: React.FC = () => {
       dataIndex: 'kind',
       key: 'kind',
       render: (kind: string, row) => (
-        <Space size={8}>
-          <FileTextOutlined style={{ color: 'var(--ax-primary)' }} />
-          <a onClick={() => window.open(row.url, '_blank')}>{kind}</a>
+        <Space size={8} align="start">
+          <FileTextOutlined style={{ color: 'var(--ax-primary)', marginTop: 4 }} />
+          <span>
+            <a onClick={() => window.open(row.url, '_blank')}>
+              {kind}{row.subject ? ` · ${row.subject}` : ''}
+            </a>
+            {/* 文件名原样印在下面 —— 「这一份是谁的」不止一眼能看，也能核对。
+                文件名里带姓名是 2026-10-26 后端加的；旧报告没有后缀，这里就只显示类型。 */}
+            <div style={{
+              fontFamily: 'monospace', fontSize: 11,
+              color: 'var(--ax-text-secondary)', wordBreak: 'break-all'
+            }}>
+              {row.name}
+            </div>
+          </span>
         </Space>
       )
     },

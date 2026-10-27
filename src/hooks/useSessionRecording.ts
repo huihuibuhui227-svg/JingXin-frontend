@@ -59,9 +59,14 @@ interface Options {
   /** **开录**。在标注提交之后调用,参数是征询结果 —— 调用方据此决定
    *  **开不开摄像头**。标注提交失败**不会**拦到这里(材料比标注值钱)。 */
   onRecordStart?: (consent: ConsentMode) => void | Promise<void>;
+  /** **设备自检**。在征询确定之后、**铸号之前**调用(2026-10-26:离摄像头太远
+   *  会让 AU/手势精度崩掉,所以开录前先确认脸和手都能采到)。
+   *  返回 `false` ⟹ 这一场不铸号、不开录(盘上什么都不留);`audio_only` 由调用方直接放行。 */
+  onBeforeRecord?: (consent: ConsentMode) => void | boolean | Promise<void | boolean>;
 }
 
-export const useSessionRecording = ({ onPrepareSession, onRecordStart }: Options = {}) => {
+export const useSessionRecording = ({ onPrepareSession, onRecordStart,
+                                     onBeforeRecord }: Options = {}) => {
   // ── 标注 ────────────────────────────────────────────────────────────────
   const [labelFields, setLabelFields] = useState<LabelFields>({
     serial: '', name: '', student_id: '', department: '',
@@ -121,6 +126,13 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart }: Options
     setConsentModalOpen(false);
     setSavingLabel(true);
     try {
+      if (onBeforeRecord) {
+        const pre = await onBeforeRecord(mode);
+        if (pre === false) {
+          message.info('设备自检没有通过 —— 这一场没有开始', 0);
+          return;
+        }
+      }
       const prepared = await onPrepareSession?.();
       if (prepared === false) {
         message.error('这一场没有开始 —— 会话没有铸成,采不到任何素材', 0);
@@ -144,7 +156,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart }: Options
     } finally {
       setSavingLabel(false);
     }
-  }, [labelFields, onPrepareSession, onRecordStart]);
+  }, [labelFields, onPrepareSession, onRecordStart, onBeforeRecord]);
 
   /** 征询窗的「不同意」。**什么都不做** —— 铸号还没发生,盘上不会有任何东西。 */
   const declineConsent = useCallback(() => {
