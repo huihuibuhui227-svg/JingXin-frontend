@@ -331,6 +331,25 @@ const RealtimeAnalysis: React.FC = () => {
   const faceCoveragePct = captureStats.sent > 0 ? Math.round((captureStats.faceHit / captureStats.sent) * 100) : 0;
   const gestCoveragePct = captureStats.sent > 0 ? Math.round((captureStats.gestHit / captureStats.sent) * 100) : 0;
 
+  const faceSvc = health?.services?.face;
+  const gestureSvc = health?.services?.gesture;
+  const voiceSvc = health?.services?.voice;
+  const captureCapabilityBar = health
+    ? [
+        faceSvc?.landmarker_3d_matrix
+          ? `面部 478 网格 · ${faceSvc.blendshapes_count ?? 52} 系数 · 3D 姿态`
+          : '面部 478 网格',
+        gestureSvc?.backend === 'rtmw'
+          ? '上肢 RTMW 133 点骨骼'
+          : '上肢 MediaPipe 双手与姿态',
+        voiceSvc?.live_pitch_backend === 'parselmouth'
+          ? (voiceSvc.live_vad_backend === 'rms_threshold'
+            ? '语音 Praat 声学基频提取'
+            : '语音 Praat 声学 + 神经 VAD')
+          : '语音转写与基频提取',
+      ].join(' · ')
+    : null;
+
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: 'var(--ax-workbench-max)', margin: '0 auto' }}>
@@ -421,6 +440,20 @@ const RealtimeAnalysis: React.FC = () => {
               </Button>
             )}
           </div>
+          {captureCapabilityBar && (
+            <div
+              style={{
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: '1px solid var(--ax-divider-soft)',
+                fontSize: 12.5,
+                color: 'var(--ax-text-secondary)',
+                lineHeight: 1.5,
+              }}
+            >
+              采集引擎：{captureCapabilityBar}
+            </div>
+          )}
         </Card>
 
         {sessionError && (

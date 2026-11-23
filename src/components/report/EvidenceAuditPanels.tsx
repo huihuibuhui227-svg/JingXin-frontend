@@ -1,6 +1,10 @@
 import React from 'react';
 import { Alert, Collapse, Space, Table, Tag, Typography } from 'antd';
-import type { EvaluationResult } from '@/types/assessment';
+import type {
+  EvaluationResult,
+  FaceDualInstrumentPair,
+  SecondInstrumentRow,
+} from '@/types/assessment';
 
 const { Text } = Typography;
 
@@ -10,6 +14,13 @@ const TIER_TONE: Record<string, React.CSSProperties> = {
   T2b: { color: '#0a4a8f', background: '#eef5fc', borderColor: '#c2dcf5' },
   T3a: { color: '#7a4a05', background: '#fdf6e9', borderColor: '#eed39e' },
   T3b: { color: '#5c5c61', background: '#f5f5f7', borderColor: '#e0e0e0' },
+};
+
+const AGREEMENT_TONE: Record<string, React.CSSProperties> = {
+  高度一致: TIER_TONE.T1,
+  中度一致: TIER_TONE.T2a,
+  分歧较大: TIER_TONE.T3a,
+  通道未激活: TIER_TONE.T3b,
 };
 
 /**
@@ -26,7 +37,8 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
   const pp = l1.parameter_provenance;
   const gov = l1.governance_ledger as any;
   const sq = l1.signal_quality_audit as any;
-  const secondInst = l1.second_instrument_appendix as any;
+  const secondInst = l1.second_instrument_appendix;
+  const dualInst = l1.face_dual_instrument;
   const blockedWarns = Array.isArray(l1.blocked_dependency_warnings) ? l1.blocked_dependency_warnings : [];
 
   const items = [];
@@ -244,10 +256,13 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
     });
   }
 
-  if (secondInst?.available) {
-    const appendixRows: any[] = Array.isArray(secondInst.rows)
+  if (secondInst?.available || dualInst?.available) {
+    const appendixRows: SecondInstrumentRow[] = Array.isArray(secondInst?.rows)
       ? secondInst.rows
-      : (Array.isArray(secondInst.items) ? secondInst.items : []);
+      : (Array.isArray(secondInst?.items) ? secondInst.items : []);
+    const hasPartA = Boolean(secondInst?.available && appendixRows.length > 0);
+    const hasPartB = Boolean(dualInst?.available && Array.isArray(dualInst.pairs) && dualInst.pairs.length > 0);
+
     items.push({
       key: 'second-instrument',
       label: (
@@ -258,19 +273,149 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
       ),
       children: (
         <div style={{ fontSize: 13, color: 'var(--ax-text-secondary)' }}>
-          <p style={{ marginTop: 0 }}>{secondInst.disclaimer || secondInst.summary_plain || '以下读数来自 FaceLandmarker 52 项回归系数，独立于主几何代理指标。'}</p>
-          {appendixRows.length > 0 && (
-            <Table
-              rowKey={(r: any, idx?: number) => r.name || r.indicator || String(idx ?? 0)}
+          {secondInst?.available && (
+            <p style={{ marginTop: 0 }}>
+              {secondInst.disclaimer || secondInst.summary_plain || '以下读数来自 FaceLandmarker 52 项回归系数，独立于主几何代理指标。'}
+            </p>
+          )}
+          {hasPartA && (
+            <Table<SecondInstrumentRow>
+              rowKey={(r, idx) => r.name || String(idx ?? 0)}
               size="small"
               pagination={false}
+              scroll={{ x: 640 }}
               dataSource={appendixRows}
               columns={[
-                { title: '对照项', dataIndex: 'label', render: (v: string, r: any) => v || r.name || r.indicator },
-                { title: '读数', dataIndex: 'value', width: 120, render: (v: number | null) => (typeof v === 'number' ? v.toFixed(3) : '—') },
-                { title: '有效样本', dataIndex: 'n_valid', width: 100, render: (v: any) => v ?? '—' },
+                {
+                  title: '对照项',
+                  dataIndex: 'label',
+                  width: 150,
+                  render: (v: string, r) => (
+                    <strong style={{ color: 'var(--ax-ink)' }}>{v || r.name}</strong>
+                  ),
+                },
+                {
+                  title: '实测值',
+                  dataIndex: 'value',
+                  width: 140,
+                  align: 'right' as const,
+                  render: (v: number | null | undefined, r) => (
+                    <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--ax-ink)' }}>
+                      {typeof v === 'number' && Number.isFinite(v)
+                        ? `${v.toFixed(3)}${r.unit ? ` ${r.unit}` : ''}`
+                        : '—'}
+                    </span>
+                  ),
+                },
+                {
+                  title: '有效样本',
+                  dataIndex: 'n_valid',
+                  width: 96,
+                  align: 'right' as const,
+                  render: (v: number | undefined) => (
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('zh-CN') : '—'}
+                    </span>
+                  ),
+                },
+                {
+                  title: '口径说明',
+                  dataIndex: 'comparable_note',
+                  render: (v: string | undefined) => (
+                    <span style={{ fontSize: 12.5, color: 'var(--ax-text-secondary)' }}>{v || '—'}</span>
+                  ),
+                },
               ]}
             />
+          )}
+
+          {hasPartB && dualInst && (
+            <div style={{ marginTop: hasPartA ? 16 : 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ax-ink)', marginBottom: 4 }}>
+                双仪器逐构念一致性核对
+              </div>
+              {dualInst.summary_plain && (
+                <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ax-text-secondary)' }}>
+                  {dualInst.summary_plain}
+                </p>
+              )}
+              <Table<FaceDualInstrumentPair>
+                rowKey="construct"
+                size="small"
+                pagination={false}
+                scroll={{ x: 640 }}
+                dataSource={dualInst.pairs}
+                columns={[
+                  {
+                    title: '行为构念',
+                    dataIndex: 'label',
+                    width: 170,
+                    render: (v: string, r) => (
+                      <strong style={{ color: 'var(--ax-ink)' }}>{v || r.construct}</strong>
+                    ),
+                  },
+                  {
+                    title: '一致等级',
+                    dataIndex: 'agreement_level',
+                    width: 115,
+                    render: (lvl: string) => (
+                      <Tag style={{ margin: 0, ...(AGREEMENT_TONE[lvl] ?? AGREEMENT_TONE['通道未激活']) }}>
+                        {lvl}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: '逐帧秩相关',
+                    dataIndex: 'spearman_rho',
+                    width: 115,
+                    align: 'right' as const,
+                    render: (v: number | null) => (
+                      <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {typeof v === 'number' && Number.isFinite(v) ? v.toFixed(3) : '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    title: '变化趋势相关',
+                    dataIndex: 'delta_spearman_rho',
+                    width: 120,
+                    align: 'right' as const,
+                    render: (v: number | null) => (
+                      <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {typeof v === 'number' && Number.isFinite(v) ? v.toFixed(3) : '—'}
+                      </span>
+                    ),
+                  },
+                  {
+                    title: '有效帧',
+                    dataIndex: 'n_valid',
+                    width: 96,
+                    align: 'right' as const,
+                    render: (v: number) => (
+                      <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('zh-CN') : '—'}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+              {dualInst.au15_pitch_diagnostic?.available && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: '8px 12px',
+                    borderRadius: 'var(--ax-rounded-sm)',
+                    background: 'var(--ax-parchment)',
+                    border: '1px solid var(--ax-hairline)',
+                    fontSize: 12.5,
+                    color: 'var(--ax-text-secondary)',
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {dualInst.au15_pitch_diagnostic.diagnostic_note}
+                </div>
+              )}
+            </div>
           )}
         </div>
       ),

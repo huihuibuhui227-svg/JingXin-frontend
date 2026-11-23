@@ -201,6 +201,83 @@ export interface SignalQualityAudit {
   inference_ms?: number;
 }
 
+export interface BehaviorRegimeSegment {
+  state: 'steady_speaking' | 'active_expressive' | 'pause_thinking' | 'low_signal' | string;
+  label: string;
+  start_sec: number;
+  end_sec: number;
+  duration_sec: number;
+  color_key?: string;
+}
+
+export interface BehaviorRegimeAudit {
+  available: boolean;
+  advisory_only: boolean;
+  n_windows: number;
+  transition_count: number;
+  total_duration_sec: number;
+  state_meta: Record<string, { label: string; description: string; color: string; color_key?: string }>;
+  state_counts: Record<string, number>;
+  state_ratios: Record<string, number>;
+  segments: BehaviorRegimeSegment[];
+  summary_plain: string;
+  disclaimer: string;
+  model_used?: boolean;
+  model_type?: string | null;
+  model_metrics?: {
+    n_sessions?: number;
+    n_windows?: number;
+    val_silhouette_mean?: number;
+    cluster_stability_ari_mean?: number;
+    state_agreement_mean?: number;
+    inference_ms?: number;
+    cpu_inference_ms_per_30_windows?: number;
+  } | null;
+  inference_ms?: number;
+}
+
+export interface FaceDualInstrumentPair {
+  construct: string;
+  label: string;
+  geometric_col: string;
+  blendshape_cols: string[];
+  n_valid: number;
+  spearman_rho: number | null;
+  delta_spearman_rho: number | null;
+  geo_floor_rate: number;
+  bs_floor_rate: number;
+  agreement_level: '高度一致' | '中度一致' | '分歧较大' | '通道未激活' | string;
+  inactive_reason?: string | null;
+}
+
+export interface FaceDualInstrumentAudit {
+  available: boolean;
+  summary_plain: string;
+  counts_by_level?: Record<string, number>;
+  pairs: FaceDualInstrumentPair[];
+  au15_pitch_diagnostic?: {
+    available: boolean;
+    diagnostic_only: boolean;
+    n_valid: number;
+    raw_floor_rate: number | null;
+    au15_pitch_spearman_rho: number | null;
+    pitch_r_squared: number | null;
+    residual_bs_frown_spearman_rho: number | null;
+    diagnostic_note: string;
+  } | null;
+}
+
+export interface SecondInstrumentRow {
+  name: string;
+  label?: string;
+  value?: number | null;
+  unit?: string;
+  n_valid?: number;
+  threshold_used?: number | null;
+  geometric_counterpart?: string;
+  comparable_note?: string;
+}
+
 export interface L1Audit {
   n_total: number;
   n_measured: number;
@@ -316,8 +393,18 @@ export interface L1Audit {
   blocked_dependency_warnings?: Array<{ indicator: string; columns: string[]; warning: string }>;
   second_instrument_appendix?: {
     available: boolean;
+    disclaimer?: string;
     summary_plain?: string;
+    rows?: SecondInstrumentRow[];
     items?: Array<{ name: string; label?: string; value?: number | null; n_valid?: number }>;
+  };
+  face_dual_instrument?: FaceDualInstrumentAudit;
+  behavior_regimes?: BehaviorRegimeAudit;
+  speaker_turn_audit?: {
+    available?: boolean;
+    isolation_mode?: string;
+    summary_plain?: string;
+    n_qa_segments?: number;
   };
   signal_quality_audit?: SignalQualityAudit;
 }

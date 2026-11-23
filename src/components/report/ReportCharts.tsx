@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Tag } from 'antd';
+import { Card, Space, Tag } from 'antd';
 import type { DimensionKey, EvaluationResult } from '@/types/assessment';
 
 const DIMENSION_ORDER: DimensionKey[] = [
@@ -115,6 +115,203 @@ export const DimensionCoverageChart: React.FC<{ report: EvaluationResult }> = ({
           );
         })}
       </div>
+    </Card>
+  );
+};
+
+const REGIME_STATES = [
+  { key: 'steady_speaking', label: '平稳陈述态', color: '#2563eb' },
+  { key: 'active_expressive', label: '活跃表达态', color: '#15803d' },
+  { key: 'pause_thinking', label: '静默停顿态', color: '#b45309' },
+  { key: 'low_signal', label: '信号受限态', color: '#9ca3af' },
+] as const;
+
+const REGIME_COLOR_MAP: Record<string, string> = {
+  steady_speaking: '#2563eb',
+  active_expressive: '#15803d',
+  pause_thinking: '#b45309',
+  low_signal: '#9ca3af',
+};
+
+const fmtMinSec = (sec: number): string => {
+  if (!Number.isFinite(sec) || sec <= 0) return '0:00';
+  const whole = Math.round(sec);
+  const mins = Math.floor(whole / 60);
+  const rem = whole % 60;
+  return `${mins}:${String(rem).padStart(2, '0')}`;
+};
+
+/** 整场行为节奏无监督分段纯 SVG 时间轴（只读提示，不参与任何汇总）。 */
+export const BehaviorRegimeTimeline: React.FC<{ report: EvaluationResult }> = ({ report }) => {
+  const br = report.l1?.behavior_regimes;
+  const clipUid = React.useId().replace(/:/g, '');
+  if (!br) return null;
+
+  const segments = Array.isArray(br.segments) ? br.segments : [];
+  const hasTimeline = br.available && segments.length > 0 && br.total_duration_sec > 0;
+  const maxSegEnd = segments.reduce((acc, s) => Math.max(acc, s.end_sec), 0);
+  const spanSec = Math.max(br.total_duration_sec || 0, maxSegEnd, 0.001);
+  const clipId = `regime-clip-${clipUid}`;
+
+  const agreement = br.model_metrics?.state_agreement_mean;
+  const inferMs = typeof br.inference_ms === 'number'
+    ? br.inference_ms
+    : br.model_metrics?.inference_ms;
+  const metricParts: string[] = [];
+  if (br.model_used !== false && typeof agreement === 'number' && Number.isFinite(agreement)) {
+    metricParts.push(`无监督模型跨场验证一致率 ${(agreement * 100).toFixed(1)}%`);
+  }
+  if (typeof inferMs === 'number' && Number.isFinite(inferMs)) {
+    metricParts.push(`本场纯 CPU 耗时 ${inferMs.toFixed(1)} ms`);
+  }
+
+  return (
+    <Card
+      size="small"
+      style={{ marginBottom: 20 }}
+      title={
+        <Space wrap size={8}>
+          <span>整场行为节奏时间轴</span>
+          <Tag
+            style={{
+              margin: 0,
+              color: br.available ? 'var(--ax-info)' : 'var(--ax-text-secondary)',
+              background: br.available ? 'var(--ax-info-soft)' : 'var(--ax-parchment)',
+              borderColor: br.available ? 'var(--ax-info-border)' : 'var(--ax-hairline)',
+              fontWeight: 600,
+            }}
+          >
+            {br.available ? `${segments.length} 个连续时段` : '样本不足'}
+          </Tag>
+        </Space>
+      }
+    >
+      {br.summary_plain && (
+        <p style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--ax-ink)', lineHeight: 1.55 }}>
+          {br.summary_plain}
+        </p>
+      )}
+
+      {hasTimeline && (
+        <div>
+          <svg
+            viewBox="0 0 800 32"
+            style={{ width: '100%', height: 32, display: 'block' }}
+            role="img"
+            aria-label={`整场行为节奏时间轴，共 ${segments.length} 个连续时段`}
+          >
+            <defs>
+              <clipPath id={clipId}>
+                <rect x="0" y="0" width="800" height="32" rx="6" />
+              </clipPath>
+            </defs>
+            <g clipPath={`url(#${clipId})`}>
+              <rect x="0" y="0" width="800" height="32" fill="#ebedf0" />
+              {segments.map((seg, idx) => {
+                const start = Math.max(0, Math.min(spanSec, seg.start_sec));
+                const end = Math.max(start, Math.min(spanSec, seg.end_sec));
+                const xRaw = (start / spanSec) * 800;
+                const wRaw = ((end - start) / spanSec) * 800;
+                const x = Math.min(xRaw, 798.5);
+                const w = Math.max(1.5, Math.min(wRaw, 800 - x));
+                const fill = REGIME_COLOR_MAP[seg.state] || '#64748b';
+                return (
+                  <rect
+                    key={`${seg.state}-${idx}`}
+                    x={x}
+                    y={0}
+                    width={w}
+                    height={32}
+                    fill={fill}
+                  >
+                    <title>{`${seg.label} ${seg.start_sec.toFixed(0)}s–${seg.end_sec.toFixed(0)}s`}</title>
+                  </rect>
+                );
+              })}
+            </g>
+          </svg>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginTop: 5,
+              fontSize: 11.5,
+              fontFamily: 'var(--ax-font-mono)',
+              fontVariantNumeric: 'tabular-nums',
+              color: 'var(--ax-text-secondary)',
+            }}
+          >
+            <span>0:00</span>
+            <span>{fmtMinSec(spanSec / 2)}</span>
+            <span>{fmtMinSec(spanSec)}</span>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+            {REGIME_STATES.map((st) => {
+              const label = br.state_meta?.[st.key]?.label || st.label;
+              const ratio = br.state_ratios?.[st.key] ?? 0;
+              const pct = Math.round(ratio * 100);
+              return (
+                <span
+                  key={st.key}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '3px 10px',
+                    borderRadius: 'var(--ax-rounded-pill)',
+                    background: 'var(--ax-parchment)',
+                    border: '1px solid var(--ax-hairline)',
+                    fontSize: 12.5,
+                    color: 'var(--ax-ink)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: 3,
+                      background: st.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span>{label}</span>
+                  <strong>{pct}%</strong>
+                </span>
+              );
+            })}
+          </div>
+
+          {metricParts.length > 0 && (
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 12,
+                color: 'var(--ax-text-secondary)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {metricParts.join(' · ')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {br.disclaimer && (
+        <div
+          style={{
+            marginTop: hasTimeline ? 8 : 0,
+            fontSize: 12,
+            color: 'var(--ax-text-secondary)',
+            lineHeight: 1.5,
+          }}
+        >
+          {br.disclaimer}
+        </div>
+      )}
     </Card>
   );
 };

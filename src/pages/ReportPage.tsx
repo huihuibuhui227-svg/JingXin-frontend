@@ -4,6 +4,7 @@ import { Layout, Card, Button, Result, Alert, Drawer, Segmented, Space, Tag, Typ
 import { RobotOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import ReportViewer from '@/components/report/ReportViewer';
+import { BehaviorRegimeTimeline } from '@/components/report/ReportCharts';
 import InstrumentProvenance from '@/components/report/InstrumentProvenance';
 import type { L1WithInstruments } from '@/components/report/InstrumentProvenance';
 import DownloadButton from '@/components/report/DownloadButton';
@@ -520,6 +521,9 @@ const ReportPage: React.FC = () => {
             )}
           </Card>
         )}
+
+        {/* 整场行为节奏时间轴 */}
+        <BehaviorRegimeTimeline report={report} />
 
         {/* 核心双层证据视图 */}
         <ReportViewer report={report} />

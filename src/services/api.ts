@@ -293,6 +293,16 @@ export interface SystemHealthResponse {
     url: string;
     asr_endpoint?: string;
     asr_reachable?: boolean;
+    backend?: string;
+    supported_backends?: string[];
+    pitch_backend?: string;
+    vad_backend?: string;
+    live_pitch_backend?: string;
+    live_vad_backend?: string;
+    whisper_conf_ready?: boolean;
+    landmarker_3d_matrix?: boolean;
+    blendshapes_count?: number;
+    live_framing?: boolean | string;
     error?: string;
   }>;
 }
