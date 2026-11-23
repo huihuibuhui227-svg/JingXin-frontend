@@ -36,21 +36,21 @@ interface AssessmentConfig {
 const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
   interview: {
     type: 'interview',
-    title: '面试评估',
-    subtitle: '系统将进行多维度分析，包括面部表情、手势姿态、语音内容等',
-    inProgressTitle: '面试评估进行中',
-    startButtonText: '开始面试',
+    title: '面试行为采集与观测',
+    subtitle: '同步采集面试问答过程中的面部动作单元、上肢姿态及语音韵律，生成可追溯的客观行为证据报告',
+    inProgressTitle: '面试采集进行中',
+    startButtonText: '开始面试采集',
     startButtonColor: 'var(--ax-primary)',
-    loadingTip: '正在启动面试...',
+    loadingTip: '正在启动面试采集会话...',
   },
   research: {
     type: 'research',
-    title: '科研能力评估',
-    subtitle: '系统将评估您的科研思维能力，包括逻辑推理、问题分析、创新思维等维度',
-    inProgressTitle: '科研评估进行中',
-    startButtonText: '开始评估',
-    startButtonColor: 'var(--ax-success)',
-    loadingTip: '正在启动科研评估...',
+    title: '科研行为采集与观测',
+    subtitle: '记录科研汇报与课题追问过程中的多模态客观行为信号与语音转写，输出证据与缺口清单（不打分）',
+    inProgressTitle: '科研采集进行中',
+    startButtonText: '开始科研采集',
+    startButtonColor: 'var(--ax-primary)',
+    loadingTip: '正在启动科研采集会话...',
   },
 };
 
@@ -145,18 +145,18 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             if (result.status === 'success' && result.result) {
               updateRealtimeMetrics({
                 face: {
-                  emotion: result.result.emotion?.primary_emotion || 'neutral',
+                  detected: true,
+                  face_scale: result.result.face_scale ?? null,
                   au_features: {
                     au_1: result.result.au_features?.au1_inner_brow_raise,
                     au_4: result.result.au_features?.au4_frown,
                     au_6: result.result.au_features?.au6_cheek_raise,
                     au_12: result.result.au_features?.au12_smile,
                   },
-                  focus_score: result.result.focus_score || 0,
-                  tension_score: result.result.tension?.tension_score || 0,
-                  symmetry_score: result.result.au_features?.symmetry_score || 0,
-                  gaze_stability: 1 - (result.result.au_features?.gaze_deviation || 0),
-                  eye_contact_ratio: 1 - (result.result.au_features?.gaze_deviation || 0),
+                  head_yaw: result.result.au_features?.head_yaw,
+                  head_pitch: result.result.au_features?.head_pitch,
+                  avg_ear: result.result.au_features?.avg_ear,
+                  blink_rate_per_min: result.result.au_features?.blink_rate_per_min,
                 }
               });
             }
@@ -404,15 +404,9 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
 
       return recognizedText;
     } catch (error: any) {
-      console.error('❌ 语音识别失败:', error);
-      console.error('❌ 错误详情:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-
-      console.warn('⚠️ 使用模拟文本（后端 ASR 未就绪）');
-      return '[语音识别服务暂时不可用，请手动输入]';
+      const detail = error?.response?.data?.detail || error?.message || '语音识别服务当前不可达，请改用文字输入';
+      console.error('❌ 语音识别失败:', detail);
+      throw new Error(detail);
     }
   };
 
@@ -455,6 +449,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         <PreflightGate
           open={preflightOpen}
           videoRef={videoRef}
+          actionLabel={config.startButtonText}
           onReady={() => finishPreflight(true)}
           onCancel={() => finishPreflight(false)}
         />
@@ -505,7 +500,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
 
         <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0 }}>{config.inProgressTitle}</h2>
+            <h1 style={{ margin: 0, fontSize: 'var(--ax-display-md-size)', fontWeight: 600 }}>{config.inProgressTitle}</h1>
             {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的
                 日志),而"报告里什么都没有"往往就是这个号对不上。 */}
             <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? 'var(--ax-success)' : 'var(--ax-text-secondary)' }}>
@@ -561,13 +556,13 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             description={
               <div>
                 <p style={{ margin: '0 0 10px' }}>
-                  帧与日志照常落了盘,但**这一场没有 `camera.webm`** ——
-                  摄像头可能没起来,或这条流在中途就断了。原因见下面的降级告警。
+                  帧与日志照常落了盘，但<strong>这一场没有原生录像文件</strong> ——
+                  摄像头可能未启动，或音视频流在中途中断。原因见页面顶部的降级告警。
                 </p>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={() => navigate('/reports')}
+                  <button onClick={() => navigate(sid ? `/report/${sid}` : '/reports')}
                     style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
-                    去看报告
+                    去看本场报告
                   </button>
                   <button onClick={handleNextSession}
                     style={{ padding: '6px 20px', background: 'var(--ax-success)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
@@ -629,9 +624,9 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         hideDefaultOk
         extraActions={
           <>
-            <button onClick={() => navigate('/reports')}
+            <button onClick={() => navigate(sid ? `/report/${sid}` : '/reports')}
               style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
-              去看报告
+              去看本场报告
             </button>
             <button onClick={handleNextSession}
               style={{ padding: '6px 20px', background: 'var(--ax-success)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>

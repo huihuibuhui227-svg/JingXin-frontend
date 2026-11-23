@@ -1,51 +1,46 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Layout, Table, Button, Empty, Spin, Typography, Alert, Space } from 'antd';
+import { Layout, Table, Button, Empty, Typography, Alert, Space, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
-import { FileTextOutlined, EyeOutlined, BarChartOutlined } from '@ant-design/icons';
+import {
+  FileTextOutlined, EyeOutlined, BarChartOutlined, DownloadOutlined, AuditOutlined,
+} from '@ant-design/icons';
 import { dashboardApi } from '@/services/api';
+import Loading from '@/components/common/Loading';
 
 const { Content } = Layout;
 const { Text } = Typography;
 
 interface ReportItem {
   name: string;
+  display_name?: string;
   url: string;
+  session_id?: string | null;
+  mtime?: number;
+  redacted?: boolean;
 }
 
-/** 一行报告的结构化形态（由文件名解析而来）。 */
 interface ReportRow {
   key: string;
   name: string;
   url: string;
-  kind: string; // 「科研评估报告」/「面试评估报告」…
-  subject: string | null; // 文件名里带的被测者姓名（没有标注就没有）
-  ts: number | null; // 毫秒时间戳，用于排序；解析失败为 null
-  tsText: string; // 展示用「2026-09-28 23:25:20」，解析失败为空串
+  sessionId: string | null;
+  redacted: boolean;
+  kind: string;
+  subject: string | null;
+  ts: number | null;
+  tsText: string;
 }
 
-/**
- * 从文件名解析出类型。
- *
- * 文件名形如 `Research_Assessment_Report_20260928_232520.html`。
- * 此前标题直接是 `name.replace(/_/g,' ')`，于是中文界面上显示一串英文机器名
- * （`Research Assessment Report 20260928 232520`）——既不是给人看的，
- * 还把日期重复了一遍（下面一行已经有格式化好的时间）。
- */
+const REPORT_FILE_RE = /(?:HengCai_Evidence_Report|Research_Assessment_Report).*\.html$/i;
+
 const parseKind = (filename: string): string => {
-  if (/^research_/i.test(filename)) return '科研评估报告';
-  if (/^interview_/i.test(filename)) return '面试评估报告';
-  return '评估报告';
+  if (/^HengCai_Evidence_Report/i.test(filename)) return '行为证据披露报告';
+  if (/^research_/i.test(filename)) return '科研行为证据报告';
+  if (/^interview_/i.test(filename)) return '面试行为证据报告';
+  return '行为证据报告';
 };
 
-/** 文件名里的被测者姓名：`..._20261026_114732-候选Y.html` → `候选Y`。
- *
- *  后端约定（2026-10-26）：报告文件名 = `Research_Assessment_Report_<生成时刻>[-<姓名>].html`；
- *  同一秒连跑多场撞名时，会在**姓名之后**再加会话 id 末四位（`...-候选Y-cb79.html`），
- *  没有姓名的场次撞名则是 `...-cb79.html`（末段纯 4 位十六进制）。
- *  所以：末段是 4 位十六进制且前面还有一段，取中间那段；只有末段且是 4 位十六进制
- *  ⟹ 那是会话号后缀，不是人。解析不出就返回 null —— 不拿机器号冒充姓名。
- */
 const parseSubject = (filename: string): string | null => {
   const segs = filename.replace(/\.html?$/i, '').split('-');
   if (segs.length < 2) return null;
@@ -58,13 +53,10 @@ const parseSubject = (filename: string): string | null => {
   return tail || null;
 };
 
-/** 解析 `20260928_232520` 为时间戳与展示文本。解析不出来就返回 null（不编造日期）。 */
 const parseTimestamp = (filename: string): { ts: number | null; text: string } => {
   const m = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
   if (!m) return { ts: null, text: '' };
   const [, y, mo, d, h, mi, s] = m;
-  // ⚠️ 用本地时间构造（与文件名记录的口径一致）。`Date.parse('2026-09-28 23:25:20')`
-  //    在各浏览器行为不一致，所以显式拆开传参。
   const date = new Date(+y, +mo - 1, +d, +h, +mi, +s);
   const ts = date.getTime();
   if (Number.isNaN(ts)) return { ts: null, text: '' };
@@ -78,42 +70,35 @@ const ReportsList: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // ⚠️ 请求的是 `reports`(面板对 **output 根目录** 的别名),不是 `report_frontend`:
-    //    报告就直接写在 `data/output/` 根下,而后者是个**不存在**的子目录 ——
-    //    面板原先回 403「不允许访问该目录」,列表因此**永远是空的**
-    //    (2026-09-26 实测:使用者反复报"报告列表承接不成功")。
-    // ⚠️ 根目录下还混着别的模块的产物(radar_chart_*.html / evidence_*.html,实测 518 个)
-    //    ⟹ 只列真正的报告文件,否则"历史报告"里会混进几百张证据图。
     dashboardApi.getFiles('reports')
       .then((files: ReportItem[]) => {
-        const htmlReports = files.filter(f => /Assessment_Report.*\.html$/i.test(f.name));
+        const htmlReports = (Array.isArray(files) ? files : []).filter((f) =>
+          REPORT_FILE_RE.test(f?.name || '')
+        );
         setReports(htmlReports);
       })
-      .catch(err => {
-        // ⚠️ 此前这里只 `console.error` 就把错误吞了，于是**请求失败**和
-        //    **真的没有报告**在页面上长得一模一样（都显示「暂无历史报告」）。
-        //    这正是本仓在杀的形态：拿不到就说拿不到，不要装作"没有"。
-        //    Home.tsx 已经这么做了，这里此前没有对齐。
+      .catch((err) => {
         console.error('获取报告列表失败:', err);
         setLoadError(err?.message || '请求失败');
       })
       .finally(() => setLoading(false));
   }, []);
 
-  // 按时间倒序（新的在前）。解析不出时间的排在最后 —— 不用 0 冒充，
-  // 否则它们会混在"最新"那一头。
   const rows: ReportRow[] = useMemo(() => {
     return reports
       .map((item) => {
-        const { ts, text } = parseTimestamp(item.name);
+        const name = item.display_name || item.name;
+        const { ts, text } = parseTimestamp(name);
         return {
-          key: item.name,
-          name: item.name,
+          key: `${name}-${item.url}`,
+          name,
           url: item.url,
-          kind: parseKind(item.name),
-          subject: parseSubject(item.name),
-          ts,
-          tsText: text
+          sessionId: item.session_id ?? null,
+          redacted: item.redacted === true,
+          kind: parseKind(name),
+          subject: parseSubject(name),
+          ts: ts ?? (typeof item.mtime === 'number' ? item.mtime * 1000 : null),
+          tsText: text || (typeof item.mtime === 'number' ? new Date(item.mtime * 1000).toLocaleString('zh-CN') : ''),
         };
       })
       .sort((a, b) => {
@@ -126,92 +111,134 @@ const ReportsList: React.FC = () => {
 
   const columns: ColumnsType<ReportRow> = [
     {
-      title: '报告',
+      title: '行为证据报告',
       dataIndex: 'kind',
       key: 'kind',
       render: (kind: string, row) => (
         <Space size={8} align="start">
           <FileTextOutlined style={{ color: 'var(--ax-primary)', marginTop: 4 }} />
-          <span>
-            <a onClick={() => window.open(row.url, '_blank')}>
-              {kind}{row.subject ? ` · ${row.subject}` : ''}
-            </a>
-            {/* 文件名原样印在下面 —— 「这一份是谁的」不止一眼能看，也能核对。
-                文件名里带姓名是 2026-10-26 后端加的；旧报告没有后缀，这里就只显示类型。 */}
+          <div>
+            <Space size={6} wrap>
+              <Button
+                type="link"
+                style={{ padding: 0, height: 'auto', fontWeight: 600 }}
+                onClick={() => (row.sessionId ? navigate(`/report/${row.sessionId}`) : window.open(row.url, '_blank'))}
+              >
+                {kind}{row.subject ? ` · ${row.subject}` : ''}
+              </Button>
+              {row.redacted && (
+                <Tag style={{ margin: 0, fontSize: 11 }}>演示脱敏</Tag>
+              )}
+              {row.sessionId && (
+                <Tag style={{ margin: 0, fontSize: 11, fontFamily: 'var(--ax-font-mono)' }}>
+                  {row.sessionId}
+                </Tag>
+              )}
+            </Space>
             <div style={{
-              fontFamily: 'monospace', fontSize: 11,
-              color: 'var(--ax-text-secondary)', wordBreak: 'break-all'
+              fontFamily: 'var(--ax-font-mono)',
+              fontSize: 11.5,
+              color: 'var(--ax-text-secondary)',
+              wordBreak: 'break-all',
+              marginTop: 2,
             }}>
               {row.name}
             </div>
-          </span>
+          </div>
         </Space>
-      )
+      ),
     },
     {
       title: '生成时间',
       dataIndex: 'ts',
       key: 'ts',
-      width: 220,
+      width: 200,
       sorter: (a, b) => (a.ts ?? -1) - (b.ts ?? -1),
       defaultSortOrder: 'descend',
       render: (_: unknown, row) =>
-        row.tsText || <Text type="secondary">时间未识别</Text>
+        row.tsText || <Text type="secondary">时间未识别</Text>,
     },
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 270,
       render: (_: unknown, row) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<EyeOutlined />}
-          style={{ paddingInline: 0 }}
-          onClick={() => window.open(row.url, '_blank')}
-        >
-          查看
-        </Button>
-      )
-    }
+        <Space size={12} wrap>
+          {row.sessionId && (
+            <Button
+              type="link"
+              size="small"
+              icon={<AuditOutlined />}
+              style={{ paddingInline: 0, fontWeight: 600 }}
+              onClick={() => navigate(`/report/${row.sessionId}`)}
+            >
+              结构化查账
+            </Button>
+          )}
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            style={{ paddingInline: 0 }}
+            onClick={() => window.open(row.url, '_blank')}
+          >
+            查看
+          </Button>
+          <a
+            href={row.url}
+            download={row.name}
+            title={`下载 ${row.name}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              whiteSpace: 'nowrap',
+              fontSize: 14,
+              color: 'var(--ax-primary)',
+            }}
+          >
+            <DownloadOutlined />
+            下载
+          </a>
+        </Space>
+      ),
+    },
   ];
 
   if (loading) {
     return (
-      <Content style={{ padding: 'var(--ax-space-lg)', textAlign: 'center' }}>
-        <Spin tip="加载报告列表..." />
+      <Content style={{ padding: 'var(--ax-space-lg)' }}>
+        <Loading tip="正在加载报告中心..." />
       </Content>
     );
   }
 
   return (
     <Content style={{ padding: 'var(--ax-space-lg)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      <div style={{ maxWidth: 'var(--ax-workbench-max)', margin: '0 auto' }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 'var(--ax-space-md)'
+            flexWrap: 'wrap',
+            gap: 12,
+            marginBottom: 'var(--ax-space-md)',
           }}
         >
           <div>
-            {/* level={1} 是语义要求（page-has-heading-one），视觉压回 h3 大小 */}
             <Typography.Title level={1} style={{ margin: 0, fontSize: 'var(--ax-display-md-size)' }}>
-              历史报告
+              报告中心
             </Typography.Title>
             {!loadError && (
-              <Text type="secondary">
-                共 {rows.length} 份
+              <Text style={{ color: 'var(--ax-text-secondary)', fontSize: 14 }}>
+                共 {rows.length} 份行为证据报告 · 点击「结构化查账」进入交互审计，或点行尾「下载」保存离线单文件 HTML
               </Text>
             )}
           </div>
           <Button
             type="primary"
             icon={<BarChartOutlined />}
-            // 2026-09-27 修:原先写死 `http://127.0.0.1:5000` —— 部署到服务器后,
-            // 从别的电脑点这个按钮打开的是**那台电脑自己**的 5000 端口。
-            // 改成走应用内的报告页(`/report/latest`),它自己按当前 host 找后端。
             onClick={() => navigate('/report/latest')}
           >
             最新结构化报告
@@ -222,14 +249,8 @@ const ReportsList: React.FC = () => {
           <Alert
             type="error"
             showIcon
-            message="报告列表没读出来"
-            description={
-              <>
-                后端可能没起，或面板拒绝了这次请求。这不是「没有报告」。
-                <br />
-                错误：{loadError}
-              </>
-            }
+            message="报告列表未能读取"
+            description={`请确认总控面板服务已启动。错误详情：${loadError}`}
             action={
               <Button size="small" onClick={() => window.location.reload()}>
                 重试
@@ -237,23 +258,17 @@ const ReportsList: React.FC = () => {
             }
           />
         ) : rows.length > 0 ? (
-          /*
-            从「卡片网格 + 每张卡底部一整条操作栏」换成表格。
-            原来的写法里，antd 的 `Card.actions` 会给**每张卡**渲染一整行页脚，
-            里面只有一个「查看」——11 份报告就是 11 条几乎一样的横条，
-            真正有信息量的只有小字。表格可以让类型/时间/操作对齐成列，
-            扫读成本低得多，而且时间列自带排序。
-          */
           <Table<ReportRow>
             columns={columns}
             dataSource={rows}
             size="middle"
+            scroll={{ x: 760 }}
             pagination={rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
           />
         ) : (
-          <Empty description="暂无历史报告" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-            <Button type="primary" onClick={() => navigate('/')}>
-              开始评估
+          <Empty description="暂无历史行为证据报告" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+            <Button type="primary" onClick={() => navigate('/interview')}>
+              开始采集
             </Button>
           </Empty>
         )}

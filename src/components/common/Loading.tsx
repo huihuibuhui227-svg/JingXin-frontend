@@ -6,33 +6,38 @@ interface LoadingProps {
   fullScreen?: boolean;
 }
 
+/**
+ * 统一加载指示器 —— 不在独立 <Spin> 上使用 tip 属性，彻底消除 antd 5 控制台警告。
+ */
 const Loading: React.FC<LoadingProps> = ({
-  tip = '加载中...',
+  tip = '加载中…',
   fullScreen = false
 }) => {
-  if (fullScreen) {
-    return (
-      <div style={{
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh',
-        flexDirection: 'column'
-      }}>
-        <Spin size="large" tip={tip} />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '40px',
-      flexDirection: 'column'
-    }}>
-      <Spin tip={tip} />
+        minHeight: fullScreen ? '60vh' : 140,
+        padding: fullScreen ? '48px 24px' : '32px 16px',
+        flexDirection: 'column',
+        gap: 12
+      }}
+    >
+      <Spin size={fullScreen ? 'large' : 'default'} />
+      {tip && (
+        <span
+          style={{
+            fontSize: 'var(--ax-caption-size)',
+            color: 'var(--ax-text-secondary)'
+          }}
+        >
+          {tip}
+        </span>
+      )}
     </div>
   );
 };

@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Drawer, Descriptions, Tabs, Button, Spin, Alert, Pagination, Empty, Space, Tag, Image, Typography } from 'antd';
-import { BarChartOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { BarChartOutlined, DownloadOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons';
 import { recordingsApi, RecordingDetail as Detail } from '@/services/recordingsApi';
 import { API_BASE_URL } from '@/utils/constants';
+import Loading from '@/components/common/Loading';
 
 const fmtBytes = (n: number): string => {
   if (!n) return '0 B';
@@ -18,6 +20,7 @@ const PER_PAGE = 24;
  * (滚动位置、筛的日志、以及"我在看第几场")。
  */
 const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = ({ sid, onClose }) => {
+  const navigate = useNavigate();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,17 +103,39 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
     <Drawer
       open={!!sid}
       onClose={onClose}
-      width={760}
+      width={780}
       title={label?.name ? `${label.name} · ${sid}` : sid}
+      extra={detail ? (
+        <Space size={8}>
+          <Button
+            size="small"
+            type="primary"
+            icon={<BarChartOutlined />}
+            onClick={() => {
+              onClose();
+              navigate(`/report/${encodeURIComponent(detail.sid)}`);
+            }}
+          >
+            结构化查账
+          </Button>
+          <Button
+            size="small"
+            icon={<ExportOutlined />}
+            onClick={() => {
+              onClose();
+              navigate(`/export?sid=${encodeURIComponent(detail.sid)}`);
+            }}
+          >
+            数据导出
+          </Button>
+        </Space>
+      ) : null}
       destroyOnClose
     >
-      {loading && <Spin tip="读取中..." />}
+      {loading && <Loading tip="正在读取本场录制详情…" />}
       {error && <Alert type="error" showIcon message={error} />}
       {detail && (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {/* ⚠️ 降级要放在**最上面**。留存账本此前没有任何消费方(§8.1-5),
-              于是"降级过的那一场"与"正常那场"在盘上长得一模一样 —— 这一页是
-              它第一个消费方,那它就必须显眼,而不是塞在折叠区里。 */}
           {detail.degraded > 0 && (
             <Alert
               type="warning"
@@ -129,42 +154,39 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
               {detail.has_video ? fmtBytes(detail.video_bytes) : <Tag>没有原生录像</Tag>}
             </Descriptions.Item>
             <Descriptions.Item label="整场体积">{fmtBytes(detail.bytes_total)}</Descriptions.Item>
-            <Descriptions.Item label="帧">
-              face {detail.frames.face} · gesture {detail.frames.gesture}
+            <Descriptions.Item label="抽帧统计">
+              面部 {detail.frames.face} 帧 · 手势 {detail.frames.gesture} 帧
             </Descriptions.Item>
             <Descriptions.Item label="标注">
               {label
                 ? [label.serial, label.student_id, label.department].filter(Boolean).join(' · ') || '（只填了姓名）'
                 : '—'}
             </Descriptions.Item>
-            <Descriptions.Item label="征询">
+            <Descriptions.Item label="授权范围">
               {label?.consent === 'audio_only'
-                ? <Tag color="blue">只同意声音 —— 摄像头未打开</Tag>
+                ? <Tag color="blue">仅同意声音（摄像头未打开）</Tag>
                 : label?.consent === 'full'
-                  ? <Tag color="green">全部同意(影像 + 声音)</Tag>
-                  : <Tag>未记录(征询上线之前的场次)</Tag>}
+                  ? <Tag color="green">全部同意（影像 + 声音）</Tag>
+                  : <Tag>未记录（授权模块上线前场次）</Tag>}
             </Descriptions.Item>
           </Descriptions>
 
           {detail.has_video ? (
             <div>
-              {/* ⚠️ `src` 里带 token 是**没办法**(`<video>` 发不了请求头,见 recordingsApi
-                  的说明)。首次打开某一場时服务端要现做预览件,会等几秒 —— 所以说出来,
-                  免得看起来像卡住了。 */}
               <video
                 controls
                 preload="metadata"
-                style={{ width: '100%', maxHeight: 420, background: '#000' }}
+                style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 8 }}
                 src={recordingsApi.videoUrl(detail.sid)}
               />
               <div style={{ marginTop: 6, color: 'var(--ax-text-secondary)', fontSize: 12 }}>
                 {detail.preview_ready
-                  ? '已备好索引 —— 进度条可以拖。'
-                  : '首次打开要先做一份带索引的预览件（几秒），之后就能拖了；这份原始录像一个字节都不会被改动。'}
+                  ? '预览索引已就绪，可直接拖动进度条回查。'
+                  : '首次打开将自动生成带时间索引的预览件（需等待数秒），原始录像文件不会被修改。'}
               </div>
             </div>
           ) : (
-            <Empty description="这一场没有原生录像（只有帧或什么都没有）" />
+            <Empty description="本场未留存原生录像（仅含抽帧或行为日志）" />
           )}
 
           <Tabs
@@ -174,21 +196,21 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                 label: `逐帧抽查（${detail.frames.face + detail.frames.gesture}）`,
                 children: (
                   <div>
-                    <Space style={{ marginBottom: 12 }}>
+                    <Space style={{ marginBottom: 12 }} wrap>
                       <Button size="small" type={modality === 'face' ? 'primary' : 'default'}
                         onClick={() => { setModality('face'); setPage(1); }}>
-                        face {detail.frames.face}
+                        面部（{detail.frames.face}）
                       </Button>
                       <Button size="small" type={modality === 'gesture' ? 'primary' : 'default'}
                         onClick={() => { setModality('gesture'); setPage(1); }}>
-                        gesture {detail.frames.gesture}
+                        手势（{detail.frames.gesture}）
                       </Button>
                       <span style={{ color: 'var(--ax-text-secondary)', fontSize: 12 }}>
-                        画面冻住时这里会看到连续多张一模一样 —— 正是 §8.2.5 那个检查
+                        若采集期间画面卡顿，此处可直观排查是否出现连续重复静帧
                       </span>
                     </Space>
                     {framesLoading ? <Spin /> : frames.frames.length === 0 ? (
-                      <Empty description="这一场这个模态没有帧" />
+                      <Empty description="本场该模态暂无抽帧画面" />
                     ) : (
                       <Image.PreviewGroup>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
@@ -213,13 +235,12 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
               },
               {
                 key: 'files',
-                label: `文件（${detail.files.length}）`,
+                label: `原始文件（${detail.files.length}）`,
                 children: detail.files.length === 0 ? <Empty description="没有可下载的文件" /> : (
                   <Space direction="vertical" style={{ width: '100%' }}>
                     {detail.files.map((f) => (
-                      <div key={f} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div key={f} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{f}</span>
-                        {/* `<a download>` 同样发不了请求头 ⟹ 一样走 URL 里的 token。 */}
                         <Button size="small" icon={<DownloadOutlined />}
                           href={recordingsApi.fileUrl(detail.sid, f)} download>
                           下载
@@ -231,29 +252,25 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
               },
               {
                 key: 'reports',
-                label: `报告（${detail.reports.length}）`,
+                label: `离线报告（${detail.reports.length}）`,
                 children: detail.reports.length === 0 ? (
-                  // ⚠️ 报告**不自动生成**(§8.2.4)。说清楚"没有"是因为没跑过,
-                  //    而不是因为这一场没有数据 —— 并**当场给一个按钮**。
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <Alert
                       type="info" showIcon
-                      message="这一场还没有报告"
-                      description="报告不会自动生成。点下面的按钮跑一次(按本场 session_id 从盘上的日志算)。"
+                      message="本场尚未归档离线 HTML 报告"
+                      description="离线单文件报告按需生成，点击下方按钮即可按本场会话号从落盘日志实时生成；也可点击右上角「结构化查账」直接在线查看。"
                     />
                     <Button type="primary" icon={<BarChartOutlined />}
                       loading={generating} onClick={generateReport}>
-                      生成报告
+                      生成离线报告
                     </Button>
                     {genMsg && <Typography.Text type="secondary">{genMsg}</Typography.Text>}
                   </Space>
                 ) : (
                   <Space direction="vertical" style={{ width: '100%' }}>
                     {detail.reports.map((r) => (
-                      <div key={r.name} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div key={r.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.name}</span>
-                        {/* ⚠️ 必须是**面板的绝对地址**：`/output/...` 相对路径会被解析到
-                            前端自己那个端口(5173)上,而那台机器上没有这个路由 ⟹ 404。 */}
                         <Button size="small" icon={<ReloadOutlined />}
                           href={`${API_BASE_URL}/output/${r.name}`} target="_blank" rel="noreferrer">
                           打开
@@ -262,13 +279,13 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                     ))}
                     <Space>
                       <Button icon={<BarChartOutlined />} loading={generating} onClick={generateReport}>
-                        再生成一份
+                        重新生成一份
                       </Button>
                       {genMsg && <Typography.Text type="secondary">{genMsg}</Typography.Text>}
                     </Space>
                     {detail.reports.length > 1 && (
                       <span style={{ color: 'var(--ax-text-secondary)', fontSize: 12 }}>
-                        同一场跑过多次就会有多个报告（报告名里是**生成时刻**，不含 session_id）
+                        同一场次多次生成会保留多份历史快照，文件名中包含生成时刻
                       </span>
                     )}
                   </Space>

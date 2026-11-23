@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { message } from 'antd';
-import { sessionApi, getSessionId } from '@/services/api';
+import { sessionApi, getSessionId, getDiscardToken } from '@/services/api';
 import { recordingsApi } from '@/services/recordingsApi';
 import { ConsentMode } from '@/components/recording/RecordingDialogs';
 import type { CaptureHealth } from '@/types/api';
@@ -113,11 +113,32 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
     if (!open && labelThenRecord) setConsentModalOpen(false);
   }, [labelThenRecord]);
 
-  /** 标注窗的「确定」。**先弹征询,不直接提交** —— 征询结果要和标注一起提交。 */
-  const submitLabel = useCallback(() => {
+  /** 标注窗的「确定」：开录前走征询流；录中/录后「改标签」直接就地更新 label，不再重开征询与铸号。 */
+  const submitLabel = useCallback(async () => {
     setLabelModalOpen(false);
-    setConsentModalOpen(true);
-  }, []);
+    if (labelThenRecord) {
+      setConsentModalOpen(true);
+      return;
+    }
+    setSavingLabel(true);
+    try {
+      const r = await sessionApi.setLabel({
+        ...labelFields,
+        consent: consentRef.current ?? undefined,
+      });
+      setSavedLabel(r?.label ?? null);
+      savedLabelRef.current = r?.label ?? null;
+      setLabelError(null);
+      message.success(`本场标注已更新：${r?.label ?? ''}`);
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      const why = detail || error?.message || '未知错误';
+      setLabelError(why);
+      message.error(`标注更新失败：${why}`);
+    } finally {
+      setSavingLabel(false);
+    }
+  }, [labelFields, labelThenRecord]);
 
   /** 征询窗的「同意」(模式由弹窗选)。铸号 → 提交标注(含 consent)→ 开录。 */
   const confirmConsent = useCallback(async (mode: ConsentMode) => {
@@ -190,7 +211,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
       //    音频完整,只是**没有视频轨**。只说"已留存"等于让人以为一切正常。
       if (health?.status === 'warn') {
         message.warning(
-          `本场原生录像已留存,但**录制体检有告警**:${health.findings.join('；')}`, 0);
+          `本场原生录像已留存，但录制体检存在告警：${health.findings.join('；')}`, 0);
       } else {
         message.success('本场原生录像已留存');
       }
@@ -257,7 +278,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
     pendingRef.current = null;
     // ② 盘上那份:服务端真删。
     try {
-      const r = await recordingsApi.discard(sid);
+      const r = await recordingsApi.discard(sid, getDiscardToken());
       console.log('🗑️ 本场已作废:', r);
       setSavedInfo({ label: savedLabelRef.current, sid, bytes: 0 });
       setSaveState('purged');

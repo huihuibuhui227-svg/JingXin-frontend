@@ -36,6 +36,11 @@ export interface EvaluationResult {
   dimensions: Partial<Record<DimensionKey, DimensionResult>>;
   /** 本次用的是哪个引擎。`l1` = M4.5 起的默认;`legacy` = 旧的 14 槽模糊匹配。 */
   engine?: 'l1' | 'legacy';
+  brand?: {
+    name: string;
+    subtitle: string;
+    slogan: string;
+  };
   /**
    * **消失的维度** —— 全部槽都没有同构念 L1 指标、因此整维不进 `dimensions`。
    *
@@ -107,6 +112,93 @@ export interface L1IndicatorRow {
   n_total: number;
   confidence: string;
   gap: string | null;
+  gap_explanation?: string | null;
+  instrument?: string;
+  instruments?: string[];
+}
+
+export interface ParameterRegistryEntry {
+  param_id: string;
+  label: string;
+  value: number | string | boolean;
+  unit: string;
+  tier: string;
+  sub_tier: string;
+  provisional: boolean;
+  provisional_tag?: string;
+  code_locations: string[];
+  affects_indicators: string[];
+  provenance: string;
+  upgrade_condition: string;
+}
+
+export interface ParameterProvenance {
+  schema_version: string;
+  tier_descriptions: Record<string, string>;
+  counts_by_tier: Record<string, number>;
+  n_total: number;
+  n_provisional: number;
+  by_indicator: Record<string, string[]>;
+  registry: ParameterRegistryEntry[];
+  summary_plain: string;
+}
+
+export interface CrossModalCoverage {
+  status: 'ok' | 'degraded' | 'blocked' | 'single_modal';
+  session_jaccard: number | null;
+  session_overlap_sec?: number;
+  session_union_sec?: number;
+  modalities_active?: string[];
+  unanchored_modalities?: string[];
+  per_dimension?: Record<string, { status: string; jaccard: number | null; note: string }>;
+  summary_plain: string;
+}
+
+export interface AsrConfidenceDisclosure {
+  engine: string;
+  source: string;
+  word_probs_available: boolean;
+  low_tail_ratio: number | null;
+  degraded_indicators: string[];
+  summary_plain: string;
+}
+
+export interface GovernanceLedger {
+  l0_blocked: Array<{ column: string; reason: string; unblock_condition: string }>;
+  l1_retired: Array<{ name: string; label?: string; reason: string }>;
+  summary_plain: string;
+}
+
+export interface SignalQualityAudit {
+  status: 'ready' | 'fallback_rule' | 'insufficient_windows';
+  advisory_only: boolean;
+  session_id?: string | null;
+  n_windows: number;
+  usable_windows: number;
+  usable_window_ratio: number | null;
+  flagged_count?: number;
+  flagged_windows: Array<{
+    window_index: number;
+    start_row: number;
+    end_row: number;
+    usability_prob: number;
+    hints: string[];
+  }>;
+  fault_hint_counts: Record<string, number>;
+  summary_plain: string;
+  disclaimer: string;
+  model_used: boolean;
+  model_type: string | null;
+  cv_metrics?: {
+    model_type?: string;
+    n_sessions?: number;
+    n_windows_total?: number;
+    cv_scheme?: string;
+    cv_roc_auc_mean?: number | null;
+    cv_f1_mean?: number | null;
+    cpu_inference_ms_per_30_windows?: number | null;
+  } | null;
+  inference_ms?: number;
 }
 
 export interface L1Audit {
@@ -193,19 +285,97 @@ export interface L1Audit {
     span_sec?: number | null;
     drift_sec?: number | null;
     wall_back_steps?: number;
+    anchored?: boolean;
+    anchor_reason?: string | null;
   }>;
+  instruments?: {
+    n_indicators: number;
+    counts: Record<string, number>;
+    footer: string;
+    labels: Record<string, string>;
+    order: Array<'blendshape' | 'geometric' | 'audio' | 'text' | 'unknown'>;
+    n_multi: number;
+    unmapped_columns: string[];
+    unknown_note: string;
+    multi_note: string;
+    sub_instruments_by_indicator?: Record<string, string[]>;
+    sub_instrument_labels?: Record<string, string>;
+    non_interchangeability_disclosure?: {
+      headline?: string;
+      detail?: string;
+    };
+  };
+  lead_summary?: string;
+  indicator_meta?: Record<string, { label: string; family: string; family_label: string; modality: string }>;
+  zero_explanations?: Record<string, string>;
+  dimension_registry?: Record<string, { canonical_id: string; display_name: string; disclaimer: string }>;
+  parameter_provenance?: ParameterProvenance;
+  cross_modal_coverage?: CrossModalCoverage;
+  asr_confidence_disclosure?: AsrConfidenceDisclosure;
+  governance_ledger?: GovernanceLedger;
+  blocked_dependency_warnings?: Array<{ indicator: string; columns: string[]; warning: string }>;
+  second_instrument_appendix?: {
+    available: boolean;
+    summary_plain?: string;
+    items?: Array<{ name: string; label?: string; value?: number | null; n_valid?: number }>;
+  };
+  signal_quality_audit?: SignalQualityAudit;
 }
 
-/** `coverage` —— 本次观测的覆盖事实。字段逐一对齐 `research_mapper._coverage()`。 */
+/** `coverage` —— 本次观测的覆盖事实。字段逐一对齐 `research_mapper._coverage()`
+ *  与 L1 的 `l1_report.build_l1_report()`。 */
 export interface Coverage {
-  /** 分母是**声明的全部旧槽数**(14),包含已消失维度的那几个槽。 */
+  /** 分母是**声明的全部旧槽数**(14),包含已消失维度的那几个槽。
+   *  ⚠️ 它**不能**当"覆盖率"的分母 —— 14 里有 6 个槽永远填不上。
+   *  要判断"这一场量得怎么样",用 `n_measurable` 或 `pass_rate_of_measurable`。 */
   n_slots: number;
   n_passed: number;
   /** 没有同构念 L1 指标、已删掉的槽数(仍计入 `n_slots`)。仅 L1 引擎给。 */
   n_dropped?: number;
+
+  // ── 三段拆分(`l1-2` 起,2026-11-21)────────────────────────────────
+  //
+  // 为什么有这三段:后端原先只发 `n_passed / n_slots`,真实那一场是 `8 / 14` ——
+  // 读者会读成"只覆盖了 57%",而可测量的 8 个槽其实是 8/8 全过,另外 6 个
+  // **不是这一场的问题**(3 个这套采集不测 + 3 个整维没有同构念指标)。
+  //
+  // ⚠️ 全部设成可选:前端 store / 浏览器缓存里可能还躺着 `l1-1` 的旧结果。
+  //    缺字段时**明说"没带"**,不拿 0 顶上(0 会被读成"一个都没有")。
+  /** 有同构念指标、且这套采集确实会测的槽数。 */
+  n_measurable?: number;
+  /** 上面那批里**本场没量到可用数**的槽数(`n_measurable - n_passed`)。 */
+  n_measurable_no_data?: number;
+  /** 维度表内被删的槽 —— 这套采集不测(不是这一场没量到)。 */
+  n_not_measured?: number;
+  /** 整维被删的槽 —— 这一维要的量当前没有任何 L1 指标承接。 */
+  n_no_indicator?: number;
+  /** `n_passed / n_measurable`。**分母为 0 时是 `null`** —— 不是 0,也不是 1:
+   *  前者会被读成"覆盖率 0%",后者会被读成"全部通过",两个都是假话。 */
+  pass_rate_of_measurable?: number | null;
+  /** 三段式那句话。由后端的 `l1_report.coverage_summary_line()` 拼 ——
+   *  前端**不拼**(HTML 报告、命令行、这里三个出口各拼一遍,迟早说的不是同一件事)。 */
+  summary_line?: string;
+  /** 那句"为什么不测"的解释。同样由后端给(`l1_report.COVERAGE_EXPLANATION`)。 */
+  explanation?: string;
+  /** 三段明细(数字 + 标签 + 一句说明)。顺序由后端定。 */
+  segments?: CoverageSegment[];
+
   /** 各维度置信度的**上限**(最乐观的那一个)。 */
   confidence_cap: string;
   passed_slots: CoverageSlot[];
+}
+
+/** 覆盖数的**一段** —— 与后端 `l1_report.coverage_segments()` 逐键对齐。
+ *
+ *  三段相加恒等于 `Coverage.n_slots`(`tests/test_coverage_three_segments.py` 守)。 */
+export interface CoverageSegment {
+  key: 'measurable' | 'not_measured' | 'no_indicator';
+  /** 人话标签(「可测量」/「本套采集不测」/「无同构念指标」)。由后端给。 */
+  label: string;
+  n: number;
+  /** 只有 `measurable` 那一段有"通过"这回事;另两段是 `null`(给 0 会被读成"0 个通过")。 */
+  n_passed: number | null;
+  note: string;
 }
 
 /** 一个**过了证据门**的指标槽的实测依据 —— 与后端 HTML 报告渲染的是同一批字段。 */
@@ -232,6 +402,7 @@ export interface DimensionResult {
   /** 该维度**为什么薄** —— 逐槽一行(未采集到对应数据 / 本次会话内无变化 /
    *  该指标本轮停用 / 尚无产出方…)。这是使用者能据以行动的东西,报告要原样列出。 */
   evidence_gaps: string[];
+  evidence_gaps_not_measured?: string[];
   confidence: string;
   /** 形如 `"1/4"` —— 过门槽数 / 总槽数。 */
   matched_indicators: string;
@@ -239,16 +410,6 @@ export interface DimensionResult {
   stats: Record<string, { val: number }>;
 }
 
-/**
- * 一个**过了证据门**的槽在证据链里的那一行。
- *
- * ⚠️ 2026-10-04 **字段集收窄**:删掉 `normalized_score` / `contribution` / `status`
- * (`✅ 强支撑`/`⚠️ 弱支撑`/`➖ 中性`)/ `direction` / `weight`,以及维度上的
- * `positive_factors` / `negative_factors` —— 它们都是**未标定标尺上的折算值与判定标签**
- * (与档位同一类物种),随评分层一起摘除(见文件顶部说明)。
- * 现在这一行只说**测到了什么**:原始值 + 本场观测区间 + 有效样本量。
- * 后端由 `tests/test_report_layer.py` 里那条"字段集"断言守着。
- */
 export interface EvidenceItem {
   feature: string;
   human_name: string;
@@ -257,22 +418,29 @@ export interface EvidenceItem {
   std: number | null;
   /** 与 `raw_value` 同量纲的实测区间;无变异时后端给空数组。 */
   observed_interval: number[];
+  instruments?: string[];
 }
 
 export interface RealtimeMetrics {
   face?: {
-    emotion: string;
+    detected?: boolean;
+    face_scale?: number | null;
+    emotion?: string;
     au_features: {
       au_1?: number;
       au_4?: number;
       au_6?: number;
       au_12?: number;
     };
-    focus_score: number;
-    tension_score: number;
-    symmetry_score: number;
-    gaze_stability: number;
-    eye_contact_ratio: number;
+    head_yaw?: number;
+    head_pitch?: number;
+    avg_ear?: number;
+    blink_rate_per_min?: number;
+    focus_score?: number;
+    tension_score?: number;
+    symmetry_score?: number;
+    gaze_stability?: number;
+    eye_contact_ratio?: number;
   };
   gesture?: {
     detected_hands: number;

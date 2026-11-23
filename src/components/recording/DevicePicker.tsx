@@ -88,25 +88,33 @@ const DevicePicker: React.FC<Props> = ({ value, onChange, audioOnly = false }) =
   return (
     <Space direction="vertical" size={6} style={{ width: '100%' }}>
       <div>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>摄像头</Typography.Text>
+        <label htmlFor="device-picker-video" style={{ display: 'block', fontSize: 12, color: 'var(--ax-text-secondary)', marginBottom: 2 }}>
+          摄像头
+        </label>
         <Select
+          id="device-picker-video"
+          aria-label="选择摄像头"
           style={{ width: '100%' }}
           size="small"
           disabled={audioOnly}
           allowClear
-          placeholder={audioOnly ? '本场只采声音 —— 不打开摄像头' : '让浏览器自己挑'}
+          placeholder={audioOnly ? '本场只采声音 —— 不打开摄像头' : '让浏览器自动选择'}
           value={value.videoDeviceId ?? undefined}
           options={optionsFor('videoinput')}
           onChange={(v) => onChange({ ...value, videoDeviceId: v ?? null })}
         />
       </div>
       <div>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>麦克风</Typography.Text>
+        <label htmlFor="device-picker-audio" style={{ display: 'block', fontSize: 12, color: 'var(--ax-text-secondary)', marginBottom: 2 }}>
+          麦克风
+        </label>
         <Select
+          id="device-picker-audio"
+          aria-label="选择麦克风"
           style={{ width: '100%' }}
           size="small"
           allowClear
-          placeholder="让浏览器自己挑"
+          placeholder="让浏览器自动选择"
           value={value.audioDeviceId ?? undefined}
           options={optionsFor('audioinput')}
           onChange={(v) => onChange({ ...value, audioDeviceId: v ?? null })}

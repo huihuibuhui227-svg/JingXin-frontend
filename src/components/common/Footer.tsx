@@ -1,35 +1,90 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { BRAND_FULL_TITLE, BRAND_PRINCIPLE, BRAND_SLOGAN } from '@/utils/constants';
 
-/**
- * 页脚 —— 按 DESIGN.md 的 `footer` 实现。
- *
- * 规范：背景 `canvas-parchment` #f5f5f7，文字 `ink-muted-80` #333，
- * 链接列用 `dense-link`（17px / 400 / **行高 2.41**）—— 那个松弛的行高
- * 正是密集链接列能扫读的原因，不是笔误。列标题 `caption-strong` 14px/600，
- * 最底部法务行 `fine-print` 12px + `ink-muted-48`。纵向内距 64px。
- *
- * 规范也指出：页脚是全站**唯一**允许"故意密集"的地方 —— 好让整个信息
- * 架构一眼可见。
- */
+const QUICK_LINKS = [
+  { to: '/interview', label: '面试观测' },
+  { to: '/research', label: '科研观测' },
+  { to: '/analysis', label: '实时监测' },
+  { to: '/reports', label: '报告中心' },
+  { to: '/recordings', label: '录制素材' },
+  { to: '/export', label: '数据导出' },
+  { to: '/question-bank', label: '题库管理' }
+];
+
 const Footer: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <footer
       style={{
         background: 'var(--ax-parchment)',
         color: 'var(--ax-ink-muted-80)',
-        padding: '64px 24px 32px'
+        padding: '48px 24px 32px',
+        borderTop: '1px solid var(--ax-hairline)'
       }}
     >
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
-        {/* 法务行：fine-print 12px */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: 24,
+            paddingBottom: 24
+          }}
+        >
+          <div style={{ maxWidth: 460 }}>
+            <div
+              style={{
+                fontFamily: 'var(--ax-font-display)',
+                fontSize: 15,
+                fontWeight: 600,
+                color: 'var(--ax-ink)',
+                letterSpacing: '-0.2px'
+              }}
+            >
+              {BRAND_FULL_TITLE}
+            </div>
+            <div
+              className="ax-fine-print"
+              style={{ color: 'var(--ax-text-secondary)', marginTop: 6, lineHeight: 1.65 }}
+            >
+              {BRAND_SLOGAN} · {BRAND_PRINCIPLE}。原始音视频与采集日志按会话独立原样留存并支持可控清理；
+              报告层不产出综合评分、不给等级评定、不做心理或临床推断。
+            </div>
+          </div>
+
+          <nav aria-label="页脚快捷入口" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px' }}>
+            {QUICK_LINKS.map((item) => (
+              <button
+                key={item.to}
+                type="button"
+                onClick={() => navigate(item.to)}
+                className="ax-press"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '4px 0',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--ax-font-text)',
+                  fontSize: 'var(--ax-caption-size)',
+                  color: 'var(--ax-primary)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
         <div
           className="ax-fine-print"
           style={{
             borderTop: '1px solid var(--ax-hairline)',
-            paddingTop: 17,
-            // 规范把 ink-muted-48(#7a7a7a) 用于法务小字,但它实测只有 4.29:1,
-            // 不到 AA。按 tokens.css 里记的约定:该档只留给**禁用态**,
-            // 真实文字用 secondary(米白底 4.66:1)。
+            paddingTop: 16,
             color: 'var(--ax-text-secondary)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -37,8 +92,8 @@ const Footer: React.FC = () => {
             flexWrap: 'wrap'
           }}
         >
-          <span>JingXin 多模态面试评估系统</span>
-          <span>面部表情 · 手势姿态 · 语音内容 · 眼动轨迹</span>
+          <span>{BRAND_FULL_TITLE}</span>
+          <span>面部几何观测 · 手势与姿态检出 · 语音声学与转写 · 白盒证据门</span>
         </div>
       </div>
     </footer>

@@ -29,6 +29,8 @@ const ROUTES = process.argv[2]
       '/analysis',
       '/reports',
       '/recordings',
+      '/export',
+      '/question-bank',
       '/report/latest'
     ];
 
@@ -39,6 +41,7 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 
 let totalBlocking = 0;
+let loadFailures = 0;
 
 for (const route of ROUTES) {
   const url = route.startsWith('http') ? route : BASE + route;
@@ -90,6 +93,7 @@ for (const route of ROUTES) {
       }
     }
   } catch (e) {
+    loadFailures += 1;
     console.log(`\n✗ ${route}  加载失败: ${e.message}`);
   } finally {
     await page.close();
@@ -98,10 +102,11 @@ for (const route of ROUTES) {
 
 await browser.close();
 
+const totalProblems = totalBlocking + loadFailures;
 console.log(
   `\n${'─'.repeat(60)}\n` +
-    (totalBlocking > 0
-      ? `✗ 共 ${totalBlocking} 项 critical/serious 违规 —— 需要修`
-      : `✓ 没有 critical/serious 违规`)
+    (totalProblems > 0
+      ? `✗ 共 ${totalBlocking} 项 critical/serious 违规，${loadFailures} 处页面加载失败 —— 需要修`
+      : `✓ 全部 ${ROUTES.length} 条路由均无 critical/serious 违规`)
 );
-process.exit(totalBlocking > 0 ? 1 : 0);
+process.exit(totalProblems > 0 ? 1 : 0);

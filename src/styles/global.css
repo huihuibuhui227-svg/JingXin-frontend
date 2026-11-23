@@ -1,7 +1,7 @@
 @import './tokens.css';
 
 /* ════════════════════════════════════════════════════════════
-   全局基线 —— 按 DESIGN.md 实现
+   衡才智析 全局基线 —— 严格按 DESIGN.md 实现
    ════════════════════════════════════════════════════════════ */
 
 * {
@@ -13,9 +13,6 @@
 html,
 body {
   font-family: var(--ax-font-text);
-  /* ⚠️ 规范：正文 17px / 400 / 1.47 / -0.374px。
-     注意行高**不许低于 1.47**（DESIGN.md「Don't」），
-     这是这个设计语言的编辑感来源。中文在此行高下也读得舒服。 */
   font-size: var(--ax-body-size);
   font-weight: var(--ax-body-weight);
   line-height: var(--ax-body-lh);
@@ -30,7 +27,6 @@ body {
   min-height: 100vh;
 }
 
-/* 标题：Display 字面 + 负字距（"Apple tight"） */
 h1,
 h2,
 h3,
@@ -50,11 +46,37 @@ h6 {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Tile —— 全宽色块，靠"面色切换"分隔，不用边框不用阴影
+   工作台与阅读容器（两档版心：1120px / 1320px）
+   工作台使用 parchment 米灰底，使白底 1px hairline 卡片自然分层
+   ════════════════════════════════════════════════════════════ */
+
+.ax-workbench {
+  background: var(--ax-parchment);
+  min-height: calc(100vh - var(--ax-nav-height) - var(--ax-subnav-height));
+  padding: 28px 24px 48px;
+}
+
+.ax-workbench__inner {
+  max-width: var(--ax-workbench-max);
+  margin: 0 auto;
+}
+
+.ax-reading {
+  background: var(--ax-parchment);
+  min-height: calc(100vh - var(--ax-nav-height) - var(--ax-subnav-height));
+  padding: 28px 24px 56px;
+}
+
+.ax-reading__inner {
+  max-width: var(--ax-content-max);
+  margin: 0 auto;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Tile —— 全宽交替色块，靠面色切换分隔，不圆角、无投影
    ════════════════════════════════════════════════════════════ */
 
 .ax-tile {
-  /* 不圆角、不全宽出血的留白由内层容器控制 */
   border-radius: var(--ax-rounded-none);
   padding: var(--ax-space-section) var(--ax-space-lg);
 }
@@ -84,7 +106,6 @@ h6 {
   color: var(--ax-on-dark);
 }
 
-/* 深色 tile 内的标题与次级文字 */
 .ax-tile--dark h1,
 .ax-tile--dark h2,
 .ax-tile--dark h3,
@@ -102,7 +123,6 @@ h6 {
   margin: 0 auto;
 }
 
-/* 深色面上的内联链接用 Sky Link Blue */
 .ax-tile--dark a,
 .ax-tile--dark-2 a,
 .ax-tile--dark-3 a {
@@ -110,10 +130,9 @@ h6 {
 }
 
 /* ════════════════════════════════════════════════════════════
-   按钮 —— 两种语法：胶囊 CTA 与紧凑方形工具按钮
+   按钮 —— 两种语法：胶囊 CTA（9999px）与紧凑工具按钮（8px）
    ════════════════════════════════════════════════════════════ */
 
-/* 系统级按压反馈：scale(0.95)。每个按钮都要有。 */
 .ax-press {
   transition:
     transform 0.1s ease,
@@ -125,7 +144,6 @@ h6 {
   transform: scale(0.95);
 }
 
-/* 主 CTA：Action Blue 胶囊 */
 .ax-btn--pill.ant-btn {
   border-radius: var(--ax-rounded-pill);
   padding: 11px 22px;
@@ -142,7 +160,6 @@ h6 {
   transform: scale(0.95);
 }
 
-/* 次级"幽灵"胶囊：透明底 + Action Blue 边框与文字 */
 .ax-btn--ghost.ant-btn {
   background: transparent;
   color: var(--ax-primary);
@@ -154,11 +171,10 @@ h6 {
   border-color: var(--ax-primary);
 }
 
-/* 深色面上的幽灵胶囊 */
 .ax-btn--ghost-dark.ant-btn {
   background: transparent;
   color: var(--ax-on-dark);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.55);
 }
 .ax-btn--ghost-dark.ant-btn:hover {
   background: var(--ax-on-dark);
@@ -166,11 +182,21 @@ h6 {
   border-color: var(--ax-on-dark);
 }
 
+.ax-btn--utility.ant-btn {
+  border-radius: var(--ax-rounded-sm);
+  padding: 8px 15px;
+  height: auto;
+  font-size: var(--ax-button-utility-size);
+  font-weight: 400;
+  letter-spacing: var(--ax-button-utility-ls);
+  box-shadow: none;
+}
+
 /* ════════════════════════════════════════════════════════════
-   工具卡片 —— 白底 + 1px hairline + 18px 圆角 + 24px 内距
-   ⚠️ **没有投影**。规范明令：投影只属于产品图。
+   工具卡片 —— 白底 + 1px hairline + 18px 圆角 + 零投影
    ════════════════════════════════════════════════════════════ */
 
+.ax-card,
 .ax-card.ant-card {
   background: var(--ax-canvas);
   border: 1px solid var(--ax-hairline);
@@ -181,15 +207,19 @@ h6 {
     transform 0.1s ease;
 }
 
-/* 可点的卡片：按下缩一下，**不加投影、不位移** */
+.ax-card--interactive,
 .ax-card--interactive.ant-card {
   cursor: pointer;
 }
+.ax-card--interactive:hover,
+.ax-card--interactive.ant-card:hover {
+  border-color: var(--ax-primary);
+}
+.ax-card--interactive:active,
 .ax-card--interactive.ant-card:active {
   transform: scale(0.99);
 }
 
-/* 深色面上的卡片 */
 .ax-tile--dark .ax-card.ant-card,
 .ax-tile--dark-2 .ax-card.ant-card,
 .ax-tile--dark-3 .ax-card.ant-card {
@@ -199,8 +229,16 @@ h6 {
 }
 
 /* ════════════════════════════════════════════════════════════
-   类型化文本工具类
+   排版工具类
    ════════════════════════════════════════════════════════════ */
+
+.ax-hero-display {
+  font-family: var(--ax-font-display);
+  font-size: var(--ax-hero-display-size);
+  font-weight: var(--ax-hero-display-weight);
+  line-height: var(--ax-hero-display-lh);
+  letter-spacing: var(--ax-hero-display-ls);
+}
 
 .ax-display-lg {
   font-family: var(--ax-font-display);
@@ -211,7 +249,7 @@ h6 {
 }
 
 .ax-display-md {
-  font-family: var(--ax-font-text);
+  font-family: var(--ax-font-display);
   font-size: var(--ax-display-md-size);
   font-weight: var(--ax-display-md-weight);
   line-height: var(--ax-display-md-lh);
@@ -247,19 +285,27 @@ h6 {
 }
 
 /* ════════════════════════════════════════════════════════════
-   antd 覆盖 —— 把组件库拉进这套语言
+   Ant Design 收敛 —— 清透高对比、零浑浊横幅、零阴影、禁 500 字重
    ════════════════════════════════════════════════════════════ */
 
 .ant-layout {
-  background: var(--ax-canvas);
+  background: transparent;
 }
 
-/* 表格：数字对齐 + hairline 分隔（不要 antd 默认的粗线） */
+.ant-card {
+  border-color: var(--ax-hairline);
+  box-shadow: none !important;
+}
+
+.ant-card .ant-card-head-title {
+  font-weight: 600;
+}
+
 .ant-table {
   font-variant-numeric: tabular-nums;
 }
 .ant-table-thead > tr > th {
-  font-weight: 600;
+  font-weight: 600 !important;
   letter-spacing: var(--ax-caption-ls);
 }
 
@@ -274,32 +320,110 @@ h6 {
   color: var(--ax-text-secondary);
 }
 
-/* antd 预设彩色标签用的是它从 colorPrimary 派生的色板，实测不达 4.5:1。
-   ⚠️ 必须带 !important：antd 5 是 CSS-in-JS，生成的规则是 3 个类，
-   普通写法（1~2 个类）特异性不够会被压掉 —— 实测踩过。
-   这里的目的是刻意覆盖设计系统派生色以达可访问性，用 !important 合适。 */
-.ant-tag.ant-tag-success {
-  color: #0a6b34 !important;
-  background: #e8f5ed !important;
-  border-color: #b7e0c6 !important;
+/* 清透高对比 Alert（彻底替换 antd 默认浑浊橄榄/暗黄底色，WCAG AA > 7:1） */
+.ant-alert {
+  border-radius: var(--ax-rounded-md) !important;
+  box-shadow: none !important;
+}
+.ant-alert .ant-alert-message {
+  font-weight: 600;
+}
+.ant-alert.ant-alert-info {
+  background-color: var(--ax-info-soft) !important;
+  border: 1px solid var(--ax-info-border) !important;
+}
+.ant-alert.ant-alert-info .ant-alert-message,
+.ant-alert.ant-alert-info .ant-alert-description,
+.ant-alert.ant-alert-info .ant-alert-icon {
+  color: var(--ax-info) !important;
+}
+
+.ant-alert.ant-alert-success {
+  background-color: var(--ax-success-soft) !important;
+  border: 1px solid var(--ax-success-border) !important;
+}
+.ant-alert.ant-alert-success .ant-alert-message,
+.ant-alert.ant-alert-success .ant-alert-description,
+.ant-alert.ant-alert-success .ant-alert-icon {
+  color: var(--ax-success) !important;
+}
+
+.ant-alert.ant-alert-warning {
+  background-color: var(--ax-warning-soft) !important;
+  border: 1px solid var(--ax-warning-border) !important;
+}
+.ant-alert.ant-alert-warning .ant-alert-message,
+.ant-alert.ant-alert-warning .ant-alert-description,
+.ant-alert.ant-alert-warning .ant-alert-icon {
+  color: var(--ax-warning) !important;
+}
+
+.ant-alert.ant-alert-error {
+  background-color: var(--ax-error-soft) !important;
+  border: 1px solid var(--ax-error-border) !important;
+}
+.ant-alert.ant-alert-error .ant-alert-message,
+.ant-alert.ant-alert-error .ant-alert-description,
+.ant-alert.ant-alert-error .ant-alert-icon {
+  color: var(--ax-error) !important;
+}
+
+/* 高对比 Tag */
+.ant-tag {
+  font-weight: 400;
+  border-radius: var(--ax-rounded-xs);
+}
+.ant-tag.ant-tag-success,
+.ant-tag.ant-tag-green {
+  color: var(--ax-success) !important;
+  background: var(--ax-success-soft) !important;
+  border-color: var(--ax-success-border) !important;
 }
 .ant-tag.ant-tag-processing,
 .ant-tag.ant-tag-blue {
-  color: #0055aa !important;
-  background: #e8f1fb !important;
-  border-color: #b9d5f0 !important;
+  color: var(--ax-info) !important;
+  background: var(--ax-info-soft) !important;
+  border-color: var(--ax-info-border) !important;
 }
 .ant-tag.ant-tag-warning,
-.ant-tag.ant-tag-orange {
-  color: #8a5a10 !important;
-  background: #fdf6e7 !important;
-  border-color: #f0d9a8 !important;
+.ant-tag.ant-tag-orange,
+.ant-tag.ant-tag-gold {
+  color: var(--ax-warning) !important;
+  background: var(--ax-warning-soft) !important;
+  border-color: var(--ax-warning-border) !important;
 }
 .ant-tag.ant-tag-error,
 .ant-tag.ant-tag-red {
-  color: #b03030 !important;
-  background: #fdecec !important;
-  border-color: #f3c4c4 !important;
+  color: var(--ax-error) !important;
+  background: var(--ax-error-soft) !important;
+  border-color: var(--ax-error-border) !important;
+}
+
+/* Collapse 审计抽屉样式收敛 */
+.ant-collapse.ax-audit-collapse {
+  background: var(--ax-canvas);
+  border: 1px solid var(--ax-hairline);
+  border-radius: var(--ax-rounded-lg);
+  overflow: hidden;
+}
+.ant-collapse.ax-audit-collapse > .ant-collapse-item {
+  border-bottom: 1px solid var(--ax-hairline);
+}
+.ant-collapse.ax-audit-collapse > .ant-collapse-item:last-child {
+  border-bottom: none;
+}
+.ant-collapse.ax-audit-collapse .ant-collapse-header {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ax-ink) !important;
+  padding: 16px 20px !important;
+  background: var(--ax-canvas);
+}
+.ant-collapse.ax-audit-collapse .ant-collapse-content {
+  border-top: 1px solid var(--ax-divider-soft);
+}
+.ant-collapse.ax-audit-collapse .ant-collapse-content-box {
+  padding: 20px !important;
 }
 
 /* ── 滚动条 ───────────────────────────────────────────────── */
@@ -322,9 +446,33 @@ h6 {
   border: 3px solid transparent;
 }
 
-/* ── 可访问性 ─────────────────────────────────────────────── */
+/* ── 响应式断层（按 DESIGN.md 断点收敛） ───────────────────── */
+@media (max-width: 1068px) {
+  .ax-hero-display {
+    font-size: 40px;
+  }
+}
 
-/* 焦点环：规范指定 2px solid #0071e3 */
+@media (max-width: 735px) {
+  .ax-tile {
+    padding: var(--ax-space-xxl) var(--ax-space-md);
+  }
+  .ax-workbench,
+  .ax-reading {
+    padding: 20px 16px 40px;
+  }
+  .ax-hero-display {
+    font-size: 34px;
+  }
+  .ax-display-lg {
+    font-size: 30px;
+  }
+  .ax-lead {
+    font-size: 21px;
+  }
+}
+
+/* ── 可访问性 ─────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--ax-primary-focus);
   outline-offset: 2px;
@@ -339,9 +487,9 @@ h6 {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  /* 减少动效时也去掉缩放反馈（它是靠 transition 平滑的） */
   .ax-press:active,
   .ax-btn--pill.ant-btn:active,
+  .ax-card--interactive:active,
   .ax-card--interactive.ant-card:active {
     transform: none;
   }

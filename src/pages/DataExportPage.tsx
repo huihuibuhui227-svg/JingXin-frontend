@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Layout, Card, Select, Button, Checkbox, Space, Typography, message,
-  Alert, Spin, Tag, Divider, Empty, Modal, Input
+  Alert, Tag, Divider, Empty, Modal, Input
 } from 'antd';
 import {
-  DownloadOutlined, LineChartOutlined, FileTextOutlined, ReloadOutlined
+  BarChartOutlined, DownloadOutlined, LineChartOutlined, FileTextOutlined,
+  LockOutlined, ReloadOutlined, UnlockOutlined
 } from '@ant-design/icons';
 import { API_BASE_URL } from '@/utils/constants';
 import { getAdminToken, recordingsApi } from '@/services/recordingsApi';
+import Loading from '@/components/common/Loading';
 
 const { Content } = Layout;
 const { Text, Title, Paragraph } = Typography;
@@ -62,9 +65,9 @@ interface ExportFiles {
 }
 
 const MODULE_OPTIONS = [
-  { value: 'face', label: '面部表情' },
+  { value: 'face', label: '面部观测' },
   { value: 'gesture', label: '手势与体态' },
-  { value: 'voice', label: '语音' }
+  { value: 'voice', label: '语音韵律' }
 ];
 
 const fmtBytes = (n: number): string => {
@@ -102,11 +105,14 @@ const downloadUrl = (url: string): string => {
 };
 
 const DataExportPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSid = searchParams.get('sid') || '';
+
   const [sessions, setSessions] = useState<ExportSession[]>([]);
-  const [sid, setSid] = useState<string>('');
+  const [sid, setSid] = useState<string>(requestedSid);
   const [files, setFiles] = useState<ExportFiles | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(true);
-  /** 401 ⟹ 服务端要求管理员。不给入口的话页面只会空着,人会以为"坏了"。 */
   const [needLogin, setNeedLogin] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -117,14 +123,22 @@ const DataExportPage: React.FC = () => {
   const [charts, setCharts] = useState<Record<string, { url?: string; error?: string; loading?: boolean }>>({});
   const urlsRef = useRef<string[]>([]);
 
-  /** 释放上一批 blob URL，别让翻页/重画把内存攒住。 */
   const clearChartUrls = () => {
     urlsRef.current.forEach((u) => URL.revokeObjectURL(u));
     urlsRef.current = [];
   };
 
+  const applySessionList = (list: ExportSession[]) => {
+    setSessions(list);
+    if (!list.length) return;
+    setSid((prev) => {
+      if (prev && list.some((s) => s.sid === prev)) return prev;
+      if (requestedSid && list.some((s) => s.sid === requestedSid)) return requestedSid;
+      return list[0].sid;
+    });
+  };
+
   useEffect(() => {
-    // 会话列表**带个人信息**（姓名/学号/院系/场次）—— 只有一串 sid 的列表没法按人对号。
     setLoadingSessions(true);
     fetch(`${API_BASE_URL}/api/export/sessions`, { headers: authHeaders() })
       .then(async (r) => {
@@ -134,8 +148,7 @@ const DataExportPage: React.FC = () => {
         setNeedLogin(false);
         const list: ExportSession[] = (body.sessions || [])
           .sort((a: ExportSession, b: ExportSession) => b.modified - a.modified);
-        setSessions(list);
-        if (list.length) setSid((prev) => prev || list[0].sid);
+        applySessionList(list);
       })
       .catch((e) => message.error(e?.message || '读不到会话列表'))
       .finally(() => setLoadingSessions(false));
@@ -144,7 +157,7 @@ const DataExportPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!sid) return;
+    if (!sid || needLogin) return;
     setLoadingFiles(true);
     setFiles(null);
     fetch(api(sid, '/files'), { headers: authHeaders() })
@@ -156,9 +169,8 @@ const DataExportPage: React.FC = () => {
       })
       .catch((e) => message.error(e?.message || '读取这一场的数据失败'))
       .finally(() => setLoadingFiles(false));
-  }, [sid]);
+  }, [sid, needLogin]);
 
-  /** 登录成功后**重新拉一遍**列表与清单 —— 否则界面还停在 401 时的空状态。 */
   const reloadAll = async () => {
     setLoadingSessions(true);
     try {
@@ -169,13 +181,22 @@ const DataExportPage: React.FC = () => {
       setNeedLogin(false);
       const list: ExportSession[] = (body.sessions || [])
         .sort((a: ExportSession, b: ExportSession) => b.modified - a.modified);
-      setSessions(list);
-      if (list.length) setSid((prev) => prev || list[0].sid);
+      applySessionList(list);
     } catch (e: any) {
       message.error(e?.message || '读不到会话列表');
     } finally {
       setLoadingSessions(false);
     }
+  };
+
+  const doLogout = () => {
+    recordingsApi.logout();
+    clearChartUrls();
+    setSessions([]);
+    setFiles(null);
+    setCharts({});
+    setNeedLogin(true);
+    message.info('已退出管理员视图');
   };
 
   const doLogin = async () => {
@@ -243,70 +264,95 @@ const DataExportPage: React.FC = () => {
 
   const current = sessions.find((s) => s.sid === sid);
 
+  const isAdmin = !needLogin && !!getAdminToken();
+
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ marginBottom: 20 }}>
-          <Title level={1} style={{ margin: 0, fontSize: 'var(--ax-display-md-size)' }}>
-            数据导出与图表
-          </Title>
-          <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            采集时的原始表与语音转写都在这里 —— 报告只印过了证据门的指标，复核与换算法用这些原件。
-          </Paragraph>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+          <div>
+            <Title level={1} style={{ margin: 0, fontSize: 'var(--ax-display-md-size)' }}>
+              数据导出与原表复核
+            </Title>
+            <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+              导出三路采集原始行为台账（CSV）、语音转写及按模块趋势图；报告页展示的是经过白盒证据门筛选后的结构化证据，科研复核与再分析可使用此处原件。
+            </Paragraph>
+          </div>
+          <Space wrap>
+            {sid && !needLogin && (
+              <Button icon={<BarChartOutlined />} onClick={() => navigate(`/report/${encodeURIComponent(sid)}`)}>
+                查看结构化报告
+              </Button>
+            )}
+            {isAdmin ? (
+              <Button icon={<UnlockOutlined />} onClick={doLogout}>退出管理员</Button>
+            ) : needLogin ? (
+              <Button type="primary" icon={<LockOutlined />} onClick={() => { setLoginError(null); setLoginOpen(true); }}>
+                管理员登录
+              </Button>
+            ) : null}
+          </Space>
         </div>
 
         {needLogin && (
           <Alert
             type="warning" showIcon style={{ marginBottom: 16 }}
-            message="这一页要管理员密码"
-            description="导出的是受试者的原始数据（转写原文、身份、三份行为表），与素材页同一道门。"
-            action={<Button size="small" type="primary" onClick={() => setLoginOpen(true)}>输入密码</Button>}
+            message="本页需验证管理员身份"
+            description="原始数据导出包含受试者身份标注、语音转写全文与原始行为台账，与录制素材页共享同一服务端鉴权通道。"
+            action={<Button size="small" type="primary" onClick={() => { setLoginError(null); setLoginOpen(true); }}>输入密码</Button>}
           />
         )}
 
         <Card size="small" style={{ marginBottom: 20 }}>
-          <Space wrap size={16} align="center">
-            <Text strong>会话</Text>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center' }}>
+            <label htmlFor="export-session-select" style={{ fontWeight: 600, color: 'var(--ax-ink)' }}>
+              选择会话
+            </label>
             <Select
+              id="export-session-select"
+              aria-label="选择导出会话"
               showSearch
               loading={loadingSessions}
+              disabled={needLogin}
               value={sid || undefined}
-              onChange={setSid}
+              onChange={(next) => {
+                setSid(next);
+                setSearchParams({ sid: next }, { replace: true });
+              }}
               options={sessionOptions}
               optionFilterProp="label"
-              style={{ width: 460 }}
-              placeholder="选一场录制"
+              style={{ minWidth: 280, maxWidth: 480, flex: '1 1 320px' }}
+              placeholder={needLogin ? '请先验证管理员身份' : '请选择一场录制'}
             />
             {current && (
               <Text type="secondary">
-                录像 {fmtBytes(current.video_bytes)} · 帧 {current.frames.face + current.frames.gesture}
+                录像 {fmtBytes(current.video_bytes)} · 抽帧 {current.frames.face + current.frames.gesture} 张
               </Text>
             )}
-          </Space>
-          {/* 这一场是谁的（与报告头同一份 label.json）。只有会话号时，导出的东西没法对号。 */}
+          </div>
           {files && (
             <div style={{ marginTop: 10, fontSize: 13, color: 'var(--ax-text-secondary)' }}>
               {files.subject && Object.keys(files.subject).length > 0 ? (
                 <Space wrap size={16}>
-                  <span>被测者 <strong style={{ color: 'var(--ax-ink)' }}>{files.subject.name || '—'}</strong></span>
+                  <span>受试者 <strong style={{ color: 'var(--ax-ink)' }}>{files.subject.name || '—'}</strong></span>
                   {files.subject.student_id && <span>学号 {files.subject.student_id}</span>}
                   {files.subject.department && <span>院系 {files.subject.department}</span>}
                   {files.subject.serial && <span>场次 {files.subject.serial}</span>}
                 </Space>
               ) : (
-                <span>被测者：未标注（录制时没有填写姓名 / 学号 / 院系）</span>
+                <span>受试者：未标注（录制时未填写姓名 / 学号 / 院系）</span>
               )}
             </div>
           )}
         </Card>
 
-        {loadingFiles && <Spin tip="读取这一场的数据…"><div style={{ height: 120 }} /></Spin>}
+        {loadingFiles && <Loading tip="正在读取本场原始数据…" />}
 
         {files && (
           <Space direction="vertical" size={20} style={{ width: '100%' }}>
             <Card
               size="small"
-              title={<Space><FileTextOutlined />数据表（CSV，原样下载）</Space>}
+              title={<Space><FileTextOutlined />原始行为台账（CSV 原样下载）</Space>}
             >
               <Space wrap size={[12, 12]}>
                 {files.logs.filter((l) => l.exists).map((l) => (
@@ -322,14 +368,14 @@ const DataExportPage: React.FC = () => {
                   </Button>
                 ))}
                 {files.logs.every((l) => !l.exists) && (
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这一场没有 CSV 日志" />
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="本场暂无 CSV 原始日志" />
                 )}
               </Space>
             </Card>
 
             <Card
               size="small"
-              title={<Space><FileTextOutlined />语音识别（转写）</Space>}
+              title={<Space><FileTextOutlined />语音识别转写</Space>}
               extra={files.transcript.exists ? (
                 <Text type="secondary">
                   {files.transcript.n_segments} 段 · {files.transcript.n_chars ?? '—'} 字
@@ -338,14 +384,14 @@ const DataExportPage: React.FC = () => {
             >
               {!files.transcript.exists ? (
                 <Alert type="info" showIcon
-                  message="这一场没有转写"
-                  description="只有提交过语音回答的场次才会有 transcript.json（实时分析页那条路不提交回答）。" />
+                  message="本场未生成语音转写"
+                  description="仅提交过语音问答的场次会生成语音转写记录（实时监测模式不提交问答）。" />
               ) : (
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   <Space wrap>
                     <Button type="primary" icon={<DownloadOutlined />}
                       href={downloadUrl(api(sid, '/transcript?format=txt'))}>
-                      下载 TXT（人读）
+                      下载 TXT（阅读版）
                     </Button>
                     <Button icon={<DownloadOutlined />}
                       href={downloadUrl(api(sid, '/transcript?format=csv'))}>
@@ -353,17 +399,18 @@ const DataExportPage: React.FC = () => {
                     </Button>
                     <Button icon={<DownloadOutlined />}
                       href={downloadUrl(api(sid, '/transcript?format=json'))}>
-                      下载 JSON（原始）
+                      下载 JSON（结构化原件）
                     </Button>
                   </Space>
                   <Alert
                     type="warning" showIcon
-                    message="转写由 FunASR 自动生成，未经人工校对"
-                    description="标点、数字可能有误；做关键词/文本分析前建议先人工抽查一遍。"
+                    message="转写文本由本地 FunASR 自动生成，未经人工校对"
+                    description="标点与专有名词可能存在识别误差；用于研究分析前建议结合音频抽检复核。"
                   />
                   {files.transcript.preview && (
                     <div style={{
-                      background: 'var(--ax-bg-secondary, #f7f7f7)', borderRadius: 8,
+                      background: 'var(--ax-canvas)', borderRadius: 8,
+                      border: '1px solid var(--ax-hairline)',
                       padding: '10px 14px', fontSize: 13, color: 'var(--ax-text-secondary)'
                     }}>
                       {files.transcript.preview}…
@@ -375,11 +422,11 @@ const DataExportPage: React.FC = () => {
 
             <Card
               size="small"
-              title={<Space><LineChartOutlined />图表（按模块，数据直接来自上面的 CSV）</Space>}
+              title={<Space><LineChartOutlined />原始台账趋势图（按模态绘制）</Space>}
               extra={<Button size="small" icon={<ReloadOutlined />} onClick={() => void loadCharts()}>重新生成</Button>}
             >
               <Space wrap size={16} style={{ marginBottom: 14 }}>
-                <Text type="secondary">模块</Text>
+                <Text type="secondary">模态筛选</Text>
                 <Checkbox.Group
                   options={MODULE_OPTIONS}
                   value={modules}
@@ -388,7 +435,7 @@ const DataExportPage: React.FC = () => {
               </Space>
 
               {modules.length === 0 && (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="至少选一个模块" />
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请至少选择一个模态" />
               )}
 
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -406,16 +453,16 @@ const DataExportPage: React.FC = () => {
                           </Button>
                         )}
                       </Space>
-                      {c.loading && <Spin><div style={{ height: 160 }} /></Spin>}
+                      {c.loading && <Loading tip={`正在绘制${label}趋势图…`} />}
                       {c.error && (
-                        <Alert type="info" showIcon message={`${label}：没有可画的数据`}
+                        <Alert type="info" showIcon message={`${label}：无可绘制数据`}
                           description={c.error} />
                       )}
                       {c.url && (
                         <img
                           src={c.url}
-                          alt={`${sid} ${label} 图表`}
-                          style={{ width: '100%', border: '1px solid #eee', borderRadius: 8 }}
+                          alt={`${sid} ${label} 趋势图`}
+                          style={{ width: '100%', border: '1px solid var(--ax-hairline)', borderRadius: 8 }}
                         />
                       )}
                       <Divider style={{ margin: '12px 0 0' }} />
@@ -429,7 +476,7 @@ const DataExportPage: React.FC = () => {
       </div>
 
       <Modal
-        title="管理员密码"
+        title="管理员身份验证"
         open={loginOpen}
         onOk={doLogin}
         confirmLoading={loggingIn}
@@ -438,8 +485,9 @@ const DataExportPage: React.FC = () => {
         onCancel={() => { setLoginOpen(false); setPassword(''); }}
       >
         <Input.Password
+          aria-label="管理员密码"
           value={password} onChange={(e) => setPassword(e.target.value)}
-          onPressEnter={doLogin} placeholder="管理员密码" autoFocus
+          onPressEnter={doLogin} placeholder="请输入管理员密码" autoFocus
         />
         {loginError && <Alert style={{ marginTop: 12 }} type="error" showIcon message={loginError} />}
       </Modal>

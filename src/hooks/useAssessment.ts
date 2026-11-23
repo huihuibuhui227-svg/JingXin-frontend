@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { message } from 'antd';
-import { voiceApi, dashboardApi, sessionApi } from '@/services/api';
+import { voiceApi, sessionApi } from '@/services/api';
 import { useAssessmentStore } from '@/store/assessmentStore';
 import { speakText } from '@/utils/speech';
 
@@ -134,55 +134,18 @@ export const useAssessment = (type: 'interview' | 'research') => {
 
     setLoading(true);
     try {
-      console.log('🚀 开始启动多模态服务...');
-
-      const facePromise = dashboardApi.runModule('face').catch(err => {
-        console.warn('⚠️ FACE模块启动失败:', err.message);
-        return null;
-      });
-
-      const gesturePromise = dashboardApi.runModule('gesture').catch(err => {
-        console.warn('⚠️ GESTURE模块启动失败:', err.message);
-        return null;
-      });
-
       const voiceApiService = type === 'interview' ? voiceApi.interview : voiceApi.research;
-      const voicePromise = voiceApiService.start();
+      const startRes = await voiceApiService.start();
 
-      const [faceResult, gestureResult, voiceResult] = await Promise.allSettled([
-        facePromise,
-        gesturePromise,
-        voicePromise
-      ]);
+      setTotalQuestions(startRes.total_questions ?? 0);
+      pushQuestion(startRes.question);
 
-      if (voiceResult.status === 'fulfilled') {
-        // 题库共几题只有服务端知道(前端没有来源)⟹ 进度分母由它给。
-        // 给不出就存 0,面板据此**不显示分母**,而不是编一个 10 出来。
-        setTotalQuestions(voiceResult.value.total_questions ?? 0);
-        // 推首题:顺带自动朗读一次并上报它的提问窗口(M2.6)。
-        pushQuestion(voiceResult.value.question);
-        console.log('✅ VOICE服务启动成功');
-      } else {
-        console.error('❌ VOICE服务启动失败:', voiceResult.reason);
-        throw new Error('语音服务启动失败');
-      }
-
-      const services = ['语音'];
-      if (faceResult.status === 'fulfilled' && faceResult.value) {
-        services.push('面部');
-        console.log('✅ FACE服务启动成功:', faceResult.value.message);
-      }
-      if (gestureResult.status === 'fulfilled' && gestureResult.value) {
-        services.push('手势');
-        console.log('✅ GESTURE服务启动成功:', gestureResult.value.message);
-      }
-
-      message.success(`${type === 'interview' ? '面试' : '科研评估'}已开始 - 已启动: ${services.join(', ')}分析`);
+      message.success(`${type === 'interview' ? '面试采集' : '科研采集'}已启动`);
       setStarted(true);
       return true;
     } catch (error: any) {
       console.error('❌ 启动失败:', error);
-      message.error(error.message || '启动失败，请检查后端服务是否正常运行');
+      message.error(error?.response?.data?.detail || error.message || '启动失败，请检查语音服务（:8001）是否正常运行');
       return false;
     } finally {
       setLoading(false);

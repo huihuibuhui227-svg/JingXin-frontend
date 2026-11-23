@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Layout, Table, Button, Tag, Space, Modal, Input, Alert, message, Tooltip, Typography,
 } from 'antd';
 import {
-  LockOutlined, UnlockOutlined, DeleteOutlined, PlayCircleOutlined, WarningOutlined,
+  LockOutlined, UnlockOutlined, DeleteOutlined, PlayCircleOutlined, WarningOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -41,6 +42,7 @@ const fmtTime = (sec: number): string => {
  *    原始素材没有第二次机会。
  */
 const RecordingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<Awaited<ReturnType<typeof recordingsApi.list>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -139,7 +141,7 @@ const RecordingsPage: React.FC = () => {
             </Text>
           )}
           {r.is_none_bucket && (
-            <Tag color="orange">NONE 桶 —— 没带 session_id 的请求，不属于任何一场</Tag>
+            <Tag color="orange">未归属场次（缺失会话号）</Tag>
           )}
         </Space>
       ),
@@ -152,7 +154,7 @@ const RecordingsPage: React.FC = () => {
       sorter: (a, b) => a.video_bytes - b.video_bytes,
     },
     {
-      title: '帧', width: 110,
+      title: '帧（面部/手势）', width: 125,
       render: (_: unknown, r) => (
         <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
           {r.frames.face} / {r.frames.gesture}
@@ -161,31 +163,41 @@ const RecordingsPage: React.FC = () => {
       sorter: (a, b) => (a.frames.face + a.frames.gesture) - (b.frames.face + b.frames.gesture),
     },
     {
-      title: '报告', dataIndex: 'report_count', width: 80,
+      title: '报告', dataIndex: 'report_count', width: 85,
       render: (v: number) => (v > 0
         ? <Tag color="processing">{v} 份</Tag>
-        : <Tooltip title="报告不会自动生成 —— 进详情点「生成报告」"><Tag>无</Tag></Tooltip>),
+        : <Tooltip title="报告按需生成 —— 可点击「查账」实时查看结构化报告，或进详情生成离线 HTML"><Tag>未归档</Tag></Tooltip>),
       sorter: (a, b) => a.report_count - b.report_count,
     },
     {
-      title: '留存', dataIndex: 'degraded', width: 90,
+      title: '留存状态', dataIndex: 'degraded', width: 95,
       render: (v: number) => (v > 0
-        ? <Tooltip title="这一场有留存降级 —— 素材可能不完整。点「查看」看原因。">
-            <Tag icon={<WarningOutlined />} color="warning">{v}</Tag>
+        ? <Tooltip title="本场留存出现降级，素材可能不完整，请点「详情」查看具体原因。">
+            <Tag icon={<WarningOutlined />} color="warning">{v} 处降级</Tag>
           </Tooltip>
         : <Tag color="success">正常</Tag>),
     },
     {
-      title: '操作', width: 150, fixed: 'right',
+      title: '操作', width: 220, fixed: 'right',
       render: (_: unknown, r) => (
-        <Space>
+        <Space size={4}>
+          {!r.is_none_bucket && (
+            <Button
+              size="small"
+              type="link"
+              icon={<BarChartOutlined />}
+              onClick={() => navigate(`/report/${encodeURIComponent(r.sid)}`)}
+            >
+              查账
+            </Button>
+          )}
           <Button size="small" type="link" icon={<PlayCircleOutlined />}
             disabled={!admin} onClick={() => setDetailSid(r.sid)}>
-            查看
+            详情
           </Button>
           <Button size="small" type="link" danger icon={<DeleteOutlined />}
             disabled={!admin} onClick={() => setTrashTarget(r)}>
-            删除
+            回收站
           </Button>
         </Space>
       ),
@@ -195,20 +207,20 @@ const RecordingsPage: React.FC = () => {
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <Typography.Title level={1} style={{ margin: 0, fontSize: "var(--ax-display-md-size)" }}>录制素材</Typography.Title>
-            <Paragraph type="secondary" style={{ margin: 0 }}>
+            <Typography.Title level={1} style={{ margin: 0, fontSize: "var(--ax-display-md-size)" }}>录制素材管理</Typography.Title>
+            <Paragraph type="secondary" style={{ margin: '4px 0 0' }}>
               {data
                 ? `${data.recordings.length} 场 · 录像合计 ${fmtBytes(data.total_video_bytes)} · 帧合计 ${data.total_frames}`
-                : '读取中…'}
-              {data && data.trash_count > 0 && ` · 回收站里还有 ${data.trash_count} 场`}
+                : '正在读取录制台账…'}
+              {data && data.trash_count > 0 && ` · 回收站中还有 ${data.trash_count} 场`}
             </Paragraph>
           </div>
           {admin ? (
             <Space direction="vertical" align="end" size={0}>
               <Button icon={<UnlockOutlined />} onClick={doLogout}>退出管理员</Button>
-              <Text type="secondary" style={{ fontSize: 12 }}>关掉标签页即失效</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>当前标签页关闭后自动失效</Text>
             </Space>
           ) : (
             <Button type="primary" icon={<LockOutlined />} onClick={() => { setLoginError(null); setLoginOpen(true); }}>
@@ -220,8 +232,8 @@ const RecordingsPage: React.FC = () => {
         {!admin && (
           <Alert
             style={{ marginBottom: 16 }} type="info" showIcon
-            message="当前是只读视图"
-            description="能看到场次、录像大小与帧数；姓名/学号/院系、录像回放、日志下载与删除都要管理员密码。身份字段**在服务端就被剥掉**，不是前端藏起来。"
+            message="当前为公开只读脱敏视图"
+            description="仅展示场次编号、录像体积、抽帧数量与留存状态，可直接点击「查账」查看匿名化的结构化行为证据报告。姓名、学号、院系、原始录像回放、原始日志下载与移入回收站均在服务端执行管理员鉴权校验，未授权请求不会返回任何身份字段。"
           />
         )}
         {listError && <Alert style={{ marginBottom: 16 }} type="error" showIcon message={listError} />}
@@ -232,41 +244,42 @@ const RecordingsPage: React.FC = () => {
           loading={loading}
           columns={columns}
           dataSource={data?.recordings ?? []}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1020 }}
           pagination={{ pageSize: 20, showSizeChanger: true }}
         />
 
         <RecordingDetail sid={detailSid} onClose={() => { setDetailSid(null); void reload(); }} />
 
         <Modal
-          title="管理员密码"
+          title="管理员身份验证"
           open={loginOpen}
           onOk={doLogin}
           confirmLoading={loggingIn}
-          okText="进入"
+          okText="进入管理员视图"
           cancelText="取消"
           onCancel={() => { setLoginOpen(false); setPassword(''); }}
         >
           <Input.Password
+            aria-label="管理员密码"
             value={password} onChange={(e) => setPassword(e.target.value)}
-            onPressEnter={doLogin} placeholder="管理员密码" autoFocus
+            onPressEnter={doLogin} placeholder="请输入管理员密码" autoFocus
           />
           {loginError && <Alert style={{ marginTop: 12 }} type="error" showIcon message={loginError} />}
         </Modal>
 
         <Modal
-          title="移到回收站"
+          title="移入回收站"
           open={!!trashTarget}
           onOk={doTrash}
-          okText="移到回收站"
+          okText="确认移入回收站"
           okButtonProps={{ danger: true }}
           confirmLoading={trashing}
           cancelText="取消"
           onCancel={() => setTrashTarget(null)}
         >
           <Paragraph>
-            这一场会被移到 <Text code>recordings/_回收站/&lt;时间戳&gt;__&lt;原名&gt;/</Text>，
-            <Text strong>不会真的删掉</Text> —— 点错了还能捞回来。
+            本场素材将被移动至服务端隔离目录 <Text code>recordings/_回收站/&lt;时间戳&gt;__&lt;原名&gt;/</Text>，
+            <Text strong>不会执行物理粉碎</Text>——误操作后可由管理员从磁盘恢复。
           </Paragraph>
           {trashTarget && (
             <Paragraph type="secondary" style={{ fontSize: 12 }}>
@@ -275,7 +288,7 @@ const RecordingsPage: React.FC = () => {
             </Paragraph>
           )}
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            移进回收站**可以捞回来**,所以不再要求抄 sid。
+            因移入回收站可逆，确认后即直接归档隔离，无需手工抄写会话号。
           </Paragraph>
         </Modal>
       </div>

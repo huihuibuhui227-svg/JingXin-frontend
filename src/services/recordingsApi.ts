@@ -171,8 +171,14 @@ export const recordingsApi = {
    *    语音服务那条入口本来就没有密码,与它同组的 `/label`、`/question` 同一姿态。
    *    实现在服务端是**同一份**(`session_purge.purge_session`)。
    */
-  discard: async (sid: string) => {
-    const r = await axios.post(`${VOICE_API_URL}/session/${encodeURIComponent(sid)}/discard`);
+  discard: async (sid: string, discardToken?: string | null) => {
+    const headers: Record<string, string> = {};
+    if (discardToken) headers['X-Discard-Token'] = discardToken;
+    const r = await axios.post(
+      `${VOICE_API_URL}/session/${encodeURIComponent(sid)}/discard`,
+      null,
+      { headers },
+    );
     return r.data as { status: string; session_id: string; session_dir: string | null; logs: string[] };
   },
 

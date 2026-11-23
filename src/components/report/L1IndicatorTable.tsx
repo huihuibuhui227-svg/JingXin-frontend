@@ -68,13 +68,13 @@ const GAP_LABEL: Record<string, { text: string; hint: string; tone: 'warn' | 'er
     tone: 'warn',
   },
   not_extracted: {
-    text: '素材在,还没提取',
-    hint: '原始录音就在盘上,只是派生序列还没算过。补救:跑一次提取即可,**不用重录**。',
+    text: '素材在，还没提取',
+    hint: '原始录音就在盘上，只是派生序列还没算过。补救：跑一次提取即可，不用重录。',
     tone: 'warn',
   },
   not_produced: {
     text: '本层不产出',
-    hint: '这条**故意不算** —— 它与另一条指标是恒等变换(实测 r = 0.9990),多报一条等于把同一份证据数两遍。',
+    hint: '这条故意不算 —— 它与另一条指标是恒等变换（实测 r = 0.9990），多报一条等于把同一份证据数两遍。',
     tone: 'muted',
   },
   time_unusable: {
@@ -236,17 +236,22 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
       dataIndex: 'name',
       key: 'name',
       fixed: 'left',
-      width: 300,
-      render: (_: unknown, r) => (
-        <div>
-          <div style={{ fontFamily: 'var(--ax-font-mono)', fontSize: 12.5, color: 'var(--ax-ink)' }}>
-            {r.name}
+      width: 280,
+      render: (_: unknown, r) => {
+        const meta = l1.indicator_meta?.[r.name];
+        const titleText = meta?.label || r.name;
+        const famText = meta?.family_label || r.family;
+        return (
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--ax-ink)' }}>
+              {titleText}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 2 }}>
+              {famText}
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 2 }}>
-            {r.family}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '模态',
@@ -306,17 +311,16 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
       dataIndex: 'gap',
       key: 'gap',
       width: 190,
-      render: (gap: string | null) => {
+      render: (gap: string | null, r: L1IndicatorRow) => {
         if (!gap) {
           return <Tag style={{ margin: 0, ...CONF_TONE['高'] }}>已测</Tag>;
         }
         const meta = GAP_LABEL[gap];
         if (!meta) {
-          // 没登记的缺口码:原样显示。**不许**把它当成"已测",也不许吞掉。
-          return <Tag style={{ margin: 0 }}>{gap}</Tag>;
+          return <Tag style={{ margin: 0 }}>{r.gap_explanation || gap}</Tag>;
         }
         return (
-          <Tooltip title={meta.hint}>
+          <Tooltip title={plain(r.gap_explanation || meta.hint)}>
             <Tag style={{ margin: 0, ...(TONE_STYLE[meta.tone] ?? {}) }}>{meta.text}</Tag>
           </Tooltip>
         );
@@ -480,18 +484,18 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ color: 'var(--ax-text-secondary)', textAlign: 'right' }}>
-                <th style={{ textAlign: 'left', fontWeight: 500 }}>指标</th>
-                <th style={{ fontWeight: 500 }}>题数</th>
-                <th style={{ fontWeight: 500 }}>中位</th>
-                <th style={{ fontWeight: 500 }}>IQR</th>
-                <th style={{ fontWeight: 500 }}>最小</th>
-                <th style={{ fontWeight: 500 }}>最大</th>
+                <th style={{ textAlign: 'left', fontWeight: 600 }}>指标</th>
+                <th style={{ fontWeight: 600 }}>题数</th>
+                <th style={{ fontWeight: 600 }}>中位</th>
+                <th style={{ fontWeight: 600 }}>IQR</th>
+                <th style={{ fontWeight: 600 }}>最小</th>
+                <th style={{ fontWeight: 600 }}>最大</th>
               </tr>
             </thead>
             <tbody>
               {dispersionRows.map((r) => (
                 <tr key={r.name} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  <td style={{ fontFamily: 'var(--ax-font-mono)' }}>{r.name}</td>
+                  <td style={{ fontWeight: 600, color: 'var(--ax-ink)' }}>{l1.indicator_meta?.[r.name]?.label || r.name}</td>
                   <td style={{ textAlign: 'right' }}>{r.n_questions}</td>
                   <td style={{ textAlign: 'right' }}>{fmtValue(r.median)}</td>
                   <td style={{ textAlign: 'right' }}>{fmtValue(r.iqr)}</td>
@@ -595,8 +599,12 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
             expandedRowRender: (r) => (
               <div style={{ fontSize: 12.5, lineHeight: 1.75, paddingLeft: 8 }}>
                 <div>
-                  <span style={{ color: 'var(--ax-text-secondary)' }}>公式：</span>
-                  {r.formula}
+                  <span style={{ color: 'var(--ax-text-secondary)' }}>内部指标键：</span>
+                  <span style={{ fontFamily: 'var(--ax-font-mono)', fontSize: 12 }}>{r.name}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--ax-text-secondary)' }}>公式与口径：</span>
+                  {plain(r.formula)}
                 </div>
                 <div>
                   <span style={{ color: 'var(--ax-text-secondary)' }}>依赖 L0：</span>
