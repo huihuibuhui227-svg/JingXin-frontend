@@ -36,9 +36,9 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
       key: 'params',
       label: (
         <Space wrap size={8}>
-          <strong>参数来源三级登记（T1 / T2 / T3）</strong>
+          <strong>测量阈值与参数出处</strong>
           <Tag style={{ margin: 0 }}>共 {pp.n_total} 项</Tag>
-          <Tag style={{ margin: 0, ...TIER_TONE.T3a }}>未标定临时值 {pp.n_provisional} 项</Tag>
+          <Tag style={{ margin: 0, ...TIER_TONE.T3a }}>经验阈值 {pp.n_provisional} 项</Tag>
         </Space>
       ),
       children: (
@@ -114,11 +114,11 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
       key: 'governance',
       label: (
         <Space wrap size={8}>
-          <strong>测量治理台账：显式封停与主动拒绝清单</strong>
-          <Tag style={{ margin: 0 }}>封停 L0 {l0Blocked.length} 项</Tag>
-          <Tag style={{ margin: 0 }}>主动拒绝/退役 {l1Retired.length} 项</Tag>
+          <strong>停用与剔除指标清单</strong>
+          <Tag style={{ margin: 0 }}>底层停用 {l0Blocked.length} 项</Tag>
+          <Tag style={{ margin: 0 }}>剔除冗余 {l1Retired.length} 项</Tag>
           {quarantineActive.length > 0 && (
-            <Tag style={{ margin: 0 }}>隔离旧代理 {quarantineActive.length} 项</Tag>
+            <Tag style={{ margin: 0 }}>旧版隔离 {quarantineActive.length} 项</Tag>
           )}
         </Space>
       ),
@@ -198,7 +198,7 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
       key: 'signal-quality',
       label: (
         <Space wrap size={8}>
-          <strong>采集信号质检参考（自监督纯 CPU 模型 · 不参与评定）</strong>
+          <strong>采集画面与信号质量检查</strong>
           {sq.usable_window_ratio != null && (
             <Tag
               style={{
@@ -206,7 +206,7 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
                 ...(sq.usable_window_ratio >= 0.8 ? TIER_TONE.T1 : TIER_TONE.T3a),
               }}
             >
-              窗口可用率 {(sq.usable_window_ratio * 100).toFixed(1)}%
+              信号可用率 {(sq.usable_window_ratio * 100).toFixed(1)}%
             </Tag>
           )}
         </Space>
@@ -252,8 +252,8 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
       key: 'second-instrument',
       label: (
         <Space wrap size={8}>
-          <strong>第二仪器独立对照附录（52 项 Blendshape）</strong>
-          <Tag style={{ margin: 0 }}>仅作独立对照，不混入主指标</Tag>
+          <strong>面部模型系数对照表</strong>
+          <Tag style={{ margin: 0 }}>52 项回归系数独立参考</Tag>
         </Space>
       ),
       children: (

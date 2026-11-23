@@ -60,7 +60,7 @@ export const DimensionCoverageChart: React.FC<{ report: EvaluationResult }> = ({
   return (
     <Card
       size="small"
-      title="五维证据覆盖与置信度总览（维度取最弱证据，不给分）"
+      title="五项行为维度覆盖与可信度"
       style={{ marginBottom: 20 }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -138,11 +138,11 @@ export const DispersionSmallMultiples: React.FC<{ report: EvaluationResult }> = 
   return (
     <Card
       size="small"
-      title={`逐题离散度小倍数图（共 ${Object.keys(disp).length} 项满足 ≥ 2 题）`}
+      title={`各题表现波动范围 · 共 ${Object.keys(disp).length} 项指标`}
       style={{ marginBottom: 20 }}
     >
       <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ax-text-secondary)' }}>
-        {report.l1?.dispersion_note || '仅反映本场不同题目间的波动范围（极小–中位–极大与四分位距），不可跨场直接相减。'}
+        {report.l1?.dispersion_note || '展示本场不同题目之间的数值变化范围，不可跨场次直接相减。'}
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {rows.map((r) => {
@@ -172,7 +172,7 @@ export const DispersionSmallMultiples: React.FC<{ report: EvaluationResult }> = 
               </div>
               {r.flat ? (
                 <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>
-                  各题读数一致（{fmtNum(r.median)}，题间无波动）
+                  各题数值相同：{fmtNum(r.median)}
                 </div>
               ) : (
                 <svg

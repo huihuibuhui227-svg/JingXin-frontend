@@ -23,30 +23,30 @@ const SERVICE_META: Array<{ key: string; label: string; port: string }> = [
 
 const ARCH_LAYERS = [
   {
-    step: '01 · 仪器层',
-    title: '冻结预训练多模态传感',
-    desc: 'MediaPipe 478 点人脸网格与 52 项 Blendshape、手部/全身姿态、FunASR 语音转写与 librosa 声学提取。纯 CPU 稳定运行，零黑盒微调。',
+    step: '01 · 仪器采集',
+    title: '多模态视觉与语音提取',
+    desc: '同步记录面部 478 点关键点、手部与上肢姿态、语音转写及基频音量，普通电脑纯 CPU 即可稳定运行。',
   },
   {
-    step: '02 · 特征层',
-    title: '纯规则几何与韵律台账',
-    desc: '86 列 L0 采集台账映射为 41 项可复核 L1 行为指标，附逐题时间窗离散度、T1/T2/T3 参数出处与双仪器不可混用披露。',
+    step: '02 · 指标核算',
+    title: '41 项客观行为指标与逐题对比',
+    desc: '将原始采集记录转化为可复核的行为指标，按题目切分统计波动范围，并注明每一项的参数来源与测量工具。',
   },
   {
-    step: '03 · 裁判层',
-    title: '零机器学习白盒证据门',
-    desc: '四档置信度、九类缺口分类、维度取最弱证据与跨模态时间窗覆盖率门控；另附毫秒级自监督采集信号质检提示，绝不参与任何打分。',
+    step: '03 · 证据核验',
+    title: '透明证据审查与缺口说明',
+    desc: '依据有效样本量与信号质量核定四档可信度，如实列出未采集到的项目及原因，不输出综合打分或主观定性评语。',
   },
 ];
 
 const WORKSPACE_LINKS = [
-  { to: '/interview', title: '面试行为采集', desc: '结构化问答 + 三模态同步留存与设备自检' },
-  { to: '/research', title: '科研行为采集', desc: '科研答辩与课题推演场景下的客观行为记录' },
-  { to: '/analysis', title: '实时监测台', desc: '三路仪器在线健康度、帧率、音轨与实时物理量监测' },
-  { to: '/reports', title: '报告中心', desc: '浏览历史行为证据披露报告，支持结构化查账与离线 HTML 下载' },
-  { to: '/recordings', title: '录制素材库', desc: '按场次管理录像、逐帧抽查、回收站与脱敏留存边界' },
-  { to: '/export', title: '数据导出与图表', desc: '管理员导出三路原始 CSV、语音转写与离线验证图表' },
-  { to: '/question-bank', title: '题库管理与检索', desc: '管理多套面试/科研题库，支持毫秒级本地语义检索' },
+  { to: '/interview', title: '面试行为采集', desc: '按题库顺序作答，同步记录画面、语音与答题时间窗' },
+  { to: '/research', title: '科研行为采集', desc: '面向科研汇报与课题问答场景的多模态行为记录' },
+  { to: '/analysis', title: '实时监测台', desc: '实时查看三路服务状态、画面帧率、麦克风音量与信号曲线' },
+  { to: '/reports', title: '报告中心', desc: '查看各场次行为证据报告，支持在线明细核对与单文件下载' },
+  { to: '/recordings', title: '录制素材库', desc: '按场次管理原始录像、逐帧画面抽查与回收站恢复' },
+  { to: '/export', title: '数据导出与原表', desc: '导出面部、手势、语音三份原始 CSV 台账、转写文本与趋势图' },
+  { to: '/question-bank', title: '题库管理', desc: '管理多套面试与科研题库，支持导入导出与关键词快速检索' },
 ];
 
 const Home: React.FC = () => {
@@ -198,7 +198,7 @@ const Home: React.FC = () => {
                   fontSize: 'var(--ax-caption-size)',
                 }}
               >
-                所测即所得 —— 实时探活四路本地服务与磁盘实存，读不到就如实报错并支持重试
+                实时检测四路本地服务与磁盘存档状态
               </p>
             </div>
             <Button
@@ -355,7 +355,7 @@ const Home: React.FC = () => {
                 }}
               >
                 <div style={{ fontSize: 'var(--ax-caption-size)', color: 'var(--ax-body-muted)' }}>
-                  本地录制素材库（支持脱敏视图）
+                  本地录制素材库
                 </div>
                 <div className="ax-display-lg" style={{ marginTop: 8, fontSize: 38, color: '#ffffff' }}>
                   {recStats === null ? (loading ? '…' : '未读到') : recStats.n}

@@ -37,7 +37,7 @@ const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
   interview: {
     type: 'interview',
     title: '面试行为采集与观测',
-    subtitle: '同步采集面试问答过程中的面部动作单元、上肢姿态及语音韵律，生成可追溯的客观行为证据报告',
+    subtitle: '按题库顺序完成问答，同步记录面部动作、上肢姿态与语音转写，结束后自动生成行为证据报告。',
     inProgressTitle: '面试采集进行中',
     startButtonText: '开始面试采集',
     startButtonColor: 'var(--ax-primary)',
@@ -46,7 +46,7 @@ const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
   research: {
     type: 'research',
     title: '科研行为采集与观测',
-    subtitle: '记录科研汇报与课题追问过程中的多模态客观行为信号与语音转写，输出证据与缺口清单（不打分）',
+    subtitle: '记录科研汇报与课题问答过程中的多模态行为数据与语音转写，结束后自动生成行为证据报告。',
     inProgressTitle: '科研采集进行中',
     startButtonText: '开始科研采集',
     startButtonColor: 'var(--ax-primary)',
@@ -437,8 +437,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
             {config.startButtonText}
           </button>
           <p style={{ marginTop: '20px', fontSize: '13px', color: 'var(--ax-text-secondary)' }}>
-            点开始之后会先请你填本场标注(谁、哪个院系)—— 填完才开录。
-            没标注的一场事后认不出是谁,等于白采。
+            点击开始后请先填写受试者信息并完成摄像头与麦克风自检，通过后即开始正式采集。
           </p>
         </div>
 

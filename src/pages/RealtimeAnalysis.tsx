@@ -344,7 +344,7 @@ const RealtimeAnalysis: React.FC = () => {
                 ? `当前会话：${sid}`
                 : sessionError
                   ? `未铸到会话：${sessionError}`
-                  : '实时监测三路仪器在线状态、采样帧率、面部覆盖率与音频电平（非评分面板）'}
+                  : '查看三路采集服务状态、画面帧率、人脸识别率与麦克风实时音量'}
             </div>
             {(recording.savedLabel || sid) && (
               <div style={{ fontSize: 13, marginTop: 4, color: 'var(--ax-primary)' }}>
@@ -497,15 +497,15 @@ const RealtimeAnalysis: React.FC = () => {
           </Row>
         )}
 
-        {/* 物理传感量实时曲线（纯 SVG，无情绪/打分/假热力图） */}
-        <Card title="客观物理信号时序监测（最近 24 次采样，仅用于采集质量核验）" style={{ marginBottom: 20 }}>
+        {/* 物理传感量实时曲线 */}
+        <Card title="实时信号曲线 · 最近 24 次采样" style={{ marginBottom: 20 }}>
           <Row gutter={[16, 16]}>
             <Col xs={24} md={8}>
               <SignalSparkline
                 points={telemetry}
                 accessor={(p) => p.au12}
                 color="#0066cc"
-                title="AU12 微笑几何代理幅度"
+                title="嘴角上扬幅度"
                 maxY={1}
               />
             </Col>
@@ -514,7 +514,7 @@ const RealtimeAnalysis: React.FC = () => {
                 points={telemetry}
                 accessor={(p) => p.au4}
                 color="#0b5d2e"
-                title="AU4 眉间收缩几何代理幅度"
+                title="眉间收缩幅度"
                 maxY={1}
               />
             </Col>
@@ -523,7 +523,7 @@ const RealtimeAnalysis: React.FC = () => {
                 points={telemetry}
                 accessor={(p) => p.jitter}
                 color="#7a4a05"
-                title="上肢手部瞬时抖动"
+                title="手部动作幅度"
                 maxY={0.3}
               />
             </Col>

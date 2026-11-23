@@ -325,7 +325,7 @@ const ReportPage: React.FC = () => {
               </div>
             ) : subjectPairs.length === 0 ? (
               <div style={{ color: 'var(--ax-text-secondary)', fontSize: 13.5 }}>
-                被测者：<strong>未标注</strong>（录制时未填写姓名 / 学号 / 院系）
+                受试者：<strong>未填写身份信息</strong>
               </div>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 18px' }}>
@@ -359,7 +359,7 @@ const ReportPage: React.FC = () => {
             }}
           >
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ax-info)', marginBottom: 4 }}>
-              核心结论导读（不给分，只陈述实测覆盖与证据薄弱处）
+              本场数据概览
             </div>
             <div style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--ax-ink)' }}>
               {leadSummary}
@@ -367,30 +367,29 @@ const ReportPage: React.FC = () => {
           </Card>
         )}
 
-        {/* 跨模态覆盖率门控 & ASR 词级置信度诚实披露条 */}
-        {(crossModal || asrDisclosure) && (() => {
+        {/* 画面与声音同步、问答声音分离 & 语音转写说明 */}
+        {(crossModal || asrDisclosure || (report?.l1 as any)?.speaker_turn_audit) && (() => {
           const cm = crossModal as any;
+          const stAudit = (report?.l1 as any)?.speaker_turn_audit;
           const fgStatus = cm?.session?.pairs?.face_gesture?.status;
-          const fgPct = cm?.session?.pairs?.face_gesture?.jaccard;
           const all3Status = cm?.session?.all_three?.status;
           let cmType: 'info' | 'warning' | 'error' | 'success' = 'info';
-          let cmLabel = '单模态 / 不可验证';
+          let cmLabel = '单路数据';
           if (all3Status === 'aligned') {
             cmType = 'success';
-            cmLabel = '三模态时间窗对齐充分';
+            cmLabel = '画面与语音全程同步';
           } else if (fgStatus === 'aligned' && (all3Status === 'blocked' || all3Status === 'degraded')) {
-            cmType = 'warning';
-            const pctStr = typeof fgPct === 'number' ? `（${Math.round(fgPct * 100)}%）` : '';
-            cmLabel = `视觉双路充分对齐${pctStr}，视觉与语音联合结论已阻断`;
+            cmType = 'info';
+            cmLabel = '面部与手势画面同步良好，语音按题分段记录';
           } else if (fgStatus === 'aligned') {
             cmType = 'success';
-            cmLabel = '视觉双路时间窗对齐充分';
+            cmLabel = '面部与手势画面同步良好';
           } else if (fgStatus === 'blocked' || all3Status === 'blocked') {
-            cmType = 'error';
-            cmLabel = '跨模态联合结论已阻断';
+            cmType = 'warning';
+            cmLabel = '不同通道采集时段重合较少，已分项独立展示';
           } else if (fgStatus === 'degraded' || all3Status === 'degraded') {
             cmType = 'warning';
-            cmLabel = '跨模态覆盖偏低（降级提示）';
+            cmLabel = '部分时段重合';
           }
           const asr = asrDisclosure as any;
           const asrDegraded = Array.isArray(asr?.degraded_indicators) ? asr.degraded_indicators : [];
@@ -400,15 +399,22 @@ const ReportPage: React.FC = () => {
                 <Alert
                   showIcon
                   type={cmType}
-                  message={`跨模态时间窗对齐：${cmLabel}`}
-                  description={cm.summary_plain}
+                  message={`画面与声音同步：${cmLabel}`}
+                  description={
+                    <div>
+                      <div>{cm.summary_plain}</div>
+                      {stAudit?.summary_plain && (
+                        <div style={{ marginTop: 4 }}>{stAudit.summary_plain}</div>
+                      )}
+                    </div>
+                  }
                 />
               )}
               {asr && (
                 <Alert
                   showIcon
                   type={asrDegraded.length > 0 ? 'warning' : 'info'}
-                  message={`语音转写置信度披露（${asr.engine || '本地 ASR'}）`}
+                  message="语音转写说明"
                   description={asr.note_plain || asr.summary_plain}
                 />
               )}
@@ -524,7 +530,7 @@ const ReportPage: React.FC = () => {
 
       {/* 按需本地辅助解读抽屉 */}
       <Drawer
-        title={<Space><RobotOutlined />本地按需辅助解读（不参与评分与计算）</Space>}
+        title={<Space><RobotOutlined />报告解读与追问参考</Space>}
         open={assistOpen}
         onClose={() => setAssistOpen(false)}
         width={520}
@@ -536,16 +542,16 @@ const ReportPage: React.FC = () => {
             onChange={(val) => void runAssist(val as 'summary' | 'interview_guide', true)}
             options={[
               { label: '客观导读摘要', value: 'summary' },
-              { label: '基于缺口的追问提纲', value: 'interview_guide' },
+              { label: '追问提纲建议', value: 'interview_guide' },
             ]}
           />
 
           <Space wrap>
             <Button size="small" type="primary" loading={assistLoading} onClick={() => void runAssist(assistMode, true)}>
-              调用本地模型生成（4s 超时自动回退）
+              生成详细解读
             </Button>
             <Button size="small" loading={assistLoading} onClick={() => void runAssist(assistMode, false)}>
-              极速确定性规则摘要
+              快速提炼要点
             </Button>
           </Space>
 

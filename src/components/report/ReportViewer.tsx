@@ -91,10 +91,14 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
               </Space>
             }
           >
-            <p style={{ color: 'var(--ax-text-secondary)', marginTop: 0, marginBottom: 12, fontSize: 13.5 }}>
-              {dim.description}
-              {reg?.disclaimer ? `（${reg.disclaimer}）` : ''}
-            </p>
+            <div style={{ color: 'var(--ax-text-secondary)', marginTop: 0, marginBottom: 12, fontSize: 13.5 }}>
+              <div>{(reg as any)?.user_summary || reg?.disclaimer || dim.description}</div>
+              {(reg as any)?.literature_anchor && (
+                <div style={{ fontSize: 12, marginTop: 3, color: 'var(--ax-ink-muted-80)' }}>
+                  理论线索参考：{(reg as any).literature_anchor}
+                </div>
+              )}
+            </div>
 
             {chain.length > 0 ? (
               <Table<EvidenceItem>
@@ -179,7 +183,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
                 }}
               >
                 <div style={{ fontWeight: 600, color: 'var(--ax-warning)', marginBottom: 4 }}>
-                  本场采集缺口（可补采或补提序列）
+                  本场未获取到的指标
                 </div>
                 <ul style={{ paddingLeft: 18, margin: 0, color: 'var(--ax-ink-muted-80)' }}>
                   {gaps.map((g, i) => (
@@ -201,7 +205,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
                 }}
               >
                 <div style={{ fontWeight: 600, color: 'var(--ax-text-secondary)', marginBottom: 4 }}>
-                  本套采集方案不测（非本场漏采）
+                  当前采集方案不测量的项目
                 </div>
                 <ul style={{ paddingLeft: 18, margin: 0, color: 'var(--ax-text-secondary)' }}>
                   {notMeasured.map((g, i) => (
@@ -214,7 +218,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
         );
       })}
 
-      {/* ══ Layer 2：一键查账（默认折叠，展开可逐条核验全部 41 项指标、参数与治理台账） ══ */}
+      {/* ══ Layer 2：一键查账 ══ */}
       {l1 && (
         <div style={{ marginTop: 24, marginBottom: 16 }}>
           <Collapse
@@ -223,8 +227,8 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
                 key: 'l1-full-table',
                 label: (
                   <Space wrap size={8}>
-                    <strong>全量行为指标明细查账（{l1.n_measured} / {l1.n_total} 项出值）</strong>
-                    <Tag style={{ margin: 0 }}>展开查看公式、L0 依赖与置信度原因</Tag>
+                    <strong>全部 {l1.n_total} 项行为指标明细 · 已测出 {l1.n_measured} 项</strong>
+                    <Tag style={{ margin: 0 }}>点击查看计算方式与未出值原因</Tag>
                   </Space>
                 ),
                 children: <L1IndicatorTable l1={l1} />,

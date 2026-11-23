@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { message } from 'antd';
-import { sessionApi, getSessionId, getDiscardToken } from '@/services/api';
+import { dashboardApi, sessionApi, getSessionId, getDiscardToken } from '@/services/api';
 import { recordingsApi } from '@/services/recordingsApi';
 import { ConsentMode } from '@/components/recording/RecordingDialogs';
 import type { CaptureHealth } from '@/types/api';
@@ -200,12 +200,17 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
       }
       console.log('✅ 原生录像已留存:', result);
       const health: CaptureHealth | null = result?.capture_health ?? null;
+      const curSid = getSessionId();
       setSavedInfo({
-        label: savedLabelRef.current, sid: getSessionId(), bytes: blob.size, health,
+        label: savedLabelRef.current, sid: curSid, bytes: blob.size, health,
       });
       setSaveState('saved');
       pendingRef.current?.resolve();
       pendingRef.current = null;
+      // 录完留存后自动在后台触发一次离线报告归档，无需用户再去手动点生成
+      if (curSid) {
+        void dashboardApi.runModule('report', curSid).catch(() => {});
+      }
       // ⚠️ 成功提示**不掩盖**体检告警:两者说的是不同的事 ——
       //    "字节存下了"与"存下的东西录坏了"。盘上就有这样的场次:文件完整、
       //    音频完整,只是**没有视频轨**。只说"已留存"等于让人以为一切正常。
@@ -249,9 +254,13 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
   const chooseKeep = useCallback(() => {
     const p = pendingRef.current;
     if (p) { void doUpload(p.blob); return; }
-    setSavedInfo({ label: savedLabelRef.current, sid: getSessionId(), bytes: 0 });
+    const curSid = getSessionId();
+    setSavedInfo({ label: savedLabelRef.current, sid: curSid, bytes: 0 });
     setSaveState('saved');
-    message.success('本场已确认留存');
+    if (curSid) {
+      void dashboardApi.runModule('report', curSid).catch(() => {});
+    }
+    message.success('本场已确认留存，正在后台自动生成报告');
   }, [doUpload]);
 
   /**
