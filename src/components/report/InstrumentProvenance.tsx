@@ -33,7 +33,7 @@
  * 等 `assessment.ts` 允许改动时,这三个类型应当整体搬进去,不要让两张类型表分叉。
  */
 import React, { useMemo } from 'react';
-import { Alert, Card, Empty, Table, Tag, Tooltip } from 'antd';
+import { Alert, Card, Collapse, Empty, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 /** 仪器名 —— 与 `instrument_provenance.INSTRUMENTS` 同序同名。 */
@@ -67,6 +67,7 @@ export interface InstrumentRow {
 export interface L1WithInstruments {
   indicators?: InstrumentRow[];
   instruments?: InstrumentSummary;
+  indicator_meta?: Record<string, { label?: string; family?: string; unit?: string }>;
 }
 
 /** 仪器 → 标签配色。`unknown` 与其它四个**不同形**(虚线 + 警示色):
@@ -128,6 +129,7 @@ const InstrumentProvenance: React.FC<InstrumentProvenanceProps> = ({ l1 }) => {
   const labels = summary?.labels ?? {};
   const order = summary?.order ?? [];
   const rows = l1?.indicators ?? [];
+  const indicatorMeta = l1?.indicator_meta ?? {};
 
   /** 只列**带得出仪器**的行:38 条里每一条都该有,一条都没有就整块不逞强。 */
   const tableRows = useMemo(
@@ -144,16 +146,17 @@ const InstrumentProvenance: React.FC<InstrumentProvenanceProps> = ({ l1 }) => {
       dataIndex: 'name',
       key: 'name',
       width: 300,
-      render: (_: unknown, r) => (
-        <div>
-          <div style={{ fontFamily: 'var(--ax-font-mono)', fontSize: 12.5 }}>{r.name}</div>
-          {r.family && (
-            <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 2 }}>
-              {r.family}
+      render: (_: unknown, r) => {
+        const cn = indicatorMeta[r.name]?.label;
+        return (
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{cn || r.name}</div>
+            <div style={{ fontFamily: 'var(--ax-font-mono)', fontSize: 11.5, color: 'var(--ax-text-secondary)', marginTop: 2 }}>
+              {r.name}{r.family ? ` · ${r.family}` : ''}
             </div>
-          )}
-        </div>
-      ),
+          </div>
+        );
+      },
     },
     {
       title: '仪器来源',
@@ -278,13 +281,29 @@ const InstrumentProvenance: React.FC<InstrumentProvenanceProps> = ({ l1 }) => {
               description="载荷里的指标一条都没带仪器字段（不是「没有仪器」：是这一份没标）"
             />
           ) : (
-            <Table<InstrumentRow>
-              rowKey="name"
-              size="small"
-              columns={columns}
-              dataSource={tableRows}
-              pagination={false}
-              scroll={{ x: 520 }}
+            <Collapse
+              ghost
+              style={{ marginTop: 4 }}
+              items={[
+                {
+                  key: 'instrument-detail-table',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      展开 {tableRows.length} 条行为指标逐项仪器来源明细
+                    </span>
+                  ),
+                  children: (
+                    <Table<InstrumentRow>
+                      rowKey="name"
+                      size="small"
+                      columns={columns}
+                      dataSource={tableRows}
+                      pagination={false}
+                      scroll={{ x: 520 }}
+                    />
+                  ),
+                },
+              ]}
             />
           )}
         </>

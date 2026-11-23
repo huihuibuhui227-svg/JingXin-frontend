@@ -270,7 +270,7 @@ const DataExportPage: React.FC = () => {
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
-          <div>
+          <div style={{ flex: '1 1 560px' }}>
             <Title level={1} style={{ margin: 0, fontSize: 'var(--ax-display-md-size)' }}>
               数据导出与原表复核
             </Title>

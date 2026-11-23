@@ -337,15 +337,15 @@ const QuestionBankPage: React.FC = () => {
     borderRadius: 4,
     fontSize: 11,
     fontWeight: 600,
-    background: isSelected ? 'rgba(255, 255, 255, 0.22)' : 'var(--ax-success-soft)',
-    color: isSelected ? '#FFFFFF' : 'var(--ax-success)',
+    background: isSelected ? '#FFFFFF' : 'var(--ax-success-soft)',
+    color: isSelected ? '#1F453A' : 'var(--ax-success)',
   });
 
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: 1060, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
-          <div>
+          <div style={{ flex: '1 1 560px' }}>
             <Title level={1} style={{ margin: 0, fontSize: 'var(--ax-display-md-size)' }}>
               题库管理
             </Title>

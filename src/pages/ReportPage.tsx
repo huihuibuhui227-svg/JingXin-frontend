@@ -368,26 +368,53 @@ const ReportPage: React.FC = () => {
         )}
 
         {/* 跨模态覆盖率门控 & ASR 词级置信度诚实披露条 */}
-        {(crossModal || asrDisclosure) && (
-          <Space direction="vertical" size={10} style={{ width: '100%', marginBottom: 16 }}>
-            {crossModal && (
-              <Alert
-                showIcon
-                type={crossModal.status === 'blocked' ? 'error' : crossModal.status === 'degraded' ? 'warning' : 'info'}
-                message={`跨模态时间窗对齐：${crossModal.status === 'ok' ? '合格' : crossModal.status === 'degraded' ? '降级提示' : crossModal.status === 'blocked' ? '跨模态联合结论已阻断' : '单模态场次'}`}
-                description={crossModal.summary_plain}
-              />
-            )}
-            {asrDisclosure && (
-              <Alert
-                showIcon
-                type={asrDisclosure.degraded_indicators.length > 0 ? 'warning' : 'info'}
-                message={`语音转写置信度披露（${asrDisclosure.engine}）`}
-                description={asrDisclosure.summary_plain}
-              />
-            )}
-          </Space>
-        )}
+        {(crossModal || asrDisclosure) && (() => {
+          const cm = crossModal as any;
+          const fgStatus = cm?.session?.pairs?.face_gesture?.status;
+          const fgPct = cm?.session?.pairs?.face_gesture?.jaccard;
+          const all3Status = cm?.session?.all_three?.status;
+          let cmType: 'info' | 'warning' | 'error' | 'success' = 'info';
+          let cmLabel = '单模态 / 不可验证';
+          if (all3Status === 'aligned') {
+            cmType = 'success';
+            cmLabel = '三模态时间窗对齐充分';
+          } else if (fgStatus === 'aligned' && (all3Status === 'blocked' || all3Status === 'degraded')) {
+            cmType = 'warning';
+            const pctStr = typeof fgPct === 'number' ? `（${Math.round(fgPct * 100)}%）` : '';
+            cmLabel = `视觉双路充分对齐${pctStr}，视觉与语音联合结论已阻断`;
+          } else if (fgStatus === 'aligned') {
+            cmType = 'success';
+            cmLabel = '视觉双路时间窗对齐充分';
+          } else if (fgStatus === 'blocked' || all3Status === 'blocked') {
+            cmType = 'error';
+            cmLabel = '跨模态联合结论已阻断';
+          } else if (fgStatus === 'degraded' || all3Status === 'degraded') {
+            cmType = 'warning';
+            cmLabel = '跨模态覆盖偏低（降级提示）';
+          }
+          const asr = asrDisclosure as any;
+          const asrDegraded = Array.isArray(asr?.degraded_indicators) ? asr.degraded_indicators : [];
+          return (
+            <Space direction="vertical" size={10} style={{ width: '100%', marginBottom: 16 }}>
+              {cm && (
+                <Alert
+                  showIcon
+                  type={cmType}
+                  message={`跨模态时间窗对齐：${cmLabel}`}
+                  description={cm.summary_plain}
+                />
+              )}
+              {asr && (
+                <Alert
+                  showIcon
+                  type={asrDegraded.length > 0 ? 'warning' : 'info'}
+                  message={`语音转写置信度披露（${asr.engine || '本地 ASR'}）`}
+                  description={asr.note_plain || asr.summary_plain}
+                />
+              )}
+            </Space>
+          );
+        })()}
 
         {/* 三段式覆盖大数卡片 */}
         <Card style={{ marginBottom: 20 }}>
@@ -488,11 +515,11 @@ const ReportPage: React.FC = () => {
           </Card>
         )}
 
-        {/* 仪器来源显式披露 */}
-        <InstrumentProvenance l1={l1WithInstruments} />
-
         {/* 核心双层证据视图 */}
         <ReportViewer report={report} />
+
+        {/* 仪器来源显式披露 */}
+        <InstrumentProvenance l1={l1WithInstruments} />
       </div>
 
       {/* 按需本地辅助解读抽屉 */}

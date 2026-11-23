@@ -24,10 +24,10 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
   if (!l1) return null;
 
   const pp = l1.parameter_provenance;
-  const gov = l1.governance_ledger;
-  const sq = l1.signal_quality_audit;
-  const secondInst = l1.second_instrument_appendix;
-  const blockedWarns = l1.blocked_dependency_warnings ?? [];
+  const gov = l1.governance_ledger as any;
+  const sq = l1.signal_quality_audit as any;
+  const secondInst = l1.second_instrument_appendix as any;
+  const blockedWarns = Array.isArray(l1.blocked_dependency_warnings) ? l1.blocked_dependency_warnings : [];
 
   const items = [];
 
@@ -50,7 +50,7 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
             rowKey="param_id"
             size="small"
             pagination={{ pageSize: 8, showSizeChanger: false }}
-            dataSource={pp.registry}
+            dataSource={Array.isArray(pp.registry) ? pp.registry : []}
             scroll={{ x: 760 }}
             columns={[
               {
@@ -104,13 +104,22 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
   }
 
   if (gov) {
+    const l0Blocked: any[] = Array.isArray(gov.l0_blocked) ? gov.l0_blocked : [];
+    const l1Retired: any[] = Array.isArray(gov.retired_redundant)
+      ? gov.retired_redundant
+      : (Array.isArray(gov.l1_retired) ? gov.l1_retired : []);
+    const quarantineActive: any[] = Array.isArray(gov.quarantine_active) ? gov.quarantine_active : [];
+
     items.push({
       key: 'governance',
       label: (
         <Space wrap size={8}>
           <strong>测量治理台账：显式封停与主动拒绝清单</strong>
-          <Tag style={{ margin: 0 }}>封停 L0 {gov.l0_blocked.length} 项</Tag>
-          <Tag style={{ margin: 0 }}>主动拒绝 L1 {gov.l1_retired.length} 项</Tag>
+          <Tag style={{ margin: 0 }}>封停 L0 {l0Blocked.length} 项</Tag>
+          <Tag style={{ margin: 0 }}>主动拒绝/退役 {l1Retired.length} 项</Tag>
+          {quarantineActive.length > 0 && (
+            <Tag style={{ margin: 0 }}>隔离旧代理 {quarantineActive.length} 项</Tag>
+          )}
         </Space>
       ),
       children: (
@@ -122,41 +131,69 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
             <Alert
               type="warning"
               showIcon
-              message={`检测到 ${blockedWarns.length} 条指标存在已封停底层列依赖告警`}
-              description={blockedWarns.map((w) => w.warning).join('；')}
+              message={`检测到 ${blockedWarns.length} 条指标存在已封停底层列依赖提示`}
+              description={blockedWarns.map((w: any) => w.note_plain || w.warning).filter(Boolean).join('；')}
             />
           )}
-          <div>
-            <Text strong style={{ display: 'block', marginBottom: 6 }}>主动拒绝的冗余 L1 指标</Text>
-            <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: 'var(--ax-text-secondary)' }}>
-              {gov.l1_retired.map((r) => (
-                <li key={r.name} style={{ marginBottom: 4 }}>
-                  <strong style={{ color: 'var(--ax-ink)' }}>{r.label || r.name}</strong>：{r.reason}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <Text strong style={{ display: 'block', marginBottom: 6 }}>显式封停的 L0 字段及解封条件</Text>
-            <Table
-              rowKey="column"
-              size="small"
-              pagination={false}
-              dataSource={gov.l0_blocked}
-              scroll={{ x: 640 }}
-              columns={[
-                { title: '封停项', dataIndex: 'column', width: 180 },
-                { title: '封停原因', dataIndex: 'reason' },
-                { title: '解封前置条件', dataIndex: 'unblock_condition', width: 220 },
-              ]}
-            />
-          </div>
+          {l1Retired.length > 0 && (
+            <div>
+              <Text strong style={{ display: 'block', marginBottom: 6 }}>主动拒绝与退役的冗余/不可测指标</Text>
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: 'var(--ax-text-secondary)' }}>
+                {l1Retired.map((r: any, idx: number) => (
+                  <li key={r.id || r.name || idx} style={{ marginBottom: 4 }}>
+                    <strong style={{ color: 'var(--ax-ink)' }}>{r.label || r.id || r.name}</strong>：{r.reason_plain || r.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {l0Blocked.length > 0 && (
+            <div>
+              <Text strong style={{ display: 'block', marginBottom: 6 }}>显式封停的 L0 底层字段及解封前置条件</Text>
+              <Table
+                rowKey={(r: any, idx?: number) => `${r.id || r.column || 'l0'}-${idx ?? 0}`}
+                size="small"
+                pagination={false}
+                dataSource={l0Blocked}
+                scroll={{ x: 640 }}
+                columns={[
+                  {
+                    title: '封停项',
+                    dataIndex: 'label',
+                    width: 190,
+                    render: (lbl: string, r: any) => (
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{lbl || r.column || r.id || '未命名字段'}</div>
+                        {r.column && (
+                          <div style={{ fontSize: 11, fontFamily: 'var(--ax-font-mono)', color: 'var(--ax-text-secondary)' }}>
+                            {r.modality ? `${r.modality}.${r.column}` : r.column}
+                          </div>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
+                    title: '封停原因',
+                    dataIndex: 'reason_plain',
+                    render: (v: string, r: any) => v || r.reason || '—',
+                  },
+                  {
+                    title: '解封前置条件',
+                    dataIndex: 'unblock_human',
+                    width: 240,
+                    render: (v: string, r: any) => v || r.unblock_condition || '—',
+                  },
+                ]}
+              />
+            </div>
+          )}
         </Space>
       ),
     });
   }
 
   if (sq) {
+    const flagged: any[] = Array.isArray(sq.flagged_windows) ? sq.flagged_windows : [];
     items.push({
       key: 'signal-quality',
       label: (
@@ -189,16 +226,16 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
               本次纯 CPU 推理耗时 {sq.inference_ms ?? '—'} ms。
             </div>
           )}
-          {sq.flagged_windows.length > 0 && (
+          {flagged.length > 0 && (
             <Table
               rowKey="window_index"
               size="small"
               pagination={false}
-              dataSource={sq.flagged_windows}
+              dataSource={flagged}
               columns={[
                 { title: '帧区间', render: (_: any, r: any) => `第 ${r.start_row + 1}–${r.end_row} 帧`, width: 130 },
                 { title: '信号可用概率', dataIndex: 'usability_prob', width: 120, render: (v: number) => `${(v * 100).toFixed(1)}%` },
-                { title: '物理异常提示', dataIndex: 'hints', render: (hs: string[]) => hs.join('；') },
+                { title: '物理异常提示', dataIndex: 'hints', render: (hs: string[]) => (Array.isArray(hs) ? hs.join('；') : String(hs || '')) },
               ]}
             />
           )}
@@ -208,6 +245,9 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
   }
 
   if (secondInst?.available) {
+    const appendixRows: any[] = Array.isArray(secondInst.rows)
+      ? secondInst.rows
+      : (Array.isArray(secondInst.items) ? secondInst.items : []);
     items.push({
       key: 'second-instrument',
       label: (
@@ -218,17 +258,17 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
       ),
       children: (
         <div style={{ fontSize: 13, color: 'var(--ax-text-secondary)' }}>
-          <p style={{ marginTop: 0 }}>{secondInst.summary_plain || '以下读数来自 FaceLandmarker 52 项回归系数，独立于主几何代理指标。'}</p>
-          {Array.isArray(secondInst.items) && secondInst.items.length > 0 && (
+          <p style={{ marginTop: 0 }}>{secondInst.disclaimer || secondInst.summary_plain || '以下读数来自 FaceLandmarker 52 项回归系数，独立于主几何代理指标。'}</p>
+          {appendixRows.length > 0 && (
             <Table
-              rowKey="name"
+              rowKey={(r: any, idx?: number) => r.name || r.indicator || String(idx ?? 0)}
               size="small"
               pagination={false}
-              dataSource={secondInst.items}
+              dataSource={appendixRows}
               columns={[
-                { title: '对照项', dataIndex: 'label', render: (v: string, r: any) => v || r.name },
+                { title: '对照项', dataIndex: 'label', render: (v: string, r: any) => v || r.name || r.indicator },
                 { title: '读数', dataIndex: 'value', width: 120, render: (v: number | null) => (typeof v === 'number' ? v.toFixed(3) : '—') },
-                { title: '有效帧', dataIndex: 'n_valid', width: 100 },
+                { title: '有效样本', dataIndex: 'n_valid', width: 100, render: (v: any) => v ?? '—' },
               ]}
             />
           )}

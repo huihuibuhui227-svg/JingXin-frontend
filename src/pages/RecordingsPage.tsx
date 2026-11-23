@@ -178,24 +178,25 @@ const RecordingsPage: React.FC = () => {
         : <Tag color="success">正常</Tag>),
     },
     {
-      title: '操作', width: 220, fixed: 'right',
+      title: '操作', width: 256, fixed: 'right',
       render: (_: unknown, r) => (
-        <Space size={4}>
+        <Space size={2} wrap={false}>
           {!r.is_none_bucket && (
             <Button
               size="small"
               type="link"
+              style={{ padding: '0 6px' }}
               icon={<BarChartOutlined />}
               onClick={() => navigate(`/report/${encodeURIComponent(r.sid)}`)}
             >
               查账
             </Button>
           )}
-          <Button size="small" type="link" icon={<PlayCircleOutlined />}
+          <Button size="small" type="link" style={{ padding: '0 6px' }} icon={<PlayCircleOutlined />}
             disabled={!admin} onClick={() => setDetailSid(r.sid)}>
             详情
           </Button>
-          <Button size="small" type="link" danger icon={<DeleteOutlined />}
+          <Button size="small" type="link" style={{ padding: '0 6px' }} danger icon={<DeleteOutlined />}
             disabled={!admin} onClick={() => setTrashTarget(r)}>
             回收站
           </Button>
@@ -244,7 +245,7 @@ const RecordingsPage: React.FC = () => {
           loading={loading}
           columns={columns}
           dataSource={data?.recordings ?? []}
-          scroll={{ x: 1020 }}
+          scroll={{ x: 1080 }}
           pagination={{ pageSize: 20, showSizeChanger: true }}
         />
 
