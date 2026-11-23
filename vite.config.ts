@@ -14,6 +14,32 @@ const extraAllowedHosts = (process.env.VITE_ALLOWED_HOSTS || '')
 
 const allowedHosts = Array.from(new Set(['.ts.net', ...extraAllowedHosts]));
 
+const sharedProxy = {
+  '/api': {
+    target: 'http://127.0.0.1:5000',
+    changeOrigin: true
+  },
+  '/output': {
+    target: 'http://127.0.0.1:5000',
+    changeOrigin: true
+  },
+  '/_svc/face': {
+    target: 'http://127.0.0.1:8000',
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/_svc\/face/, '')
+  },
+  '/_svc/voice': {
+    target: 'http://127.0.0.1:8001',
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/_svc\/voice/, '')
+  },
+  '/_svc/gesture': {
+    target: 'http://127.0.0.1:8002',
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/_svc\/gesture/, '')
+  }
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -32,15 +58,11 @@ export default defineConfig({
   server: {
     port: 5173,
     allowedHosts,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/output': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      }
-    }
+    proxy: sharedProxy
+  },
+  preview: {
+    port: 5173,
+    strictPort: true,
+    proxy: sharedProxy
   }
 });
