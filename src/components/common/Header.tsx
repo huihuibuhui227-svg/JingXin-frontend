@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/recordings', label: '录制素材' },
   { key: '/export', label: '数据导出' },
   { key: '/question-bank', label: '题库管理' },
+  { key: '/benchmarks', label: '科研基准' },
 ];
 
 const sectionName = (pathname: string): string => {

@@ -31,6 +31,7 @@ const ROUTES = process.argv[2]
       '/recordings',
       '/export',
       '/question-bank',
+      '/benchmarks',
       '/report/latest'
     ];
 

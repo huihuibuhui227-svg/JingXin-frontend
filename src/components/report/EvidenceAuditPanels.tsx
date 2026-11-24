@@ -1,5 +1,6 @@
 import React from 'react';
 import { Alert, Collapse, Space, Table, Tag, Typography } from 'antd';
+import { BehaviorRegimeTimeline } from './ReportCharts';
 import type {
   BlendshapeCalibrationConstruct,
   EvaluationResult,
@@ -672,6 +673,26 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
                 : ''}
             </div>
           )}
+        </Space>
+      ),
+    });
+  }
+
+  if (l1.referee_ml?.available && l1.behavior_regimes?.available) {
+    items.push({
+      key: 'baseline-gmm-regime',
+      label: (
+        <Space wrap size={8}>
+          <strong>基线对照：逐窗无监督行为节律（GMM 原始分窗）</strong>
+          <Tag style={{ margin: 0, ...TIER_TONE.T2a }}>对比参考</Tag>
+        </Space>
+      ),
+      children: (
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--ax-text-secondary)', lineHeight: 1.55 }}>
+            主时间轴采用隐马尔可夫模型与变点检测过滤了短时波动切换；以下保留逐窗高斯混合模型原始分窗结果作为方法学基线对照，不参与任何指标评定。
+          </p>
+          <BehaviorRegimeTimeline report={report} />
         </Space>
       ),
     });

@@ -522,11 +522,12 @@ const ReportPage: React.FC = () => {
           </Card>
         )}
 
-        {/* 第三层模型裁判：证据核验阶段与宏观行为分段 */}
-        <RefereeStagePanel report={report} />
-
-        {/* 整场行为节奏时间轴 */}
-        <BehaviorRegimeTimeline report={report} />
+        {/* 第三层模型裁判：证据核验阶段与宏观行为分段（不可用时退回无监督行为节奏时间轴） */}
+        {report.l1?.referee_ml?.available ? (
+          <RefereeStagePanel report={report} />
+        ) : (
+          <BehaviorRegimeTimeline report={report} />
+        )}
 
         {/* 核心双层证据视图 */}
         <ReportViewer report={report} />

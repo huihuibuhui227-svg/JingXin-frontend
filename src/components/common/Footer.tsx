@@ -9,7 +9,8 @@ const QUICK_LINKS = [
   { to: '/reports', label: '报告中心' },
   { to: '/recordings', label: '录制素材' },
   { to: '/export', label: '数据导出' },
-  { to: '/question-bank', label: '题库管理' }
+  { to: '/question-bank', label: '题库管理' },
+  { to: '/benchmarks', label: '科研基准' }
 ];
 
 const Footer: React.FC = () => {

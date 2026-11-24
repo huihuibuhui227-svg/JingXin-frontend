@@ -341,6 +341,218 @@ export interface QuestionSearchResponse {
   latency_ms: number;
 }
 
+export interface BenchmarkModelMacroRow {
+  model: string;
+  pearson_r?: number | null;
+  spearman_rho?: number | null;
+  rmse?: number | null;
+  mae?: number | null;
+  acc_1_minus_mae?: number | null;
+}
+
+export interface BlendshapeStatsBand {
+  mean?: number | null;
+  median?: number | null;
+  p25?: number | null;
+  p75?: number | null;
+  min?: number | null;
+  max?: number | null;
+}
+
+export interface ResearchBenchmarksResponse {
+  status: string;
+  research_only: boolean;
+  scoring_participation: boolean;
+  boundary_note?: string;
+  multicorpus: {
+    available: boolean;
+    generated_at?: string;
+    extraction?: {
+      total_clips_succeeded?: number;
+      clips_per_sec?: number;
+      workers?: number;
+    };
+    mit?: {
+      n_interviews?: number;
+      n_participants?: number;
+      cv_scheme?: string;
+      best_model?: string;
+      models?: BenchmarkModelMacroRow[];
+      gpu_mlp_hardware?: {
+        device_name?: string;
+        torch_version?: string;
+        dtype?: string;
+        elapsed_sec?: number;
+        peak_vram_mb?: number;
+        available?: boolean;
+      };
+    };
+    recruitview?: {
+      cv_scheme?: string;
+      track_a_n_clips?: number;
+      track_a_n_users?: number;
+      track_a_models?: BenchmarkModelMacroRow[];
+      track_b_n_clips?: number;
+      track_b_n_users?: number;
+      track_b_best_model?: string;
+      track_b_models?: BenchmarkModelMacroRow[];
+    };
+    chalearn?: {
+      split_counts?: { train?: number; val?: number; test?: number };
+      n_total_features?: number;
+      best_model?: string;
+      models?: BenchmarkModelMacroRow[];
+      best_model_dimensions?: Array<{
+        key: string;
+        pearson_r?: number | null;
+        spearman_rho?: number | null;
+        acc_1_minus_mae?: number | null;
+      }>;
+    };
+    regime_transfer?: {
+      shared_features?: string[];
+      chinese_corpus?: {
+        n_sessions?: number;
+        n_sessions_with_voice?: number;
+        n_windows?: number;
+      };
+      english_corpus?: {
+        n_clips?: number;
+        breakdown?: Record<string, number>;
+      };
+      regimes?: Record<string, {
+        val_silhouette_mean?: number;
+        silhouette_on_chinese?: number;
+        ari_vs_chinese_ref?: number;
+        nmi_vs_chinese_ref?: number;
+        state_agreement_vs_chinese_ref?: number;
+        chinese_state_distribution?: Record<string, number>;
+      }>;
+    };
+  };
+  blendshape_calibration: {
+    available: boolean;
+    generated_at?: string;
+    corpus_summary?: {
+      total_sessions?: number;
+      available_sessions?: number;
+      unavailable_sessions?: number;
+      pose_mode_counts?: {
+        '3d_matrix'?: number;
+        '2d_legacy'?: number;
+        unavailable?: number;
+      };
+      constructs_summary?: Record<string, {
+        label?: string;
+        n_valid_sessions?: number;
+        raw_rho?: BlendshapeStatsBand;
+        calibrated_rho?: BlendshapeStatsBand;
+        rho_delta?: BlendshapeStatsBand;
+        pose_r2?: BlendshapeStatsBand;
+        counts_by_eligibility?: Record<string, number>;
+      }>;
+    };
+  };
+  referee_ml: {
+    available: boolean;
+    trained_at?: string;
+    scoring_participation?: boolean;
+    non_scoring_guarantee?: string;
+    dataset?: {
+      n_real_sessions?: number;
+      n_real_windows?: number;
+      n_real_sessions_with_voice_series?: number;
+      n_synthetic_boundary_calibration?: number;
+      synthetic_usage_note?: string;
+      real_stage_distribution?: Record<string, number>;
+    };
+    stage_segmentation?: {
+      model_type?: string;
+      cv_scheme?: string;
+      flicker_reduction_pct?: number;
+      full_corpus_flicker_reduction_pct?: number;
+      hmm_mean_dwell_sec?: number;
+      gmm_mean_dwell_sec?: number;
+      cross_fold_viterbi_ari_mean?: number;
+      cross_fold_viterbi_agreement_mean?: number;
+      pelt_mean_changepoints_per_session?: number;
+      pelt_median_ms_per_session?: number;
+    };
+    evidence_gate?: {
+      model_type?: string;
+      cv_scheme?: string;
+      supervision_protocol?: string;
+      supervision_note_plain?: string;
+      cv_accuracy?: number;
+      cv_macro_f1?: number;
+      empirical_conformal_coverage?: number;
+      target_coverage?: number;
+      mean_conformal_set_size?: number;
+      uncertainty_escalation_rate?: number;
+      ood_auroc_mean?: number;
+      ood_auroc_std?: number;
+      confusion_matrix?: number[][] | { labels?: string[]; matrix?: number[][] };
+      non_circular_raw_telemetry_ablation?: {
+        n_features?: number;
+        features?: string[];
+        cv_accuracy?: number;
+        cv_macro_f1?: number;
+        empirical_conformal_coverage?: number;
+        ood_auroc_mean?: number;
+        note?: string;
+      } | Record<string, unknown>;
+    };
+    cpu_runtime?: {
+      benchmark_session_windows?: number;
+      warm_inference_ms_median?: number;
+      warm_inference_ms_p95?: number;
+      standalone_inference_ms_median?: number;
+    };
+  };
+  gpu_vs_cpu: {
+    available: boolean;
+    generated_at?: string;
+    hardware?: {
+      gpu_tested?: string;
+      fp16_tensor_core_available?: boolean;
+      precision_used?: string;
+    };
+    cpu_referee?: {
+      n_sessions_seq?: number;
+      total_windows_seq?: number;
+      cpu_full_evaluate_ms_median?: number;
+      cpu_full_evaluate_ms_p95?: number;
+      cpu_model_core_single_ms_median?: number;
+      cpu_batch128_ms_median?: number;
+      cpu_batch128_sess_per_sec?: number;
+      cpu_batch256_ms_median?: number;
+      cpu_batch256_sess_per_sec?: number;
+    };
+    gpu_neural_sequence_referee?: {
+      device?: string;
+      gpu_name?: string;
+      torch_version?: string;
+      precision?: string;
+      architecture?: string;
+      cv_agreement_with_hmm_mean?: number;
+      cv_agreement_std?: number;
+      cold_torch_cuda_init_ms?: number;
+      gpu_single_e2e_ms_median?: number;
+      gpu_single_kernel_ms_median?: number;
+      gpu_batch128_e2e_ms_median?: number;
+      gpu_batch128_sess_per_sec?: number;
+      gpu_batch256_e2e_ms_median?: number;
+      gpu_batch256_sess_per_sec?: number;
+      train_peak_vram_mb?: number;
+    };
+    comparison?: {
+      single_session_gpu_vs_cpu_model_core_ratio?: number;
+      batch256_gpu_speedup_over_cpu?: number;
+      conclusion_plain?: string;
+    };
+  };
+}
+
 export const dashboardApi = {
   runModule: async (module: 'report' | 'report_live' | 'voice_series', sessionId?: string | null) => {
     const response = await axios.post(
@@ -374,6 +586,14 @@ export const dashboardApi = {
     return response.data;
   },
 
+  getResearchBenchmarks: async (): Promise<ResearchBenchmarksResponse> => {
+    const response = await axios.get(`${API_BASE_URL}/api/research/benchmarks`, {
+      headers: adminHeaders(),
+      timeout: 10000,
+    });
+    return response.data;
+  },
+
   reportLlmAssist: async (params: {
     session_id?: string | null;
     mode: 'summary' | 'interview_guide';
@@ -381,7 +601,7 @@ export const dashboardApi = {
   }): Promise<ReportLlmAssistResponse> => {
     const response = await axios.post(`${API_BASE_URL}/api/report/llm-assist`, params, {
       headers: adminHeaders(),
-      timeout: 15000,
+      timeout: 20000,
     });
     return response.data;
   },
