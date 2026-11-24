@@ -1032,8 +1032,11 @@ const BenchmarksPage: React.FC = () => {
                           <div>
                             准确率 {fmtPct(rawAblation.cv_accuracy as number, 1)} · Macro-F1{' '}
                             {fmtPct(rawAblation.cv_macro_f1 as number, 1)} · 覆盖率{' '}
-                            {fmtPct(rawAblation.empirical_conformal_coverage as number, 1)} · AUROC{' '}
-                            {fmtFixed(rawAblation.ood_auroc_mean as number, 3)}
+                            {fmtPct(rawAblation.empirical_conformal_coverage as number, 1)}
+                            {typeof rawAblation.ood_auroc_mean === 'number' &&
+                            Number.isFinite(rawAblation.ood_auroc_mean)
+                              ? ` · AUROC ${fmtFixed(rawAblation.ood_auroc_mean, 3)}`
+                              : ''}
                           </div>
                           {typeof rawAblation.note === 'string' && (
                             <div style={{ marginTop: 4 }}>{rawAblation.note}</div>

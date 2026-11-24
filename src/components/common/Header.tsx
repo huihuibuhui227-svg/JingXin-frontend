@@ -104,11 +104,16 @@ const Header: React.FC = () => {
                     type="button"
                     onClick={() => navigate(item.key)}
                     aria-current={active ? 'page' : undefined}
-                    className="ax-press"
+                    className="ax-press ax-nav-link"
                     style={{
+                      position: 'relative',
+                      display: 'inline-flex',
+                      alignItems: 'center',
                       background: 'none',
                       border: 'none',
-                      padding: '4px 0',
+                      borderTop: '2px solid transparent',
+                      borderBottom: active ? '2px solid #ffffff' : '2px solid transparent',
+                      padding: '10px 2px',
                       cursor: 'pointer',
                       fontFamily: 'var(--ax-font-text)',
                       fontSize: 'var(--ax-nav-link-size)',

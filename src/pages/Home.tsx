@@ -1,6 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Row, Col, Space, Tag } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import {
+  ReloadOutlined,
+  VideoCameraOutlined,
+  ExperimentOutlined,
+  LineChartOutlined,
+  FileTextOutlined,
+  FolderOpenOutlined,
+  DatabaseOutlined,
+  BookOutlined,
+  BarChartOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi, SystemHealthResponse } from '@/services/api';
 import { recordingsApi } from '@/services/recordingsApi';
@@ -14,6 +24,13 @@ const fmtBytes = (n: number): string => {
 
 const REPORT_FILE_RE = /(?:HengCai_Evidence_Report|Research_Assessment_Report).*\.html$/i;
 
+const HERO_SPECS = [
+  '41 项客观行为指标',
+  '3D 姿态残差校准',
+  '保形置信覆盖 ≥ 90%',
+  '零评分零临床推断',
+];
+
 const SERVICE_META: Array<{ key: string; label: string; port: string }> = [
   { key: 'panel', label: '总控与报告', port: ':5000' },
   { key: 'face', label: '面部仪器', port: ':8000' },
@@ -21,32 +38,103 @@ const SERVICE_META: Array<{ key: string; label: string; port: string }> = [
   { key: 'gesture', label: '上肢体态仪器', port: ':8002' },
 ];
 
+const getEngineBadge = (
+  key: string,
+  st?: SystemHealthResponse['services'][string]
+): string | null => {
+  if (!st || !st.ok) return null;
+  if (key === 'face' && st.landmarker_3d_matrix) {
+    return `3D 矩阵 · ${st.blendshapes_count ?? 52} 系数`;
+  }
+  if (key === 'voice' && st.live_pitch_backend) {
+    return st.live_vad_backend === 'rms_threshold'
+      ? 'Parselmouth · RMS VAD'
+      : 'Parselmouth · Silero VAD';
+  }
+  if (key === 'gesture' && st.backend === 'rtmw') {
+    return 'RTMW 133 点';
+  }
+  if (key === 'panel') {
+    return '证据门 · Qwen2.5-14B';
+  }
+  return null;
+};
+
 const ARCH_LAYERS = [
   {
     step: '01 · 仪器采集',
     title: '多模态真 3D 视觉与声学提取',
     desc: '同步采集面部 478 点三维姿态与 52 项面部动作系数、RTMW 上肢双手骨骼、Praat 声学与神经 VAD 语音转写。',
+    spec: '478 点 + 52 系数 + 133 关节',
   },
   {
     step: '02 · 特征校准与动力学',
     title: '姿态去偏与时序动力学建模',
     desc: '融合平滑滤波与头部姿态残差校准，计算 41 项行为指标、SPARC 上肢平滑度及 pycatch22 时序动力学特征。',
+    spec: '41 项指标 + pycatch22 + SPARC',
   },
   {
     step: '03 · 可解释模型裁判',
     title: '不打分阶段切分与不确定性核验',
     desc: '基于隐马尔可夫模型与变点检测划分连续行为阶段，并以保形预测核验三档证据支持度、生成白盒特征归因，绝不给出总分或主观品格推断。',
+    spec: 'HMM+PELT + Split Conformal',
   },
 ];
 
-const WORKSPACE_LINKS = [
-  { to: '/interview', title: '面试行为采集', desc: '按题库顺序作答，同步记录画面、语音与答题时间窗' },
-  { to: '/research', title: '科研行为采集', desc: '面向科研汇报与课题问答场景的多模态行为记录' },
-  { to: '/analysis', title: '实时监测台', desc: '实时查看三路服务状态、画面帧率、麦克风音量与信号曲线' },
-  { to: '/reports', title: '报告中心', desc: '查看各场次行为证据报告，支持在线明细核对与单文件下载' },
-  { to: '/recordings', title: '录制素材库', desc: '按场次管理原始录像、逐帧画面抽查与回收站恢复' },
-  { to: '/export', title: '数据导出与原表', desc: '导出面部、手势、语音三份原始 CSV 台账、转写文本与趋势图' },
-  { to: '/question-bank', title: '题库管理', desc: '管理多套面试与科研题库，支持导入导出与关键词快速检索' },
+const WORKSPACE_LINKS: Array<{
+  to: string;
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    to: '/interview',
+    title: '面试行为采集',
+    desc: '按题库顺序作答，同步记录画面、语音与答题时间窗',
+    icon: <VideoCameraOutlined />,
+  },
+  {
+    to: '/research',
+    title: '科研行为采集',
+    desc: '面向科研汇报与课题问答场景的多模态行为记录',
+    icon: <ExperimentOutlined />,
+  },
+  {
+    to: '/analysis',
+    title: '实时监测台',
+    desc: '实时查看三路服务状态、画面帧率、麦克风音量与信号曲线',
+    icon: <LineChartOutlined />,
+  },
+  {
+    to: '/reports',
+    title: '报告中心',
+    desc: '查看各场次行为证据报告，支持在线明细核对与单文件下载',
+    icon: <FileTextOutlined />,
+  },
+  {
+    to: '/recordings',
+    title: '录制素材库',
+    desc: '按场次管理原始录像、逐帧画面抽查与回收站恢复',
+    icon: <FolderOpenOutlined />,
+  },
+  {
+    to: '/export',
+    title: '数据导出与原表',
+    desc: '导出面部、手势、语音三份原始 CSV 台账、转写文本与趋势图',
+    icon: <DatabaseOutlined />,
+  },
+  {
+    to: '/question-bank',
+    title: '题库管理',
+    desc: '管理多套面试与科研题库，支持导入导出与关键词快速检索',
+    icon: <BookOutlined />,
+  },
+  {
+    to: '/benchmarks',
+    title: '科研基准',
+    desc: '跨语料多模态验证、3D 姿态校准效果与算力基准对比',
+    icon: <BarChartOutlined />,
+  },
 ];
 
 const Home: React.FC = () => {
@@ -167,6 +255,37 @@ const Home: React.FC = () => {
               进入实时监测台
             </Button>
           </Space>
+
+          <div
+            style={{
+              marginTop: 24,
+              display: 'flex',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}
+          >
+            {HERO_SPECS.map((spec) => (
+              <span
+                key={spec}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '5px 14px',
+                  borderRadius: 'var(--ax-rounded-pill)',
+                  background: 'var(--ax-parchment)',
+                  border: '1px solid var(--ax-hairline)',
+                  color: 'var(--ax-text-secondary)',
+                  fontSize: 12.5,
+                  fontWeight: 400,
+                  lineHeight: 1.4,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {spec}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -247,6 +366,7 @@ const Home: React.FC = () => {
                       ? '降级（ASR 未就绪）'
                       : '离线';
               const dotColor = loading ? '#999999' : ok ? '#4cd964' : st?.status === 'degraded' ? '#ffd60a' : '#ff6961';
+              const engineBadge = !loading ? getEngineBadge(svc.key, st) : null;
               return (
                 <Col xs={12} md={6} key={svc.key}>
                   <div
@@ -256,55 +376,80 @@ const Home: React.FC = () => {
                       borderRadius: 'var(--ax-rounded-md)',
                       padding: '14px 16px',
                       height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
-                        {svc.label}
-                      </span>
-                      <span
-                        aria-hidden="true"
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
+                          {svc.label}
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 9,
+                            height: 9,
+                            borderRadius: '50%',
+                            background: dotColor,
+                            display: 'inline-block',
+                            flexShrink: 0,
+                          }}
+                        />
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ax-body-muted)' }}>
+                        {statusText}
+                      </div>
+                      <div
                         style={{
-                          width: 9,
-                          height: 9,
-                          borderRadius: '50%',
-                          background: dotColor,
-                          display: 'inline-block',
-                          flexShrink: 0,
+                          marginTop: 4,
+                          fontSize: 11,
+                          fontFamily: 'var(--ax-font-mono)',
+                          color: 'rgba(255,255,255,0.72)',
                         }}
-                      />
+                      >
+                        {svc.port}
+                        {svc.key === 'voice' && st?.asr_reachable !== undefined
+                          ? ` · FunASR ${st.asr_reachable ? '在线' : '离线'}`
+                          : ''}
+                      </div>
                     </div>
-                    <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ax-body-muted)' }}>
-                      {statusText}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 4,
-                        fontSize: 11,
-                        fontFamily: 'var(--ax-font-mono)',
-                        color: 'rgba(255,255,255,0.65)',
-                      }}
-                    >
-                      {svc.port}
-                      {svc.key === 'voice' && st?.asr_reachable !== undefined
-                        ? ` · FunASR ${st.asr_reachable ? '在线' : '离线'}`
-                        : ''}
-                    </div>
+                    {engineBadge && (
+                      <div style={{ marginTop: 10 }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            color: '#a8d5ff',
+                            background: 'rgba(41, 151, 255, 0.16)',
+                            border: '1px solid rgba(41, 151, 255, 0.38)',
+                            borderRadius: 'var(--ax-rounded-xs)',
+                            padding: '2px 8px',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {engineBadge}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </Col>
               );
             })}
           </Row>
 
-          {/* 两张真实盘上统计卡片 */}
+          {/* 三列对称盘上实况与科研基准入口 */}
           <Row gutter={[20, 20]}>
-            <Col xs={24} md={12}>
+            <Col xs={24} md={8}>
               <button
                 type="button"
-                className="ax-press"
+                className="ax-press ax-card--dark-interactive"
                 onClick={() => navigate('/reports')}
                 style={{
                   width: '100%',
+                  height: '100%',
                   textAlign: 'left',
                   background: 'var(--ax-tile-3)',
                   border: '1px solid rgba(255,255,255,0.18)',
@@ -313,20 +458,25 @@ const Home: React.FC = () => {
                   cursor: 'pointer',
                   color: 'var(--ax-on-dark)',
                   fontFamily: 'var(--ax-font-text)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
                 }}
               >
-                <div style={{ fontSize: 'var(--ax-caption-size)', color: 'var(--ax-body-muted)' }}>
-                  盘上行为证据报告
+                <div>
+                  <div style={{ fontSize: 'var(--ax-caption-size)', color: 'var(--ax-body-muted)' }}>
+                    盘上行为证据报告
+                  </div>
+                  <div className="ax-display-lg" style={{ marginTop: 8, fontSize: 38, color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>
+                    {reportCount === null ? (loading ? '…' : '未读到') : reportCount}
+                    {reportCount !== null && (
+                      <span style={{ fontSize: 16, fontWeight: 400, marginLeft: 8, color: 'var(--ax-body-muted)' }}>
+                        份
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="ax-display-lg" style={{ marginTop: 8, fontSize: 38, color: '#ffffff' }}>
-                  {reportCount === null ? (loading ? '…' : '未读到') : reportCount}
-                  {reportCount !== null && (
-                    <span style={{ fontSize: 16, fontWeight: 400, marginLeft: 8, color: 'var(--ax-body-muted)' }}>
-                      份
-                    </span>
-                  )}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: 'var(--ax-primary-on-dark)' }}>
+                <div style={{ marginTop: 12, fontSize: 13, color: 'var(--ax-primary-on-dark)' }}>
                   {reportCount === null
                     ? loading
                       ? '正在读取报告目录…'
@@ -336,13 +486,14 @@ const Home: React.FC = () => {
               </button>
             </Col>
 
-            <Col xs={24} md={12}>
+            <Col xs={24} md={8}>
               <button
                 type="button"
-                className="ax-press"
+                className="ax-press ax-card--dark-interactive"
                 onClick={() => navigate('/recordings')}
                 style={{
                   width: '100%',
+                  height: '100%',
                   textAlign: 'left',
                   background: 'var(--ax-tile-3)',
                   border: '1px solid rgba(255,255,255,0.18)',
@@ -351,25 +502,68 @@ const Home: React.FC = () => {
                   cursor: 'pointer',
                   color: 'var(--ax-on-dark)',
                   fontFamily: 'var(--ax-font-text)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
                 }}
               >
-                <div style={{ fontSize: 'var(--ax-caption-size)', color: 'var(--ax-body-muted)' }}>
-                  本地录制素材库
+                <div>
+                  <div style={{ fontSize: 'var(--ax-caption-size)', color: 'var(--ax-body-muted)' }}>
+                    本地录制素材库
+                  </div>
+                  <div className="ax-display-lg" style={{ marginTop: 8, fontSize: 38, color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>
+                    {recStats === null ? (loading ? '…' : '未读到') : recStats.n}
+                    {recStats !== null && (
+                      <span style={{ fontSize: 16, fontWeight: 400, marginLeft: 8, color: 'var(--ax-body-muted)' }}>
+                        场
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="ax-display-lg" style={{ marginTop: 8, fontSize: 38, color: '#ffffff' }}>
-                  {recStats === null ? (loading ? '…' : '未读到') : recStats.n}
-                  {recStats !== null && (
-                    <span style={{ fontSize: 16, fontWeight: 400, marginLeft: 8, color: 'var(--ax-body-muted)' }}>
-                      场
-                    </span>
-                  )}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: 'var(--ax-primary-on-dark)' }}>
+                <div style={{ marginTop: 12, fontSize: 13, color: 'var(--ax-primary-on-dark)' }}>
                   {recStats
                     ? `原生音视频合计 ${fmtBytes(recStats.bytes)} · 浏览回放与留存管理 ›`
                     : loading
                       ? '正在读取素材库…'
                       : '点击前往录制素材页重试 ›'}
+                </div>
+              </button>
+            </Col>
+
+            <Col xs={24} md={8}>
+              <button
+                type="button"
+                className="ax-press ax-card--dark-interactive"
+                onClick={() => navigate('/benchmarks')}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  textAlign: 'left',
+                  background: 'var(--ax-tile-3)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  borderRadius: 'var(--ax-rounded-lg)',
+                  padding: 'var(--ax-space-lg)',
+                  cursor: 'pointer',
+                  color: 'var(--ax-on-dark)',
+                  fontFamily: 'var(--ax-font-text)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 'var(--ax-caption-size)', color: 'var(--ax-body-muted)' }}>
+                    科研方法学验证
+                  </div>
+                  <div className="ax-display-lg" style={{ marginTop: 8, fontSize: 38, color: '#ffffff', fontVariantNumeric: 'tabular-nums' }}>
+                    4
+                    <span style={{ fontSize: 16, fontWeight: 400, marginLeft: 8, color: 'var(--ax-body-muted)' }}>
+                      项基准
+                    </span>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, fontSize: 13, color: 'var(--ax-primary-on-dark)' }}>
+                  4 大国际/跨语料基准 · 实时数据对比 →
                 </div>
               </button>
             </Col>
@@ -402,25 +596,48 @@ const Home: React.FC = () => {
                     borderRadius: 'var(--ax-rounded-lg)',
                     padding: '22px',
                     height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <Tag
-                    style={{
-                      marginBottom: 10,
-                      color: 'var(--ax-primary)',
-                      background: 'var(--ax-info-soft)',
-                      borderColor: 'var(--ax-info-border)',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {layer.step}
-                  </Tag>
-                  <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600, color: 'var(--ax-ink)' }}>
-                    {layer.title}
-                  </h3>
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: 'var(--ax-text-secondary)' }}>
-                    {layer.desc}
-                  </p>
+                  <div>
+                    <Tag
+                      style={{
+                        marginBottom: 10,
+                        color: 'var(--ax-primary)',
+                        background: 'var(--ax-info-soft)',
+                        borderColor: 'var(--ax-info-border)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {layer.step}
+                    </Tag>
+                    <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600, color: 'var(--ax-ink)' }}>
+                      {layer.title}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: 'var(--ax-text-secondary)' }}>
+                      {layer.desc}
+                    </p>
+                  </div>
+                  <div style={{ marginTop: 16 }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        fontFamily: 'var(--ax-font-mono)',
+                        fontSize: 12,
+                        fontWeight: 400,
+                        color: 'var(--ax-info)',
+                        background: 'var(--ax-parchment)',
+                        border: '1px solid var(--ax-hairline)',
+                        borderRadius: 'var(--ax-rounded-xs)',
+                        padding: '4px 10px',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {layer.spec}
+                    </span>
+                  </div>
                 </div>
               </Col>
             ))}
@@ -437,10 +654,10 @@ const Home: React.FC = () => {
 
           <Row gutter={[16, 16]}>
             {WORKSPACE_LINKS.map((item) => (
-              <Col xs={24} sm={12} md={8} key={item.to}>
+              <Col xs={24} sm={12} lg={6} key={item.to}>
                 <button
                   type="button"
-                  className="ax-press"
+                  className="ax-press ax-card ax-card--interactive"
                   onClick={() => navigate(item.to)}
                   style={{
                     width: '100%',
@@ -448,8 +665,8 @@ const Home: React.FC = () => {
                     textAlign: 'left',
                     background: 'var(--ax-canvas)',
                     border: '1px solid var(--ax-hairline)',
-                    borderRadius: 'var(--ax-rounded-md)',
-                    padding: '16px 18px',
+                    borderRadius: 'var(--ax-rounded-lg)',
+                    padding: '18px',
                     cursor: 'pointer',
                     fontFamily: 'var(--ax-font-text)',
                     display: 'flex',
@@ -458,6 +675,24 @@ const Home: React.FC = () => {
                   }}
                 >
                   <div>
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 'var(--ax-rounded-md)',
+                        background: 'var(--ax-info-soft)',
+                        border: '1px solid var(--ax-info-border)',
+                        color: 'var(--ax-primary)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 17,
+                        marginBottom: 12,
+                      }}
+                    >
+                      {item.icon}
+                    </div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ax-ink)' }}>
                       {item.title}
                     </div>
@@ -465,7 +700,7 @@ const Home: React.FC = () => {
                       {item.desc}
                     </div>
                   </div>
-                  <div style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: 'var(--ax-primary)' }}>
+                  <div style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: 'var(--ax-primary)' }}>
                     进入 ›
                   </div>
                 </button>

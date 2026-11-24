@@ -203,8 +203,9 @@ h6 {
   border-radius: var(--ax-rounded-lg);
   box-shadow: none;
   transition:
-    border-color 0.15s ease,
-    transform 0.1s ease;
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
 }
 
 .ax-card--interactive,
@@ -214,6 +215,7 @@ h6 {
 .ax-card--interactive:hover,
 .ax-card--interactive.ant-card:hover {
   border-color: var(--ax-primary);
+  transform: translateY(-2px);
 }
 .ax-card--interactive:active,
 .ax-card--interactive.ant-card:active {
@@ -226,6 +228,27 @@ h6 {
   background: var(--ax-tile-2);
   border-color: rgba(255, 255, 255, 0.12);
   color: var(--ax-on-dark);
+}
+
+.ax-tile--dark .ax-card--dark-interactive {
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+.ax-tile--dark .ax-card--dark-interactive:hover {
+  border-color: var(--ax-primary-on-dark) !important;
+  transform: translateY(-2px);
+}
+.ax-tile--dark .ax-card--dark-interactive:active {
+  transform: scale(0.99);
+}
+
+.ax-nav-link {
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ax-nav-link:hover {
+  color: var(--ax-on-dark) !important;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -307,6 +330,7 @@ h6 {
 .ant-table-thead > tr > th {
   font-weight: 600 !important;
   letter-spacing: var(--ax-caption-ls);
+  white-space: nowrap;
 }
 
 .ant-statistic-content {
@@ -489,8 +513,12 @@ h6 {
   }
   .ax-press:active,
   .ax-btn--pill.ant-btn:active,
+  .ax-card--interactive:hover,
+  .ax-card--interactive.ant-card:hover,
   .ax-card--interactive:active,
-  .ax-card--interactive.ant-card:active {
+  .ax-card--interactive.ant-card:active,
+  .ax-tile--dark .ax-card--dark-interactive:hover,
+  .ax-tile--dark .ax-card--dark-interactive:active {
     transform: none;
   }
 }

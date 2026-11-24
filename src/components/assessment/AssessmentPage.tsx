@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Progress, Alert, message } from 'antd';
+import { Layout, Progress, Alert, Button, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useCamera } from '@/hooks/useCamera';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -416,29 +416,120 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
 
   if (!started) {
     return (
-      <Content style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <h1>{config.title}</h1>
-          <p style={{ fontSize: '16px', color: 'var(--ax-text-secondary)', marginBottom: '40px' }}>
-            {config.subtitle}
-          </p>
-          <button
-            onClick={handleStart}
+      <Content className="ax-workbench" style={{ padding: '36px 24px 56px' }}>
+        <div
+          className="ax-card"
+          style={{
+            maxWidth: 780,
+            margin: '28px auto',
+            padding: '36px 32px',
+            textAlign: 'center',
+          }}
+        >
+          <div
             style={{
-              padding: '12px 48px',
-              fontSize: '18px',
-              background: config.startButtonColor,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
+              display: 'inline-block',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ax-primary)',
+              background: 'var(--ax-info-soft)',
+              border: '1px solid var(--ax-info-border)',
+              borderRadius: 'var(--ax-rounded-pill)',
+              padding: '4px 14px',
+              marginBottom: 16,
             }}
           >
-            {config.startButtonText}
-          </button>
-          <p style={{ marginTop: '20px', fontSize: '13px', color: 'var(--ax-text-secondary)' }}>
-            点击开始后请先填写受试者信息并完成摄像头与麦克风自检，通过后即开始正式采集。
+            {config.type === 'interview' ? '面试场景观测' : '科研场景观测'}
+          </div>
+
+          <h1
+            className="ax-display-md"
+            style={{
+              margin: '0 auto',
+              fontSize: 32,
+              fontWeight: 600,
+              color: 'var(--ax-ink)',
+            }}
+          >
+            {config.title}
+          </h1>
+          <p
+            style={{
+              margin: '12px auto 0',
+              maxWidth: 620,
+              fontSize: 16,
+              lineHeight: 1.6,
+              color: 'var(--ax-text-secondary)',
+            }}
+          >
+            {config.subtitle}
           </p>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 14,
+              marginTop: 28,
+              textAlign: 'left',
+            }}
+          >
+            {[
+              {
+                step: '01 · 身份确认与知情同意',
+                desc: '支持匿名或实名标注，明确采录模态与隐私边界',
+              },
+              {
+                step: '02 · 音视频设备自检',
+                desc: '实时探测摄像头人脸检出率与麦克风输入电平',
+              },
+              {
+                step: '03 · 逐题作答与自动报告',
+                desc: '结束后自动对齐三路流生成行为证据披露报告',
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                style={{
+                  background: 'var(--ax-parchment)',
+                  border: '1px solid var(--ax-hairline)',
+                  borderRadius: 'var(--ax-rounded-md)',
+                  padding: '14px 16px',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ax-ink)' }}>
+                  {item.step}
+                </div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 12.5,
+                    lineHeight: 1.5,
+                    color: 'var(--ax-text-secondary)',
+                  }}
+                >
+                  {item.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ marginTop: 22, marginBottom: 0, fontSize: 13, color: 'var(--ax-text-secondary)' }}>
+            全流程本地离线处理，逐帧采样率与设备状态全程可视。
+          </p>
+
+          <div style={{ marginTop: 24 }}>
+            <Button
+              type="primary"
+              size="large"
+              className="ax-btn--pill"
+              loading={loading}
+              onClick={handleStart}
+              style={{ minWidth: 200, fontSize: 16, fontWeight: 400 }}
+            >
+              {config.startButtonText}
+            </Button>
+          </div>
         </div>
 
         {/* 开录前也要有一个 <video>:设备自检要从它抓帧。隐藏起来不占版面 ——

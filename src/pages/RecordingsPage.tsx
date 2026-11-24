@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Layout, Table, Button, Tag, Space, Modal, Input, Alert, message, Tooltip, Typography,
+  Layout, Table, Button, Tag, Space, Modal, Input, Alert, message, Tooltip, Typography, Card,
 } from 'antd';
 import {
   LockOutlined, UnlockOutlined, DeleteOutlined, PlayCircleOutlined, WarningOutlined, BarChartOutlined,
@@ -154,7 +154,8 @@ const RecordingsPage: React.FC = () => {
       sorter: (a, b) => a.video_bytes - b.video_bytes,
     },
     {
-      title: '帧（面部/手势）', width: 125,
+      title: <span style={{ whiteSpace: 'nowrap' }}>帧数（面/手）</span>,
+      width: 150,
       render: (_: unknown, r) => (
         <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
           {r.frames.face} / {r.frames.gesture}
@@ -163,14 +164,14 @@ const RecordingsPage: React.FC = () => {
       sorter: (a, b) => (a.frames.face + a.frames.gesture) - (b.frames.face + b.frames.gesture),
     },
     {
-      title: '报告', dataIndex: 'report_count', width: 85,
+      title: '报告', dataIndex: 'report_count', width: 95,
       render: (v: number) => (v > 0
         ? <Tag color="processing">{v} 份</Tag>
         : <Tooltip title="报告按需生成 —— 可点击「查账」实时查看结构化报告，或进详情生成离线 HTML"><Tag>未归档</Tag></Tooltip>),
       sorter: (a, b) => a.report_count - b.report_count,
     },
     {
-      title: '留存状态', dataIndex: 'degraded', width: 95,
+      title: '留存状态', dataIndex: 'degraded', width: 110,
       render: (v: number) => (v > 0
         ? <Tooltip title="本场留存出现降级，素材可能不完整，请点「详情」查看具体原因。">
             <Tag icon={<WarningOutlined />} color="warning">{v} 处降级</Tag>
@@ -206,8 +207,8 @@ const RecordingsPage: React.FC = () => {
   ];
 
   return (
-    <Content style={{ padding: '24px' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <Content className="ax-workbench">
+      <div className="ax-workbench__inner">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16, flexWrap: 'wrap' }}>
           <div>
             <Typography.Title level={1} style={{ margin: 0, fontSize: "var(--ax-display-md-size)" }}>录制素材管理</Typography.Title>
@@ -239,15 +240,17 @@ const RecordingsPage: React.FC = () => {
         )}
         {listError && <Alert style={{ marginBottom: 16 }} type="error" showIcon message={listError} />}
 
-        <Table
-          rowKey="sid"
-          size="small"
-          loading={loading}
-          columns={columns}
-          dataSource={data?.recordings ?? []}
-          scroll={{ x: 1080 }}
-          pagination={{ pageSize: 20, showSizeChanger: true }}
-        />
+        <Card className="ax-card" bodyStyle={{ padding: 0 }} style={{ overflow: 'hidden' }}>
+          <Table
+            rowKey="sid"
+            size="small"
+            loading={loading}
+            columns={columns}
+            dataSource={data?.recordings ?? []}
+            scroll={{ x: 1080 }}
+            pagination={{ pageSize: 20, showSizeChanger: true }}
+          />
+        </Card>
 
         <RecordingDetail sid={detailSid} onClose={() => { setDetailSid(null); void reload(); }} />
 

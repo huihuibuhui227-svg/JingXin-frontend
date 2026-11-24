@@ -75,8 +75,73 @@ const SignalSparkline: React.FC<{
           <path d={pathD} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
         </svg>
       ) : (
-        <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--ax-text-secondary)' }}>
-          开始录制后将实时绘制采样曲线（至少需 2 个采样点）
+        <div
+          style={{
+            position: 'relative',
+            height: 110,
+            borderRadius: 'var(--ax-rounded-xs)',
+            overflow: 'hidden',
+          }}
+        >
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            aria-hidden="true"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+          >
+            {[0.25, 0.5, 0.75].map((ratio) => {
+              const x = pad + ratio * (W - pad * 2);
+              return (
+                <line
+                  key={`vx-${ratio}`}
+                  x1={x}
+                  y1={pad}
+                  x2={x}
+                  y2={H - pad}
+                  stroke="#e5e7eb"
+                  strokeDasharray="3 3"
+                  strokeWidth="1"
+                />
+              );
+            })}
+            {[pad, H / 2].map((y, idx) => (
+              <line
+                key={`hy-${idx}`}
+                x1={pad}
+                y1={y}
+                x2={W - pad}
+                y2={y}
+                stroke="#e5e7eb"
+                strokeDasharray="3 3"
+                strokeWidth="1"
+              />
+            ))}
+            <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="#d4d4d8" strokeWidth="1" />
+            <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#d4d4d8" strokeWidth="1" />
+          </svg>
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 12px',
+              textAlign: 'center',
+              fontSize: 12.5,
+              color: 'var(--ax-text-secondary)',
+            }}
+          >
+            <span
+              style={{
+                background: 'rgba(245, 245, 247, 0.92)',
+                padding: '4px 10px',
+                borderRadius: 'var(--ax-rounded-xs)',
+              }}
+            >
+              开始录制后将实时绘制采样曲线（至少需 2 个采样点）
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -351,7 +416,7 @@ const RealtimeAnalysis: React.FC = () => {
     : null;
 
   return (
-    <Content style={{ padding: '24px' }}>
+    <Content className="ax-workbench" style={{ padding: '24px 24px 48px' }}>
       <div style={{ maxWidth: 'var(--ax-workbench-max)', margin: '0 auto' }}>
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
           <div>
@@ -531,7 +596,7 @@ const RealtimeAnalysis: React.FC = () => {
         )}
 
         {/* 物理传感量实时曲线 */}
-        <Card title="实时信号曲线 · 最近 24 次采样" style={{ marginBottom: 20 }}>
+        <Card className="ax-card" title="实时信号曲线 · 最近 24 次采样" style={{ marginBottom: 20 }}>
           <Row gutter={[16, 16]}>
             <Col xs={24} md={8}>
               <SignalSparkline
@@ -562,6 +627,150 @@ const RealtimeAnalysis: React.FC = () => {
             </Col>
           </Row>
         </Card>
+
+        {!isRecording && (
+          <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+            {[
+              {
+                key: 'face',
+                name: '面部通道',
+                port: ':8000',
+                icon: <VideoCameraOutlined style={{ color: 'var(--ax-primary)' }} />,
+                spec: '478 点 3D 网格 + 52 项表情系数',
+                detail: faceSvc?.landmarker_3d_matrix
+                  ? '3D 姿态矩阵解耦已启用'
+                  : '面部关键点与动作单元提取',
+                svc: faceSvc,
+              },
+              {
+                key: 'gesture',
+                name: '上肢通道',
+                port: ':8002',
+                icon: <InteractionOutlined style={{ color: 'var(--ax-primary)' }} />,
+                spec: 'RTMW 133 点骨骼 + 双手姿态',
+                detail: gestureSvc?.backend === 'rtmw'
+                  ? 'RTMW 全身与双手关键点就绪'
+                  : '肩臂与双手稳定性实时提取',
+                svc: gestureSvc,
+              },
+              {
+                key: 'voice',
+                name: '语音通道',
+                port: ':8001',
+                icon: <AudioOutlined style={{ color: 'var(--ax-primary)' }} />,
+                spec: 'Parselmouth 声学 + 神经 VAD + 转写',
+                detail: voiceSvc?.asr_reachable
+                  ? 'FunASR 语音转写服务在线'
+                  : '等待语音转写服务连接',
+                svc: voiceSvc,
+              },
+            ].map((ch) => {
+              const ok = ch.svc?.ok === true;
+              const degraded = ch.svc?.status === 'degraded';
+              const badgeColor = ok
+                ? 'var(--ax-success)'
+                : degraded
+                  ? 'var(--ax-warning)'
+                  : 'var(--ax-error)';
+              const badgeBg = ok
+                ? 'var(--ax-success-soft)'
+                : degraded
+                  ? 'var(--ax-warning-soft)'
+                  : 'var(--ax-error-soft)';
+              const badgeBorder = ok
+                ? 'var(--ax-success-border)'
+                : degraded
+                  ? 'var(--ax-warning-border)'
+                  : 'var(--ax-error-border)';
+              const stateLabel = healthLoading
+                ? '检测中'
+                : ok
+                  ? `在线 · ${ch.svc?.latency_ms ?? 0} ms`
+                  : degraded
+                    ? '降级'
+                    : '离线';
+              return (
+                <Col xs={24} md={8} key={ch.key}>
+                  <Card size="small" className="ax-card" style={{ height: '100%' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 'var(--ax-rounded-sm)',
+                            background: 'var(--ax-info-soft)',
+                            border: '1px solid var(--ax-info-border)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 15,
+                          }}
+                        >
+                          {ch.icon}
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ax-ink)' }}>
+                          {ch.name}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: 'var(--ax-font-mono)',
+                            fontSize: 12,
+                            color: 'var(--ax-text-secondary)',
+                          }}
+                        >
+                          {ch.port}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: badgeColor,
+                          background: badgeBg,
+                          border: `1px solid ${badgeBorder}`,
+                          borderRadius: 'var(--ax-rounded-pill)',
+                          padding: '2px 10px',
+                          fontVariantNumeric: 'tabular-nums',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {stateLabel}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 10,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--ax-ink)',
+                      }}
+                    >
+                      {ch.spec}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color: 'var(--ax-text-secondary)',
+                      }}
+                    >
+                      {ch.detail}
+                    </div>
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
+        )}
       </div>
 
       <PreflightGate

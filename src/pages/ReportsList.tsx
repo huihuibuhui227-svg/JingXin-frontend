@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Layout, Table, Button, Empty, Typography, Alert, Space, Tag } from 'antd';
+import { Layout, Table, Button, Empty, Typography, Alert, Space, Tag, Input, Card } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileTextOutlined, EyeOutlined, BarChartOutlined, DownloadOutlined, AuditOutlined,
+  FileTextOutlined, EyeOutlined, BarChartOutlined, DownloadOutlined, AuditOutlined, SearchOutlined,
 } from '@ant-design/icons';
 import { dashboardApi } from '@/services/api';
 import Loading from '@/components/common/Loading';
@@ -68,6 +68,7 @@ const ReportsList: React.FC = () => {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     dashboardApi.getFiles('reports')
@@ -108,6 +109,18 @@ const ReportsList: React.FC = () => {
         return b.ts - a.ts;
       });
   }, [reports]);
+
+  const filteredRows: ReportRow[] = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (r) =>
+        (r.sessionId || '').toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        (r.subject || '').toLowerCase().includes(q) ||
+        r.kind.toLowerCase().includes(q)
+    );
+  }, [rows, query]);
 
   const columns: ColumnsType<ReportRow> = [
     {
@@ -207,15 +220,15 @@ const ReportsList: React.FC = () => {
 
   if (loading) {
     return (
-      <Content style={{ padding: 'var(--ax-space-lg)' }}>
+      <Content className="ax-workbench">
         <Loading tip="正在加载报告中心..." />
       </Content>
     );
   }
 
   return (
-    <Content style={{ padding: 'var(--ax-space-lg)' }}>
-      <div style={{ maxWidth: 'var(--ax-workbench-max)', margin: '0 auto' }}>
+    <Content className="ax-workbench">
+      <div className="ax-workbench__inner">
         <div
           style={{
             display: 'flex',
@@ -258,19 +271,67 @@ const ReportsList: React.FC = () => {
             }
           />
         ) : rows.length > 0 ? (
-          <Table<ReportRow>
-            columns={columns}
-            dataSource={rows}
-            size="middle"
-            scroll={{ x: 760 }}
-            pagination={rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
-          />
+          <>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+                marginBottom: 14,
+              }}
+            >
+              <Input
+                allowClear
+                prefix={<SearchOutlined style={{ color: 'var(--ax-text-secondary)' }} />}
+                placeholder="按会话号或文件名筛选报告…"
+                aria-label="筛选行为证据报告"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{ maxWidth: 360, borderRadius: 'var(--ax-rounded-pill)', height: 38 }}
+              />
+              <span
+                style={{
+                  fontSize: 13,
+                  color: 'var(--ax-text-secondary)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {query.trim()
+                  ? `筛选命中 ${filteredRows.length} / ${rows.length} 份`
+                  : `按生成时间倒序排列 · 共 ${rows.length} 份`}
+              </span>
+            </div>
+
+            <Card className="ax-card" bodyStyle={{ padding: 0 }} style={{ overflow: 'hidden' }}>
+              <Table<ReportRow>
+                columns={columns}
+                dataSource={filteredRows}
+                size="middle"
+                scroll={{ x: 760 }}
+                pagination={filteredRows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
+                locale={{
+                  emptyText: (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={`未找到匹配“${query.trim()}”的报告`}
+                    >
+                      <Button onClick={() => setQuery('')}>清空筛选</Button>
+                    </Empty>
+                  ),
+                }}
+              />
+            </Card>
+          </>
         ) : (
-          <Empty description="暂无历史行为证据报告" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-            <Button type="primary" onClick={() => navigate('/interview')}>
-              开始采集
-            </Button>
-          </Empty>
+          <Card className="ax-card">
+            <Empty description="暂无历史行为证据报告" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+              <Button type="primary" onClick={() => navigate('/interview')}>
+                开始采集
+              </Button>
+            </Empty>
+          </Card>
         )}
       </div>
     </Content>
