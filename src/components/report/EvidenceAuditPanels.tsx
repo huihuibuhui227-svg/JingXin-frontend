@@ -1,8 +1,10 @@
 import React from 'react';
 import { Alert, Collapse, Space, Table, Tag, Typography } from 'antd';
 import type {
+  BlendshapeCalibrationConstruct,
   EvaluationResult,
   FaceDualInstrumentPair,
+  FeatureLayerV2Highlight,
   SecondInstrumentRow,
 } from '@/types/assessment';
 
@@ -23,6 +25,33 @@ const AGREEMENT_TONE: Record<string, React.CSSProperties> = {
   通道未激活: TIER_TONE.T3b,
 };
 
+const CALIBRATION_ELIGIBILITY_TONE: Record<string, React.CSSProperties> = {
+  已校准可融合: TIER_TONE.T1,
+  辅助对照: TIER_TONE.T2a,
+  待3D重采验证: TIER_TONE.T3a,
+};
+
+const POSE_MODE_BADGE: Record<string, { label: string; style: React.CSSProperties }> = {
+  '3d_matrix': { label: '三维姿态矩阵校准', style: TIER_TONE.T1 },
+  '2d_legacy': { label: '二维姿态代理校准', style: TIER_TONE.T3a },
+  unavailable: { label: '无姿态参照', style: TIER_TONE.T3b },
+};
+
+const V2_TRACK_LABEL: Record<string, string> = {
+  face_kinematics: '面部运动学',
+  voice_dynamics: '语音动力学',
+  gesture_smoothness: '上肢平滑度',
+  catch22_dynamics: '多通道时序',
+};
+
+const fmtHighlightValue = (v: number | null, unit: string): string => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '—';
+  if (unit === '比例') return `${(v * 100).toFixed(1)}%`;
+  const abs = Math.abs(v);
+  const numStr = abs >= 100 ? v.toFixed(1) : abs >= 1 ? v.toFixed(2) : v.toFixed(3);
+  return unit ? `${numStr} ${unit}` : numStr;
+};
+
 /**
  * Layer 2 深度查账手风琴面板（默认折叠，一键展开）：
  * 1. 参数来源三级登记（T1 / T2 / T3）；
@@ -39,6 +68,8 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
   const sq = l1.signal_quality_audit as any;
   const secondInst = l1.second_instrument_appendix;
   const dualInst = l1.face_dual_instrument;
+  const bsCal = l1.blendshape_calibration;
+  const fv2 = l1.feature_layer_v2;
   const blockedWarns = Array.isArray(l1.blocked_dependency_warnings) ? l1.blocked_dependency_warnings : [];
 
   const items = [];
@@ -256,12 +287,15 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
     });
   }
 
-  if (secondInst?.available || dualInst?.available) {
+  if (secondInst?.available || dualInst?.available || bsCal?.available) {
     const appendixRows: SecondInstrumentRow[] = Array.isArray(secondInst?.rows)
       ? secondInst.rows
       : (Array.isArray(secondInst?.items) ? secondInst.items : []);
     const hasPartA = Boolean(secondInst?.available && appendixRows.length > 0);
     const hasPartB = Boolean(dualInst?.available && Array.isArray(dualInst.pairs) && dualInst.pairs.length > 0);
+    const hasPartC = Boolean(bsCal?.available);
+    const calConstructs = Array.isArray(bsCal?.constructs) ? bsCal.constructs : [];
+    const poseBadge = bsCal ? (POSE_MODE_BADGE[bsCal.pose_mode] ?? POSE_MODE_BADGE.unavailable) : POSE_MODE_BADGE.unavailable;
 
     items.push({
       key: 'second-instrument',
@@ -417,7 +451,228 @@ const EvidenceAuditPanels: React.FC<{ report: EvaluationResult }> = ({ report })
               )}
             </div>
           )}
+
+          {hasPartC && bsCal && (
+            <div style={{ marginTop: hasPartA || hasPartB ? 16 : 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <Space wrap size={8}>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--ax-ink)' }}>
+                    Part C · 时序平滑与头部姿态校准对照
+                  </span>
+                  <Tag style={{ margin: 0, ...poseBadge.style }}>{poseBadge.label}</Tag>
+                </Space>
+                <span style={{ fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: 'var(--ax-text-secondary)' }}>
+                  有效帧 {bsCal.n_clean_frames.toLocaleString('zh-CN')} / {bsCal.n_raw_frames.toLocaleString('zh-CN')}
+                  {typeof bsCal.quality_pass_rate === 'number' && Number.isFinite(bsCal.quality_pass_rate)
+                    ? ` · 通过率 ${(bsCal.quality_pass_rate * 100).toFixed(1)}%`
+                    : ''}
+                </span>
+              </div>
+
+              {bsCal.summary_plain && (
+                <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ax-text-secondary)', lineHeight: 1.55 }}>
+                  {bsCal.summary_plain}
+                </p>
+              )}
+
+              {calConstructs.length > 0 && (
+                <Table<BlendshapeCalibrationConstruct>
+                  rowKey="key"
+                  size="small"
+                  pagination={false}
+                  scroll={{ x: 720 }}
+                  dataSource={calConstructs}
+                  columns={[
+                    {
+                      title: '面部动作',
+                      dataIndex: 'label',
+                      width: 240,
+                      render: (v: string, r) => (
+                        <div>
+                          <strong style={{ color: 'var(--ax-ink)' }}>{v || r.key}</strong>
+                          {r.note && (
+                            <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 2, lineHeight: 1.45 }}>
+                              {r.note}
+                            </div>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      title: '校准前一致度',
+                      dataIndex: 'raw_rho',
+                      width: 112,
+                      align: 'right' as const,
+                      render: (v: number | null) => (
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {typeof v === 'number' && Number.isFinite(v) ? v.toFixed(3) : '—'}
+                        </span>
+                      ),
+                    },
+                    {
+                      title: '校准后一致度',
+                      dataIndex: 'calibrated_rho',
+                      width: 112,
+                      align: 'right' as const,
+                      render: (v: number | null) => (
+                        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--ax-ink)' }}>
+                          {typeof v === 'number' && Number.isFinite(v) ? v.toFixed(3) : '—'}
+                        </span>
+                      ),
+                    },
+                    {
+                      title: '提升幅值',
+                      dataIndex: 'rho_delta',
+                      width: 100,
+                      align: 'right' as const,
+                      render: (v: number | null) => (
+                        <span
+                          style={{
+                            fontVariantNumeric: 'tabular-nums',
+                            fontWeight: typeof v === 'number' && v > 0 ? 600 : 400,
+                            color: typeof v === 'number' && v > 0 ? 'var(--ax-success)' : 'var(--ax-text-secondary)',
+                          }}
+                        >
+                          {typeof v === 'number' && Number.isFinite(v) ? `${v > 0 ? '+' : ''}${v.toFixed(3)}` : '—'}
+                        </span>
+                      ),
+                    },
+                    {
+                      title: '头姿解释占比',
+                      dataIndex: 'pose_r2',
+                      width: 112,
+                      align: 'right' as const,
+                      render: (v: number | null) => (
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {typeof v === 'number' && Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—'}
+                        </span>
+                      ),
+                    },
+                    {
+                      title: '融合判定',
+                      dataIndex: 'eligibility',
+                      width: 128,
+                      render: (el: string) => (
+                        <Tag style={{ margin: 0, ...(CALIBRATION_ELIGIBILITY_TONE[el] ?? TIER_TONE.T3a) }}>
+                          {el}
+                        </Tag>
+                      ),
+                    },
+                  ]}
+                />
+              )}
+
+              {bsCal.disclaimer && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ax-text-secondary)', lineHeight: 1.5 }}>
+                  {bsCal.disclaimer}
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      ),
+    });
+  }
+
+  if (fv2?.available) {
+    const highlights: FeatureLayerV2Highlight[] = Array.isArray(fv2.highlights) ? fv2.highlights : [];
+    const fwTags: string[] = Array.isArray(fv2.framework_tags) ? fv2.framework_tags : [];
+    const nStreams = fv2.tracks?.catch22_dynamics?.n_streams ?? 0;
+
+    items.push({
+      key: 'feature-layer-v2',
+      label: (
+        <Space wrap size={8}>
+          <strong>第二层动力学特征明细</strong>
+          <Tag style={{ margin: 0, ...TIER_TONE.T2a }}>{highlights.length} 项动力学指标</Tag>
+        </Space>
+      ),
+      children: (
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          {fwTags.length > 0 && (
+            <Space wrap size={6}>
+              {fwTags.map((tag) => (
+                <Tag key={tag} style={{ margin: 0, ...TIER_TONE.T2a }}>
+                  {tag}
+                </Tag>
+              ))}
+            </Space>
+          )}
+
+          {fv2.summary_plain && (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ax-text-secondary)', lineHeight: 1.6 }}>
+              {fv2.summary_plain}
+            </p>
+          )}
+
+          {highlights.length > 0 && (
+            <Table<FeatureLayerV2Highlight>
+              rowKey="key"
+              size="small"
+              pagination={false}
+              scroll={{ x: 640 }}
+              dataSource={highlights}
+              columns={[
+                {
+                  title: '指标名称',
+                  dataIndex: 'label',
+                  width: 190,
+                  render: (v: string, r) => (
+                    <strong style={{ color: 'var(--ax-ink)' }}>{v || r.key}</strong>
+                  ),
+                },
+                {
+                  title: '实测读数',
+                  dataIndex: 'value',
+                  width: 150,
+                  align: 'right' as const,
+                  render: (v: number | null, r) => (
+                    <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--ax-ink)' }}>
+                      {fmtHighlightValue(v, r.unit)}
+                    </span>
+                  ),
+                },
+                {
+                  title: '来源通道',
+                  dataIndex: 'track',
+                  width: 130,
+                  render: (track: string) => (
+                    <Tag style={{ margin: 0, ...TIER_TONE.T3b }}>
+                      {V2_TRACK_LABEL[track] || track}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: '说明',
+                  dataIndex: 'note',
+                  render: (v: string) => (
+                    <span style={{ fontSize: 12.5, color: 'var(--ax-text-secondary)', lineHeight: 1.5 }}>
+                      {v || '—'}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          )}
+
+          {(nStreams > 0 || typeof fv2.inference_ms === 'number') && (
+            <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+              {nStreams > 0 ? `已提取 ${nStreams} 条多通道时间序列动力学特征` : '已完成多通道动力学计算'}
+              {typeof fv2.inference_ms === 'number' && Number.isFinite(fv2.inference_ms)
+                ? ` · 耗时 ${fv2.inference_ms.toFixed(1)} ms`
+                : ''}
+            </div>
+          )}
+        </Space>
       ),
     });
   }

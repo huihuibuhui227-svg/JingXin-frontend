@@ -278,6 +278,123 @@ export interface SecondInstrumentRow {
   comparable_note?: string;
 }
 
+export interface BlendshapeCalibrationConstruct {
+  key: string;
+  label: string;
+  n_valid: number;
+  raw_rho: number | null;
+  calibrated_rho: number | null;
+  rho_delta: number | null;
+  pose_r2: number | null;
+  eligibility: '已校准可融合' | '辅助对照' | '待3D重采验证' | string;
+  note: string;
+}
+
+export interface BlendshapeCalibrationAudit {
+  available: boolean;
+  pose_mode: '3d_matrix' | '2d_legacy' | 'unavailable' | string;
+  n_raw_frames: number;
+  n_clean_frames: number;
+  quality_pass_rate: number | null;
+  eligible_construct_count: number;
+  summary_plain: string;
+  constructs: BlendshapeCalibrationConstruct[];
+  disclaimer: string;
+  inference_ms: number;
+}
+
+export interface FeatureLayerV2Highlight {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  track: string;
+  note: string;
+}
+
+export interface FeatureLayerV2Audit {
+  available: boolean;
+  pose_mode: string;
+  framework_tags: string[];
+  tracks: {
+    face_kinematics: Record<string, unknown>;
+    voice_dynamics: Record<string, unknown>;
+    gesture_smoothness: Record<string, unknown>;
+    catch22_dynamics: {
+      n_streams: number;
+      streams: Record<string, Record<string, number>>;
+      summary: Record<string, unknown>;
+    };
+  };
+  highlights: FeatureLayerV2Highlight[];
+  summary_plain: string;
+  inference_ms: number;
+}
+
+export interface RefereeAttributionItem {
+  feature_key: string;
+  label: string;
+  value_display: string;
+  contribution: number;
+  direction: '正向支撑' | '待补强' | string;
+}
+
+export interface RefereeMacroStageSegment {
+  stage: string;
+  label: string;
+  start_sec: number;
+  end_sec: number;
+  duration_sec: number;
+  color_key: string;
+  ratio: number;
+  annotation?: string;
+}
+
+export interface RefereeChangePoint {
+  time_sec: number;
+  window_idx?: number;
+  magnitude: number;
+  cue_summary: string;
+}
+
+export interface RefereeMLAudit {
+  available: boolean;
+  advisory_only: boolean;
+  non_scoring_guarantee: string;
+  session_id: string | null;
+  evidence_gate: {
+    stage_code: 'stage_1_verified' | 'stage_2_review' | 'stage_3_limited' | 'unavailable' | string;
+    stage_label: string;
+    stage_probs: Record<string, number>;
+    conformal_set: string[];
+    conformal_set_labels: string[];
+    uncertainty_escalated: boolean;
+    alpha: number;
+    target_coverage: number;
+    empirical_cv_coverage: number | null;
+    ood_anomaly_flag: boolean;
+    ood_score: number | null;
+    attributions: RefereeAttributionItem[];
+    summary_plain: string;
+  };
+  stage_segmentation: {
+    available: boolean;
+    method: string;
+    n_windows: number;
+    total_duration_sec: number;
+    transition_count: number;
+    mean_dwell_sec: number;
+    transition_entropy: number;
+    flicker_reduction_pct: number | null;
+    macro_stages: RefereeMacroStageSegment[];
+    change_points: RefereeChangePoint[];
+    summary_plain: string;
+  };
+  model_metrics?: Record<string, unknown>;
+  disclaimer: string;
+  inference_ms: number;
+}
+
 export interface L1Audit {
   n_total: number;
   n_measured: number;
@@ -399,7 +516,10 @@ export interface L1Audit {
     items?: Array<{ name: string; label?: string; value?: number | null; n_valid?: number }>;
   };
   face_dual_instrument?: FaceDualInstrumentAudit;
+  blendshape_calibration?: BlendshapeCalibrationAudit;
+  feature_layer_v2?: FeatureLayerV2Audit;
   behavior_regimes?: BehaviorRegimeAudit;
+  referee_ml?: RefereeMLAudit;
   speaker_turn_audit?: {
     available?: boolean;
     isolation_mode?: string;
