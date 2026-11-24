@@ -16,7 +16,7 @@ import Loading from '@/components/common/Loading';
 const { Content } = Layout;
 const { Text, Title, Paragraph } = Typography;
 
-type Module = 'interview' | 'research';
+type Module = 'interview' | 'research' | 'metacognition';
 
 interface QItem { question: string; reference_answer: string }
 interface BankInfo { id: string; name: string; updated_at: string | null; questions: QItem[] }
@@ -377,6 +377,7 @@ const QuestionBankPage: React.FC = () => {
               options={[
                 { label: '面试题库', value: 'interview' },
                 { label: '科研题库', value: 'research' },
+                { label: 'AI元能力审辨', value: 'metacognition' },
               ]}
             />
             <Space wrap>

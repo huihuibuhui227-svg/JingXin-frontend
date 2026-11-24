@@ -15,6 +15,20 @@ const adminHeaders = (): Record<string, string> => {
 let sessionId: string | null = null;
 let discardToken: string | null = null;
 
+export type PrivacyConsentMode = 'full' | 'audio_only' | 'anonymous_kinematics_only';
+let currentPrivacyMode: PrivacyConsentMode | null = null;
+
+export const setPrivacyMode = (mode: PrivacyConsentMode | null): void => {
+  currentPrivacyMode = mode;
+};
+
+export const getPrivacyMode = (): PrivacyConsentMode | null => currentPrivacyMode;
+
+const privacyHeaders = (override?: PrivacyConsentMode | null): Record<string, string> => {
+  const effective = override ?? currentPrivacyMode;
+  return effective ? { 'X-Privacy-Mode': effective } : {};
+};
+
 // 清掉旧版本残留在 localStorage 里的 UUID —— 不清的话老用户会一直用旧值,id 永远对不上
 localStorage.removeItem('assessment_session_id');
 localStorage.removeItem('face_session_id');
@@ -35,7 +49,7 @@ const withSession = (url: string, override: string | null = sessionId): string =
   override ? `${url}${url.includes('?') ? '&' : '?'}session_id=${override}` : url;
 
 export const faceApi = {
-  analyzeImage: async (file: Blob | File) => {
+  analyzeImage: async (file: Blob | File, opts?: { privacyMode?: PrivacyConsentMode | null }) => {
     const formData = new FormData();
 
     // 如果是 Blob，转换为 File
@@ -51,7 +65,10 @@ export const faceApi = {
       withSession(`${FACE_API_URL}/analyze?fps=30`),
       formData,
       {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...privacyHeaders(opts?.privacyMode),
+        }
       }
     );
 
@@ -61,7 +78,7 @@ export const faceApi = {
 
 
 export const gestureApi = {
-  analyzeGesture: async (file: Blob | File) => {
+  analyzeGesture: async (file: Blob | File, opts?: { privacyMode?: PrivacyConsentMode | null }) => {
     const formData = new FormData();
 
     // 如果是 Blob，转换为 File
@@ -75,7 +92,12 @@ export const gestureApi = {
     const response = await axios.post(
       withSession(`${GESTURE_API_URL}/analyze`),
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...privacyHeaders(opts?.privacyMode),
+        }
+      }
     );
 
     return response.data;
@@ -105,7 +127,10 @@ export const voiceApi = {
    *    逐字时间戳算**语速/停顿/反应潜伏期** —— 翻倍是静默的。
    *    `record` 缺省 true:与从前逐字一致(纯 ASR 调用方不受影响)。
    */
-  speechToText: async (audioFile: File, opts?: { record?: boolean }) => {
+  speechToText: async (
+    audioFile: File,
+    opts?: { record?: boolean; privacyMode?: PrivacyConsentMode | null }
+  ) => {
     const formData = new FormData();
     formData.append('audio', audioFile);
 
@@ -113,7 +138,10 @@ export const voiceApi = {
     // 带 id:这次识别会累积进**该会话**的 transcript.json(不带则落 NONE,报告侧排除)
     const response = await axios.post(
       withSession(`${VOICE_API_URL}/asr${record ? '' : '?record=false'}`), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...privacyHeaders(opts?.privacyMode),
+      }
     });
 
     return response.data;
@@ -138,14 +166,19 @@ export const voiceApi = {
       return response.data;
     },
 
-    submitAudioAnswer: async (audioFile: File) => {
+    submitAudioAnswer: async (audioFile: File, opts?: { privacyMode?: PrivacyConsentMode | null }) => {
       const formData = new FormData();
       formData.append('audio', audioFile);
 
       const response = await axios.post(
         withSession(`${VOICE_API_URL}/interview/answer_audio`),
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            ...privacyHeaders(opts?.privacyMode),
+          }
+        }
       );
 
       return response.data;
@@ -158,8 +191,9 @@ export const voiceApi = {
   },
 
   research: {
-    start: async () => {
-      const response = await axios.post(`${VOICE_API_URL}/research/start`);
+    start: async (module: 'research' | 'metacognition' | 'followup' = 'research') => {
+      const q = module && module !== 'research' ? `?module=${encodeURIComponent(module)}` : '';
+      const response = await axios.post(`${VOICE_API_URL}/research/start${q}`);
       setSessionId(response.data?.session_id ?? null, response.data?.discard_token ?? null);
       return response.data;
     },
@@ -176,14 +210,19 @@ export const voiceApi = {
       return response.data;
     },
 
-    submitAudioAnswer: async (audioFile: File) => {
+    submitAudioAnswer: async (audioFile: File, opts?: { privacyMode?: PrivacyConsentMode | null }) => {
       const formData = new FormData();
       formData.append('audio', audioFile);
 
       const response = await axios.post(
         withSession(`${VOICE_API_URL}/research/answer_audio`),
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            ...privacyHeaders(opts?.privacyMode),
+          }
+        }
       );
 
       return response.data;
@@ -218,14 +257,20 @@ export const sessionApi = {
    *    后果是这一场的原生录像整个没有。这里显式 `timeout: 0`(不设上限)。
    * ⚠️ 重复上传**覆盖**服务端同名文件,而账本各留一行(sha 各不同)⟹ 覆盖有据可查。
    */
-  uploadMedia: async (video: Blob) => {
+  uploadMedia: async (video: Blob, opts?: { privacyMode?: PrivacyConsentMode | null }) => {
     const sid = requireSessionId('上传本场原生视频');
     const formData = new FormData();
     formData.append('file', video, 'camera.webm');   // 字段名必须是 file(spec §5.3)
     const response = await axios.post(
       `${VOICE_API_URL}/session/${sid}/media`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 }
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...privacyHeaders(opts?.privacyMode),
+        },
+        timeout: 0,
+      }
     );
     return response.data;
   },
@@ -245,11 +290,7 @@ export const sessionApi = {
    */
   setLabel: async (fields: {
     serial: string; name: string; student_id: string; department: string;
-    /** 本场征询结果。`"full"` = 全都同意;`"audio_only"` = 只同意声音。
-     *  它随标注一起落 `label.json` —— 同意与否是**证据**,不能只活在页面状态里。
-     *  ⚠️ 取值由服务端校验,未知值 400(不回落默认:把"没同意"当成"全同意"是
-     *     最坏的方向)。 */
-    consent?: 'full' | 'audio_only';
+    consent?: PrivacyConsentMode;
   }) => {
     const sid = requireSessionId('上报本场标注');
     const response = await axios.post(`${VOICE_API_URL}/session/${sid}/label`, fields);
@@ -570,11 +611,12 @@ export const dashboardApi = {
     return response.data;
   },
 
-  getStructuredReport: async (sessionId?: string | null) => {
-    const response = await axios.get(
-      withSession(`${API_BASE_URL}/api/report/structured`, sessionId),
-      { headers: adminHeaders() }
-    );
+  getStructuredReport: async (sessionId?: string | null, sceneProfile?: string | null) => {
+    let url = withSession(`${API_BASE_URL}/api/report/structured`, sessionId);
+    if (sceneProfile) {
+      url += `${url.includes('?') ? '&' : '?'}scene_profile=${encodeURIComponent(sceneProfile)}`;
+    }
+    const response = await axios.get(url, { headers: adminHeaders() });
     return response.data;
   },
 
@@ -607,7 +649,7 @@ export const dashboardApi = {
   },
 
   searchQuestionBank: async (params: {
-    module: 'interview' | 'research';
+    module: 'interview' | 'research' | 'metacognition';
     query: string;
     top_k?: number;
     use_llm?: boolean;
@@ -616,6 +658,330 @@ export const dashboardApi = {
       headers: adminHeaders(),
       timeout: 12000,
     });
+    return response.data;
+  },
+};
+
+// ── 一核三基地扩展接口：声明式场景档案 / Career MCP / 长周期随访 / 人工复核注记 ──
+
+export interface SceneProfileDescriptor {
+  id: string;
+  name: string;
+  short_label: string;
+  weight_label: string;
+  route_base: string;
+  baseline_mode: string;
+  privacy_modes_supported: string[];
+  default_privacy_mode: PrivacyConsentMode;
+  question_bank_modules: string[];
+  core_indicator_count: number;
+  active_indicator_families: string[];
+  extension_indicators: string[];
+  stage_windows: string[];
+  explicit_blocked_overrides: Array<{ key: string; label: string; reason: string }>;
+  compliance_banner: string;
+  description: string;
+}
+
+export const sceneProfilesApi = {
+  list: async (): Promise<{
+    status: string;
+    default_profile: string;
+    profiles: SceneProfileDescriptor[];
+  }> => {
+    const response = await axios.get(`${API_BASE_URL}/api/scene-profiles`, { timeout: 8000 });
+    return response.data;
+  },
+  get: async (id: string): Promise<{ status: string; profile: SceneProfileDescriptor }> => {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/scene-profiles?id=${encodeURIComponent(id)}`,
+      { timeout: 8000 }
+    );
+    return response.data;
+  },
+};
+
+export interface CareerCompetencyItem {
+  key: string;
+  label: string;
+  required_indicators: string[];
+  critique_focus?: string;
+  matched_keywords?: string[];
+}
+
+export interface CareerPosition {
+  position_id: string;
+  title: string;
+  track: string;
+  level: string;
+  jd_summary: string;
+  observable_competencies: CareerCompetencyItem[];
+  blocked_hard_skills: string[];
+  sample_ai_critique_prompt?: string;
+}
+
+export interface JdDecomposeResponse {
+  status: string;
+  source: string;
+  char_count: number;
+  observable_competencies: CareerCompetencyItem[];
+  blocked_hard_skills: string[];
+  non_scoring_notice: string;
+}
+
+export interface CritiqueTaskResponse {
+  status: string;
+  position_title: string;
+  task_pattern: string;
+  stages: Array<{ stage: string; label: string; tip: string }>;
+  question_prompt: string;
+  focus_checklist: string[];
+}
+
+export interface EvidenceAlignmentResponse {
+  status: string;
+  session_id: string;
+  position_id: string;
+  position_title: string;
+  scoring_participation: boolean;
+  non_scoring_statement: string;
+  summary_counts: {
+    competencies_total: number;
+    covered_strong: number;
+    covered_partial: number;
+    missing_gap: number;
+  };
+  referee_stage_summary: {
+    stage_label: string;
+    uncertainty_escalated: boolean;
+  };
+  competency_alignments: Array<{
+    key: string;
+    label: string;
+    coverage_status: string;
+    critique_focus: string;
+    evidences: Array<{
+      indicator: string;
+      label: string;
+      value: number | null;
+      unit: string;
+      confidence: string;
+      gap: string | null;
+    }>;
+  }>;
+  explicit_blocked_hard_skills: string[];
+  next_practice_task: Omit<CritiqueTaskResponse, 'status'>;
+}
+
+export const careerMcpApi = {
+  rpc: async (method: string, params?: Record<string, unknown>, id: number | string = 1) => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/mcp/career`,
+      { jsonrpc: '2.0', id, method, params: params ?? {} },
+      { timeout: 15000 }
+    );
+    return response.data;
+  },
+  listPositions: async (params?: { keyword?: string; track?: string; level?: string }): Promise<{
+    status: string;
+    total: number;
+    tracks: string[];
+    levels: string[];
+    positions: CareerPosition[];
+    scoring_participation: boolean;
+  }> => {
+    const q = new URLSearchParams();
+    if (params?.keyword) q.set('keyword', params.keyword);
+    if (params?.track) q.set('track', params.track);
+    if (params?.level) q.set('level', params.level);
+    const qs = q.toString();
+    const response = await axios.get(`${API_BASE_URL}/api/career/positions${qs ? `?${qs}` : ''}`, {
+      timeout: 10000,
+    });
+    return response.data;
+  },
+  decomposeJd: async (jd_text: string): Promise<JdDecomposeResponse> => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/career/decompose-jd`,
+      { jd_text },
+      { timeout: 10000 }
+    );
+    return response.data;
+  },
+  generateTask: async (params: { position_id?: string; jd_text?: string }): Promise<CritiqueTaskResponse> => {
+    const response = await axios.post(`${API_BASE_URL}/api/career/generate-task`, params, {
+      timeout: 10000,
+    });
+    return response.data;
+  },
+  alignEvidence: async (params: {
+    session_id: string;
+    position_id?: string;
+    jd_text?: string;
+  }): Promise<EvidenceAlignmentResponse> => {
+    const response = await axios.post(`${API_BASE_URL}/api/career/align-evidence`, params, {
+      timeout: 20000,
+    });
+    return response.data;
+  },
+};
+
+export interface LongitudinalVisitSummary {
+  session_id: string;
+  tested_at: string | null;
+  def_version: string;
+  def_version_note: string;
+  pose_mode: string;
+  has_loaded_logs: boolean;
+  coverage_passed: number;
+  coverage_slots: number;
+  confidence_cap: string;
+  referee_stage_code: string;
+  referee_stage_label: string;
+  uncertainty_escalated: boolean;
+  ood_anomaly_flag: boolean;
+  visit_order: number;
+  visit_label: string;
+  privacy_mode: string;
+}
+
+export interface LongitudinalMetricSeries {
+  key: string;
+  label: string;
+  unit: string;
+  summary: {
+    n_valid_visits: number;
+    t0_baseline: number | null;
+    p25: number | null;
+    median: number | null;
+    p75: number | null;
+    drawable: boolean;
+  };
+  points: Array<{
+    visit_order: number;
+    visit_label: string;
+    session_id: string;
+    value: number | null;
+    delta_from_t0_pct: number | null;
+    confidence: string;
+    gap: string | null;
+  }>;
+}
+
+export interface LongitudinalSubject {
+  subject_code: string;
+  scene_profile: string;
+  alias_note: string;
+  consent_mode: PrivacyConsentMode | string;
+  created_at: string;
+  updated_at: string;
+  visits: Array<{
+    session_id: string;
+    visit_order: number;
+    visit_label: string;
+    privacy_mode: string;
+    attached_at: string;
+  }>;
+}
+
+export interface LongitudinalTrajectoryResponse {
+  status: string;
+  subject?: LongitudinalSubject;
+  comparable: boolean;
+  def_versions: string[];
+  comparability_notes: string[];
+  n_visits: number;
+  visits: LongitudinalVisitSummary[];
+  series: LongitudinalMetricSeries[];
+  review_alerts: string[];
+  compliance_note: string;
+}
+
+export const longitudinalApi = {
+  listSubjects: async (): Promise<{
+    status: string;
+    compliance_note: string;
+    metrics: Array<{ key: string; label: string; unit: string; source: string }>;
+    subjects: LongitudinalSubject[];
+  }> => {
+    const response = await axios.get(`${API_BASE_URL}/api/longitudinal/subjects`, { timeout: 10000 });
+    return response.data;
+  },
+  upsertSubject: async (params: {
+    subject_code: string;
+    scene_profile?: string;
+    alias_note?: string;
+    consent_mode?: PrivacyConsentMode;
+  }) => {
+    const response = await axios.post(`${API_BASE_URL}/api/longitudinal/subjects`, params, {
+      timeout: 10000,
+    });
+    return response.data;
+  },
+  attachVisit: async (
+    subjectCode: string,
+    params: { session_id: string; visit_label?: string; privacy_mode?: PrivacyConsentMode }
+  ) => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/longitudinal/subjects/${encodeURIComponent(subjectCode)}/visits`,
+      params,
+      { timeout: 10000 }
+    );
+    return response.data;
+  },
+  getTrajectory: async (subjectCode: string): Promise<LongitudinalTrajectoryResponse> => {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/longitudinal/subjects/${encodeURIComponent(subjectCode)}/trajectory`,
+      { timeout: 20000 }
+    );
+    return response.data;
+  },
+  compareSessions: async (
+    sessionIds: string[],
+    sceneProfile = 'research_interview'
+  ): Promise<LongitudinalTrajectoryResponse> => {
+    const q = new URLSearchParams({
+      session_ids: sessionIds.join(','),
+      scene_profile: sceneProfile,
+    });
+    const response = await axios.get(`${API_BASE_URL}/api/reports/compare?${q.toString()}`, {
+      timeout: 25000,
+    });
+    return response.data;
+  },
+};
+
+export interface ReviewerNote {
+  session_id: string;
+  exists: boolean;
+  verification_status: 'pending_review' | 'verified_consistent' | 'needs_recollect' | 'signal_artifact_noted' | string;
+  verification_label: string;
+  focus_tags: string[];
+  note_text: string;
+  updated_at: string | null;
+}
+
+export const reviewerNotesApi = {
+  get: async (sessionId: string): Promise<{ status: string; note: ReviewerNote }> => {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/report/review-notes/${encodeURIComponent(sessionId)}`,
+      { timeout: 8000 }
+    );
+    return response.data;
+  },
+  save: async (
+    sessionId: string,
+    params: {
+      verification_status: string;
+      focus_tags: string[];
+      note_text: string;
+    }
+  ): Promise<{ status: string; note: ReviewerNote }> => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/report/review-notes/${encodeURIComponent(sessionId)}`,
+      params,
+      { headers: adminHeaders(), timeout: 8000 }
+    );
     return response.data;
   },
 };

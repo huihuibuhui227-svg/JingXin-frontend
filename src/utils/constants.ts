@@ -1,5 +1,5 @@
 /**
- * 衡才智析 · 多模态行为证据披露系统 — 运行时服务地址与品牌常量。
+ * 衡才智析 · 多模态行为证据分析系统 — 运行时服务地址与品牌常量。
  *
  * 默认走同源相对路径（由 Vite dev / preview 统一在服务端本地 127.0.0.1 反代至
  * :5000 / :8000 / :8001 / :8002）：
@@ -15,12 +15,14 @@ export const GESTURE_API_URL = import.meta.env.VITE_GESTURE_API_URL || '/_svc/ge
 export const VOICE_API_URL = import.meta.env.VITE_VOICE_API_URL || '/_svc/voice';
 
 export const BRAND_NAME = '衡才智析';
-export const BRAND_SUBTITLE = '多模态行为证据披露系统';
-export const BRAND_FULL_TITLE = '衡才智析 · 多模态行为证据披露系统';
+export const BRAND_SUBTITLE = '多模态行为证据分析系统';
+export const BRAND_FULL_TITLE = '衡才智析 · 多模态行为证据分析系统';
 export const BRAND_SLOGAN = '不给分，只给证据与缺口';
 export const BRAND_PRINCIPLE = '仪器可以是黑盒，裁判必须是白盒';
 
 export const SCENARIOS = {
   INTERVIEW: 'interview',
-  RESEARCH: 'research'
+  RESEARCH: 'research',
+  METACOGNITION: 'metacognition',
+  FOLLOWUP: 'followup',
 } as const;

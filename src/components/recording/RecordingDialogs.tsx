@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Input, Modal, Radio, Space, Typography } from 'antd';
 import { LabelFields, SaveState, SavedInfo } from '@/hooks/useSessionRecording';
 
-/** `full` = 摄像头 + 麦克风全开;`audio_only` = 只开麦克风。 */
-export type ConsentMode = 'full' | 'audio_only';
+/** `full` = 摄像头 + 麦克风全开;`audio_only` = 只开麦克风;`anonymous_kinematics_only` = 仅内存提取匿名特征、零原始媒体落盘。 */
+export type ConsentMode = 'full' | 'audio_only' | 'anonymous_kinematics_only';
 
 /**
  * 「一场录制」的四个共用弹窗 + 一条降级横幅。
@@ -116,8 +116,12 @@ export const ConsentModal: React.FC<{
   devicePicker?: React.ReactNode;
   label?: string | null;
   saving?: boolean;
-}> = ({ open, onOk, onDecline, devicePicker, label, saving }) => {
-  const [mode, setMode] = useState<ConsentMode>('full');
+  defaultMode?: ConsentMode;
+}> = ({ open, onOk, onDecline, devicePicker, label, saving, defaultMode = 'full' }) => {
+  const [mode, setMode] = useState<ConsentMode>(defaultMode);
+  useEffect(() => {
+    if (open) setMode(defaultMode);
+  }, [open, defaultMode]);
   return (
     <Modal
       title="这一场需要征得同意"
@@ -129,12 +133,12 @@ export const ConsentModal: React.FC<{
       confirmLoading={saving}
       onCancel={onDecline}
       maskClosable={false}
-      width={520}
+      width={560}
     >
       <Space direction="vertical" size={12} style={{ width: '100%', paddingTop: 8 }}>
         <Typography.Paragraph style={{ margin: 0 }}>
-          本场会采集并留存你的<strong>声音</strong>与<strong>影像</strong>,用于行为分析。
-          请选择你同意的范围:
+          本场会采集你的<strong>声音</strong>与<strong>姿态特征</strong>,用于行为分析。
+          请选择你同意的数据留存范围:
         </Typography.Paragraph>
         <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)}>
           <Space direction="vertical" size={8}>
@@ -149,6 +153,12 @@ export const ConsentModal: React.FC<{
               <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>
                 <strong>摄像头不会被打开</strong> —— 本场不产生任何画面。代价是
                 面部与手势两个维度<strong>没有数据</strong>,报告里会如实标注「未采集」。
+              </div>
+            </Radio>
+            <Radio value="anonymous_kinematics_only">
+              <strong>仅匿名特征（原始影像与原声零落盘）</strong>
+              <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>
+                摄像头与麦克风仅在内存完成三维姿态与声学标量提取，服务端<strong>不落盘任何原始图像、原声或原生录像</strong>。
               </div>
             </Radio>
           </Space>
@@ -224,8 +234,9 @@ export const SaveGateModal: React.FC<{
   /** 藏掉那个默认的「确定」。评估页要用:它后面没有"继续录"这条路,
    *  默认按钮关掉弹窗只会把人留在一条死路上 —— 必须二选一。 */
   hideDefaultOk?: boolean;
+  consentMode?: ConsentMode | null;
 }> = ({ saveState, savedInfo, saveError, onKeep, onDiscard, onRetry, onAbandon,
-        onClose, extraActions, hideDefaultOk }) => {
+        onClose, extraActions, hideDefaultOk, consentMode }) => {
   const btn = (bg: string, color: string, border = 'none'): React.CSSProperties => ({
     padding: '6px 20px', background: bg, color, border, borderRadius: 6, cursor: 'pointer',
   });
@@ -298,7 +309,9 @@ export const SaveGateModal: React.FC<{
           {saveState === 'saved' ? (
             <div>素材：<strong>{savedInfo.bytes
               ? `${(savedInfo.bytes / 1048576).toFixed(1)} MB`
-              : '(本场没有原生录像,盘上只有帧与日志)'}</strong></div>
+              : consentMode === 'anonymous_kinematics_only'
+                ? '（匿名特征模式：仅记录三维姿态与声学标量日志，原始影像与原声未入盘）'
+                : '(本场没有原生录像,盘上只有帧与日志)'}</strong></div>
           ) : (
             <div style={{ color: 'var(--ax-error)' }}>
               已删除 —— 场次目录与日志 CSV 都从盘上抹掉了,<strong>没有入盘</strong>。

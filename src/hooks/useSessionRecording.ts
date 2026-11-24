@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { message } from 'antd';
-import { dashboardApi, sessionApi, getSessionId, getDiscardToken } from '@/services/api';
+import { dashboardApi, sessionApi, getSessionId, getDiscardToken, setPrivacyMode } from '@/services/api';
 import { recordingsApi } from '@/services/recordingsApi';
 import { ConsentMode } from '@/components/recording/RecordingDialogs';
 import type { CaptureHealth } from '@/types/api';
@@ -144,6 +144,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
   const confirmConsent = useCallback(async (mode: ConsentMode) => {
     setConsent(mode);
     consentRef.current = mode;
+    setPrivacyMode(mode);
     setConsentModalOpen(false);
     setSavingLabel(true);
     try {
@@ -191,6 +192,18 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
 
   /** 真正上传。**成功才让那个 promise 落定** —— 落定 = 撤掉刷新拦截。 */
   const doUpload = useCallback(async (blob: Blob) => {
+    if (consentRef.current === 'anonymous_kinematics_only') {
+      const curSid = getSessionId();
+      setSavedInfo({ label: savedLabelRef.current, sid: curSid, bytes: 0, health: null });
+      setSaveState('saved');
+      pendingRef.current?.resolve();
+      pendingRef.current = null;
+      if (curSid) {
+        void dashboardApi.runModule('report', curSid).catch(() => {});
+      }
+      message.success('本场匿名特征日志已确认留存（原始音视频零落盘）');
+      return;
+    }
     setSaveState('saving');
     setSaveError(null);
     try {
@@ -233,6 +246,12 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
 
   /** 交给 `useCamera` 的 `onVideoReady`。**必须 return 它的返回值。** */
   const submitVideo = useCallback((video: Blob): Promise<void> => {
+    if (consentRef.current === 'anonymous_kinematics_only') {
+      // 匿名无影像隐私模式：不保留任何内存或磁盘音视频字节，直接放行保存门禁仅确认匿名标量日志
+      pendingRef.current = null;
+      setSaveState('choosing');
+      return Promise.resolve();
+    }
     console.log('🎥 本场原生录像收尾，准备上传:', video.size, 'bytes');
     return new Promise<void>((resolve) => {
       pendingRef.current = { blob: video, resolve };
@@ -329,6 +348,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
 
   /** 换场前把上一场留在页面上的东西清干净。 */
   const reset = useCallback(() => {
+    setPrivacyMode(null);
     setDegraded([]);
     setSavedLabel(null);
     savedLabelRef.current = null;

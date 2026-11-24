@@ -18,6 +18,11 @@ const RecordingsPage = React.lazy(() => import('./pages/RecordingsPage'));
 const DataExportPage = React.lazy(() => import('./pages/DataExportPage'));
 const QuestionBankPage = React.lazy(() => import('./pages/QuestionBankPage'));
 const BenchmarksPage = React.lazy(() => import('./pages/BenchmarksPage'));
+const CareerMcpPage = React.lazy(() => import('./pages/CareerMcpPage'));
+const MetacognitionAssessment = React.lazy(() => import('./pages/MetacognitionAssessment'));
+const FollowupPage = React.lazy(() => import('./pages/FollowupPage'));
+const FollowupCapture = React.lazy(() => import('./pages/FollowupCapture'));
+const CompareSessionsPage = React.lazy(() => import('./pages/CompareSessionsPage'));
 
 const PageLoader: React.FC = () => <Loading tip="页面加载中…" />;
 
@@ -141,6 +146,11 @@ const App: React.FC = () => {
                   <Route path="/export" element={<DataExportPage />} />
                   <Route path="/question-bank" element={<QuestionBankPage />} />
                   <Route path="/benchmarks" element={<BenchmarksPage />} />
+                  <Route path="/career-mcp" element={<CareerMcpPage />} />
+                  <Route path="/metacognition" element={<MetacognitionAssessment />} />
+                  <Route path="/followup" element={<FollowupPage />} />
+                  <Route path="/followup/capture" element={<FollowupCapture />} />
+                  <Route path="/compare" element={<CompareSessionsPage />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

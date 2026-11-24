@@ -32,7 +32,12 @@ const ROUTES = process.argv[2]
       '/export',
       '/question-bank',
       '/benchmarks',
-      '/report/latest'
+      '/report/latest',
+      '/career-mcp',
+      '/metacognition',
+      '/followup',
+      '/followup/capture',
+      '/compare'
     ];
 
 // axe 的 impact 分级：critical > serious > moderate > minor

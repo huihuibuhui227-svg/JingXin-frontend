@@ -4,7 +4,16 @@ import { voiceApi, sessionApi } from '@/services/api';
 import { useAssessmentStore } from '@/store/assessmentStore';
 import { speakText } from '@/utils/speech';
 
-export const useAssessment = (type: 'interview' | 'research') => {
+export type AssessmentScenarioType = 'interview' | 'research' | 'metacognition' | 'followup';
+
+const START_LABELS: Record<AssessmentScenarioType, string> = {
+  interview: '面试采集',
+  research: '科研采集',
+  metacognition: 'AI元能力审辨实训',
+  followup: '长周期匿名随访采录',
+};
+
+export const useAssessment = (type: AssessmentScenarioType) => {
   const [loading, setLoading] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [started, setStarted] = useState(false);
@@ -134,13 +143,15 @@ export const useAssessment = (type: 'interview' | 'research') => {
 
     setLoading(true);
     try {
-      const voiceApiService = type === 'interview' ? voiceApi.interview : voiceApi.research;
-      const startRes = await voiceApiService.start();
+      const startRes =
+        type === 'interview'
+          ? await voiceApi.interview.start()
+          : await voiceApi.research.start(type);
 
       setTotalQuestions(startRes.total_questions ?? 0);
       pushQuestion(startRes.question);
 
-      message.success(`${type === 'interview' ? '面试采集' : '科研采集'}已启动`);
+      message.success(`${START_LABELS[type] ?? '采集'}已启动`);
       setStarted(true);
       return true;
     } catch (error: any) {

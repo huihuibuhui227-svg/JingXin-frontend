@@ -3,7 +3,7 @@ import { Layout, Table, Button, Empty, Typography, Alert, Space, Tag, Input, Car
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileTextOutlined, EyeOutlined, BarChartOutlined, DownloadOutlined, AuditOutlined, SearchOutlined,
+  FileTextOutlined, EyeOutlined, BarChartOutlined, DownloadOutlined, AuditOutlined, SearchOutlined, SwapOutlined,
 } from '@ant-design/icons';
 import { dashboardApi } from '@/services/api';
 import Loading from '@/components/common/Loading';
@@ -249,13 +249,21 @@ const ReportsList: React.FC = () => {
               </Text>
             )}
           </div>
-          <Button
-            type="primary"
-            icon={<BarChartOutlined />}
-            onClick={() => navigate('/report/latest')}
-          >
-            最新结构化报告
-          </Button>
+          <Space wrap>
+            <Button
+              icon={<SwapOutlined />}
+              onClick={() => navigate('/compare')}
+            >
+              多场纵向对比
+            </Button>
+            <Button
+              type="primary"
+              icon={<BarChartOutlined />}
+              onClick={() => navigate('/report/latest')}
+            >
+              最新结构化报告
+            </Button>
+          </Space>
         </div>
 
         {loadError ? (

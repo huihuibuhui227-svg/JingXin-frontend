@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { BRAND_FULL_TITLE, BRAND_PRINCIPLE, BRAND_SLOGAN } from '@/utils/constants';
 
 const QUICK_LINKS = [
+  { to: '/research', label: '科研采集' },
   { to: '/interview', label: '面试观测' },
-  { to: '/research', label: '科研观测' },
-  { to: '/analysis', label: '实时监测' },
+  { to: '/compare', label: '多场对比' },
+  { to: '/career-mcp', label: '岗位 MCP 中心' },
+  { to: '/metacognition', label: 'AI 审辨实训' },
+  { to: '/followup', label: '长周期随访' },
   { to: '/reports', label: '报告中心' },
-  { to: '/recordings', label: '录制素材' },
-  { to: '/export', label: '数据导出' },
-  { to: '/question-bank', label: '题库管理' },
-  { to: '/benchmarks', label: '科研基准' }
+  { to: '/benchmarks', label: '科研基准' },
 ];
 
 const Footer: React.FC = () => {

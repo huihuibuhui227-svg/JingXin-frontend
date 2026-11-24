@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Card, Button, Result, Alert, Drawer, Segmented, Space, Tag, Typography } from 'antd';
-import { RobotOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Layout, Card, Button, Result, Alert, Drawer, Segmented, Space, Tag, Typography, Select, Input, Table, message } from 'antd';
+import { EditOutlined, RobotOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import ReportViewer from '@/components/report/ReportViewer';
 import { BehaviorRegimeTimeline, RefereeStagePanel } from '@/components/report/ReportCharts';
@@ -10,7 +10,8 @@ import type { L1WithInstruments } from '@/components/report/InstrumentProvenance
 import DownloadButton from '@/components/report/DownloadButton';
 import Loading from '@/components/common/Loading';
 import { useAssessmentStore } from '@/store/assessmentStore';
-import { dashboardApi, getSessionId, ReportLlmAssistResponse } from '@/services/api';
+import { dashboardApi, getSessionId, ReportLlmAssistResponse, ReviewerNote, reviewerNotesApi } from '@/services/api';
+import { getAdminToken } from '@/services/recordingsApi';
 import { API_BASE_URL } from '@/utils/constants';
 import { downloadFile } from '@/utils/helpers';
 import { EvaluationResult, Coverage } from '@/types/assessment';
@@ -52,9 +53,13 @@ const tailOf = (text?: string, n = 240): string => (text || '').trim().slice(-n)
 
 const ReportPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { evaluationResult: storeResult } = useAssessmentStore();
 
+  const [sceneProfile, setSceneProfile] = useState<string>(
+    () => searchParams.get('scene_profile') || 'research_interview'
+  );
   const [report, setReport] = useState<EvaluationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +85,16 @@ const ReportPage: React.FC = () => {
   const [assistData, setAssistData] = useState<ReportLlmAssistResponse | null>(null);
   const [assistError, setAssistError] = useState<string | null>(null);
 
+  // 管理员/导师人工复核注记（严格不打分，承接保形门不确定升级结果）
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewNote, setReviewNote] = useState<ReviewerNote | null>(null);
+  const [reviewStatusDraft, setReviewStatusDraft] = useState<string>('pending_review');
+  const [reviewTagsDraft, setReviewTagsDraft] = useState<string[]>([]);
+  const [reviewTextDraft, setReviewTextDraft] = useState<string>('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const isAdmin = !!getAdminToken();
+
   useEffect(() => {
     // 路由切换时彻底清零派生状态，杜绝上一场内容残留；指定了 `:id`（含 `/report/latest`）时一律向服务端现取，不被旧 store 劫持。
     setReport(null);
@@ -92,15 +107,17 @@ const ReportPage: React.FC = () => {
     setDownloadNote(null);
     setAssistData(null);
     setAssistError(null);
+    setReviewNote(null);
+    setReviewError(null);
 
-    if (!id && storeResult) {
+    if (!id && storeResult && sceneProfile === 'research_interview' && !searchParams.get('scene_profile')) {
       setReport(storeResult);
       return;
     }
 
     const querySid = id && SESSION_ID_RE.test(id) ? id : undefined;
     setLoading(true);
-    dashboardApi.getStructuredReport(querySid)
+    dashboardApi.getStructuredReport(querySid, sceneProfile)
       .then((data) => {
         if (data.status === 'success' && data.result) {
           setReport(data.result);
@@ -117,7 +134,22 @@ const ReportPage: React.FC = () => {
         setError('获取报告失败，请确认总控面板服务已运行');
       })
       .finally(() => setLoading(false));
-  }, [id, storeResult]);
+  }, [id, storeResult, sceneProfile]);
+
+  useEffect(() => {
+    const sid = describedSession ?? (id && SESSION_ID_RE.test(id) ? id : null);
+    if (!sid || !SESSION_ID_RE.test(sid)) return;
+    reviewerNotesApi.get(sid)
+      .then((res) => {
+        if (res?.note) {
+          setReviewNote(res.note);
+          setReviewStatusDraft(res.note.verification_status || 'pending_review');
+          setReviewTagsDraft(res.note.focus_tags || []);
+          setReviewTextDraft(res.note.note_text || '');
+        }
+      })
+      .catch(() => {});
+  }, [describedSession, id]);
 
   const coverage = report?.coverage;
   const l1WithInstruments = report?.l1 as unknown as L1WithInstruments | undefined;
@@ -208,6 +240,33 @@ const ReportPage: React.FC = () => {
     }
   };
 
+  const saveReviewNote = async () => {
+    if (!describedId) return;
+    setReviewSaving(true);
+    setReviewError(null);
+    try {
+      const res = await reviewerNotesApi.save(describedId, {
+        verification_status: reviewStatusDraft,
+        focus_tags: reviewTagsDraft,
+        note_text: reviewTextDraft,
+      });
+      setReviewNote(res.note);
+      message.success('人工复核注记已合规存档');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || '保存人工复核注记失败';
+      setReviewError(msg);
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
+  const handleSceneProfileChange = (nextProfile: string) => {
+    setSceneProfile(nextProfile);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('scene_profile', nextProfile);
+    setSearchParams(nextParams, { replace: true });
+  };
+
   if (loading) {
     return <Loading fullScreen tip="正在加载行为证据披露报告..." />;
   }
@@ -257,11 +316,29 @@ const ReportPage: React.FC = () => {
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
         {/* 顶栏操作 */}
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <Button onClick={() => navigate('/reports')}>← 返回报告中心</Button>
-          <h1 style={{ margin: 0, fontSize: 'var(--ax-display-md-size)', fontWeight: 600 }}>
-            行为证据披露报告
-          </h1>
+          <Space wrap align="center" size={14}>
+            <Button onClick={() => navigate('/reports')}>← 返回报告中心</Button>
+            <h1 style={{ margin: 0, fontSize: 'var(--ax-display-md-size)', fontWeight: 600 }}>
+              行为证据披露报告
+            </h1>
+          </Space>
           <Space wrap>
+            <Segmented
+              aria-label="切换报告场景档案"
+              size="small"
+              value={sceneProfile}
+              onChange={(val) => handleSceneProfileChange(String(val))}
+              options={[
+                { label: '科研过程', value: 'research_interview' },
+                { label: 'AI 元能力', value: 'ai_metacognition' },
+                { label: '长周期随访', value: 'longitudinal_followup' },
+              ]}
+            />
+            {describedId && (
+              <Button icon={<EditOutlined />} onClick={() => setReviewOpen(true)}>
+                人工复核注记
+              </Button>
+            )}
             <Button icon={<RobotOutlined />} onClick={openAssistDrawer}>
               本地辅助解读
             </Button>
@@ -346,6 +423,73 @@ const ReportPage: React.FC = () => {
                 {describedSession && <> · 会话 <code style={{ fontSize: 12 }}>{describedSession}</code></>}
               </div>
             )}
+          </Card>
+        )}
+
+        {/* 当前场景档案合规边界、主动封停项与场景扩展观测 */}
+        {report.scene_profile && (
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <Space wrap size={8}>
+                  <Tag style={{ margin: 0, color: 'var(--ax-primary)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)', fontWeight: 600 }}>
+                    当前场景：{report.scene_profile.name}
+                  </Tag>
+                  {report.scene_profile.weight_label && <Tag style={{ margin: 0 }}>{report.scene_profile.weight_label}</Tag>}
+                </Space>
+                {reviewNote && (
+                  <Tag
+                    style={
+                      reviewNote.exists
+                        ? { margin: 0, color: 'var(--ax-success)', background: 'var(--ax-success-soft)', borderColor: 'var(--ax-success-border)' }
+                        : { margin: 0 }
+                    }
+                  >
+                    复核状态：{reviewNote.verification_label}
+                  </Tag>
+                )}
+              </div>
+
+              {report.scene_profile.compliance_banner && (
+                <div style={{ fontSize: 13, color: 'var(--ax-text-secondary)' }}>
+                  {report.scene_profile.compliance_banner}
+                </div>
+              )}
+
+              {Array.isArray(report.scene_profile.explicit_blocked_overrides) && report.scene_profile.explicit_blocked_overrides.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {report.scene_profile.explicit_blocked_overrides.map((ov) => (
+                    <Tag key={ov.key} color="warning" style={{ margin: 0, whiteSpace: 'normal' }}>
+                      主动封停：{ov.label}
+                    </Tag>
+                  ))}
+                </div>
+              )}
+
+              {Array.isArray(report.scene_profile.extensions?.metacognition_text?.indicators) &&
+                report.scene_profile.extensions!.metacognition_text!.indicators!.length > 0 && (
+                  <div style={{ marginTop: 4 }}>
+                    <Text strong style={{ fontSize: 13.5 }}>AI 元能力审辨文本扩展观测量（纯规则结构指标，严禁黑盒给分）</Text>
+                    <Table
+                      size="small"
+                      style={{ marginTop: 8 }}
+                      rowKey="name"
+                      pagination={false}
+                      dataSource={report.scene_profile.extensions!.metacognition_text!.indicators}
+                      columns={[
+                        { title: '扩展观测量', dataIndex: 'label', key: 'label' },
+                        {
+                          title: '实测读数',
+                          key: 'value',
+                          render: (_, r) => (r.value === null ? '缺口暂不可给' : `${r.value} ${r.unit}`.trim()),
+                        },
+                        { title: '置信度', dataIndex: 'confidence', key: 'confidence' },
+                        { title: '说明', dataIndex: 'summary', key: 'summary' },
+                      ]}
+                    />
+                  </div>
+                )}
+            </Space>
           </Card>
         )}
 
@@ -599,6 +743,99 @@ const ReportPage: React.FC = () => {
                 message={assistData.watermark}
               />
             </>
+          )}
+        </Space>
+      </Drawer>
+
+      {/* 导师/管理员非打分人工复核注记抽屉 */}
+      <Drawer
+        title={<Space><EditOutlined />人工复核注记（承接第三层不确定升级 · 严禁打分）</Space>}
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        width={480}
+      >
+        <Space direction="vertical" size={14} style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="仅记录复核一致情况、关注核验点与客观追问备忘；服务端已挂红线拦截任何数值打分或心理定性词汇。"
+          />
+          {reviewError && <Alert type="error" showIcon message={reviewError} />}
+
+          <div>
+            <Text strong style={{ fontSize: 13 }}>复核核验结论（非能力评价）</Text>
+            <Select
+              aria-label="选择复核状态"
+              value={reviewStatusDraft}
+              onChange={setReviewStatusDraft}
+              disabled={!isAdmin}
+              style={{ width: '100%', marginTop: 6 }}
+              options={[
+                { label: '待人工复核', value: 'pending_review' },
+                { label: '复核与证据一致', value: 'verified_consistent' },
+                { label: '建议补充采录', value: 'needs_recollect' },
+                { label: '已注明采样干扰', value: 'signal_artifact_noted' },
+              ]}
+            />
+          </div>
+
+          <div>
+            <Text strong style={{ fontSize: 13 }}>重点关注标记（可选多选）</Text>
+            <Select
+              mode="tags"
+              aria-label="编辑复核关注标签"
+              value={reviewTagsDraft}
+              onChange={setReviewTagsDraft}
+              disabled={!isAdmin}
+              placeholder="例如：核验手势入画率、追问推导前提"
+              style={{ width: '100%', marginTop: 6 }}
+              options={[
+                { label: '核验手势入画率', value: '核验手势入画率' },
+                { label: '追问推导前提', value: '追问推导前提' },
+                { label: '注意收音底噪', value: '注意收音底噪' },
+                { label: '建议补充正面3D视场', value: '建议补充正面3D视场' },
+              ]}
+            />
+          </div>
+
+          <div>
+            <Text strong style={{ fontSize: 13 }}>客观复核备注（限 1000 字）</Text>
+            <Input.TextArea
+              aria-label="输入人工复核备注"
+              rows={5}
+              value={reviewTextDraft}
+              onChange={(e) => setReviewTextDraft(e.target.value)}
+              disabled={!isAdmin}
+              placeholder="记录画面遮挡核实、提问窗口对齐核查或后续面谈建议追问的关键环节…"
+              style={{ marginTop: 6 }}
+            />
+          </div>
+
+          {reviewNote?.updated_at && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              最近存档时间：{reviewNote.updated_at}
+            </Text>
+          )}
+
+          {isAdmin ? (
+            <Button
+              type="primary"
+              loading={reviewSaving}
+              onClick={() => void saveReviewNote()}
+            >
+              保存人工复核注记
+            </Button>
+          ) : (
+            <Alert
+              type="warning"
+              showIcon
+              message="当前为只读演示状态"
+              description={
+                <Button size="small" type="link" style={{ paddingLeft: 0 }} onClick={() => navigate('/recordings')}>
+                  前往「录制素材」或「题库管理」登录管理员后解锁保存 ›
+                </Button>
+              }
+            />
           )}
         </Space>
       </Drawer>

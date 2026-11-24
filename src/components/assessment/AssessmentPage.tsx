@@ -3,10 +3,10 @@ import { Layout, Progress, Alert, Button, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useCamera } from '@/hooks/useCamera';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useAssessment } from '@/hooks/useAssessment';
+import { useAssessment, AssessmentScenarioType } from '@/hooks/useAssessment';
 import { useSessionRecording } from '@/hooks/useSessionRecording';
 import { useAssessmentStore } from '@/store/assessmentStore';
-import { faceApi, gestureApi, voiceApi, getSessionId } from '@/services/api';
+import { faceApi, gestureApi, voiceApi, getSessionId, setPrivacyMode } from '@/services/api';
 import CameraView from '@/components/assessment/CameraView';
 import RealtimeMetrics from '@/components/assessment/RealtimeMetrics';
 import QuestionCard from '@/components/assessment/QuestionCard';
@@ -24,7 +24,8 @@ import { createAnalysisHealth } from '@/utils/analysisHealth';
 const { Content } = Layout;
 
 interface AssessmentConfig {
-  type: 'interview' | 'research';
+  type: AssessmentScenarioType;
+  badge: string;
   title: string;
   subtitle: string;
   inProgressTitle: string;
@@ -33,9 +34,10 @@ interface AssessmentConfig {
   loadingTip: string;
 }
 
-const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
+const CONFIG: Record<AssessmentScenarioType, AssessmentConfig> = {
   interview: {
     type: 'interview',
+    badge: '面试过程观测 · 基地一',
     title: '面试行为采集与观测',
     subtitle: '按题库顺序完成问答，同步记录面部动作、上肢姿态与语音转写，结束后自动生成行为证据报告。',
     inProgressTitle: '面试采集进行中',
@@ -45,6 +47,7 @@ const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
   },
   research: {
     type: 'research',
+    badge: '科研过程观测 · 基地一（60% 主线）',
     title: '科研行为采集与观测',
     subtitle: '记录科研汇报与课题问答过程中的多模态行为数据与语音转写，结束后自动生成行为证据报告。',
     inProgressTitle: '科研采集进行中',
@@ -52,13 +55,49 @@ const CONFIG: Record<'interview' | 'research', AssessmentConfig> = {
     startButtonColor: 'var(--ax-primary)',
     loadingTip: '正在启动科研采集会话...',
   },
+  metacognition: {
+    type: 'metacognition',
+    badge: 'AI 元能力三阶段审辨实训 · 基地二（30% 拓展）',
+    title: 'AI 元能力与求职审辨实训',
+    subtitle: '围绕「阅读 AI 回答 → 审辨找错 → 阐述修正」三阶段结构完成作答，提取连接质疑标记与复核锚点证据。',
+    inProgressTitle: 'AI 元能力审辨实训中',
+    startButtonText: '开始审辨实训',
+    startButtonColor: 'var(--ax-primary)',
+    loadingTip: '正在启动 AI 元能力审辨实训会话...',
+  },
+  followup: {
+    type: 'followup',
+    badge: '非医疗长周期科研随访 · 基地三（10% 前瞻）',
+    title: '匿名无影像行为随访采录',
+    subtitle: '默认仅在内存提取匿名三维姿态与声学标量，零原始图像及原声落盘，仅作个体内首访基线对比。',
+    inProgressTitle: '匿名随访采录进行中',
+    startButtonText: '开始匿名随访采录',
+    startButtonColor: 'var(--ax-primary)',
+    loadingTip: '正在启动匿名随访会话...',
+  },
 };
 
-interface AssessmentPageProps {
-  assessmentType: 'interview' | 'research';
+export interface AssessmentTaskBanner {
+  positionTitle?: string;
+  prompt?: string;
+  stages?: Array<{ label: string; tip: string }>;
 }
 
-const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
+interface AssessmentPageProps {
+  assessmentType: AssessmentScenarioType;
+  defaultPrivacyMode?: ConsentMode;
+  complianceBanner?: string;
+  initialTaskBanner?: AssessmentTaskBanner | null;
+  reportSceneProfile?: string;
+}
+
+const AssessmentPage: React.FC<AssessmentPageProps> = ({
+  assessmentType,
+  defaultPrivacyMode = 'full',
+  complianceBanner,
+  initialTaskBanner,
+  reportSceneProfile,
+}) => {
   const config = CONFIG[assessmentType];
   const navigate = useNavigate();
   const [started, setStarted] = useState(false);
@@ -72,7 +111,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   const [nothingToSave, setNothingToSave] = useState(false);
   // 本场征询结果。**这里是 UI 的依据** —— `audio_only` 时摄像头根本不打开。
   // 真正落盘的依据是服务端 `label.json` 里的那一份(经 `setLabel` 带上送的)。
-  const [consent, setConsent] = useState<ConsentMode | null>(null);
+  const [consent, setConsent] = useState<ConsentMode | null>(defaultPrivacyMode);
   const { selection: devices, update: setDevices } = useDeviceSelection();
   const frameCountRef = useRef(0);
 
@@ -209,13 +248,9 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     // M2.6:整场**原生音视频**录完 → 上传留存(spec §5.3/§5.4)。一场一个 `camera.webm`。
     // 触发点在 `useCamera.stopCapture` 里(走 ref,卸载清理那条路也到得了)——
     // 挂到 `stopCamera` 的 `if (stream)` 里会**静默丢录像**,理由见 useCamera 顶部注释。
-    onVideoReady: (video) => {
-      // ⚠️ **必须 return 这个 promise**。改之前这一页在这里只弹了个 8 秒 toast,
-      //    然后 handleSubmitAnswer 1.5 秒后就把页面**跳走**了 —— 上传还没落定人已经
-      //    在报告页了,存没存下无从得知。现在它交给保存门禁:promise 只在**留存确认**
-      //    (或使用者明确放弃)之后才落定,落定前 `useCamera` 的刷新拦截一直挂着。
-      return recording.submitVideo(video);
-    },
+    onVideoReady: consent === 'anonymous_kinematics_only'
+      ? undefined
+      : (video) => recording.submitVideo(video),
 
     // 降级不是失败,但**必须让面试官当场知道** —— 这一场留下的素材与"正常那一场"
     // 不是一回事(camera.webm 没声音 / 可能不完整),事后只看文件是看不出来的。
@@ -294,6 +329,8 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   const preflightResolveRef = useRef<((ok: boolean) => void) | null>(null);
 
   onBeforeRecordRef.current = async (mode: ConsentMode) => {
+    setConsent(mode);
+    setPrivacyMode(mode);
     if (mode === 'audio_only') return true;      // 只采声音:不开摄像头,没有画面可检
     const ok = await startCamera();
     if (!ok) {
@@ -326,7 +363,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     setConfirmStopOpen(false);
     setEnded(true);
     setNothingToSave(false);
-    stopCapture();
+    if (consent === 'anonymous_kinematics_only') {
+      stopCamera();
+    } else {
+      stopCapture();
+    }
     // 停完就**问留存 / 不留存** —— 不是自动上传,也不是自动丢。
     // (`beginChoice` 会等在 `idle` 上,所以没有原生录像时也照常问:盘上还有帧和日志。)
     setTimeout(() => recording.beginChoice(), 300);
@@ -373,6 +414,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     recording.reset();
     resetAssessment();
     stopCamera();
+    setConsent(defaultPrivacyMode);
     frameCountRef.current = 0;
     setNothingToSave(false);
     setSid(null);
@@ -410,6 +452,17 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
     }
   };
 
+  const reportRouteOf = (targetSid: string | null) => {
+    const base = targetSid ? `/report/${targetSid}` : '/reports';
+    const sp = reportSceneProfile
+      ?? (assessmentType === 'metacognition'
+        ? 'ai_metacognition'
+        : assessmentType === 'followup'
+          ? 'longitudinal_followup'
+          : undefined);
+    return targetSid && sp ? `${base}?scene_profile=${encodeURIComponent(sp)}` : base;
+  };
+
   if (loading) {
     return <Loading fullScreen tip={config.loadingTip} />;
   }
@@ -439,7 +492,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
               marginBottom: 16,
             }}
           >
-            {config.type === 'interview' ? '面试场景观测' : '科研场景观测'}
+            {config.badge}
           </div>
 
           <h1
@@ -464,6 +517,40 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
           >
             {config.subtitle}
           </p>
+
+          {complianceBanner && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginTop: 18, textAlign: 'left' }}
+              message={complianceBanner}
+            />
+          )}
+
+          {initialTaskBanner?.prompt && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginTop: 16, textAlign: 'left' }}
+              message={
+                initialTaskBanner.positionTitle
+                  ? `联动自岗位 MCP：${initialTaskBanner.positionTitle}`
+                  : '三阶段 AI 审辨实训指引'
+              }
+              description={
+                <div>
+                  <div style={{ marginBottom: 6 }}>{initialTaskBanner.prompt}</div>
+                  {initialTaskBanner.stages && initialTaskBanner.stages.length > 0 && (
+                    <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5 }}>
+                      {initialTaskBanner.stages.map((st) => (
+                        <li key={st.label}><strong>{st.label}：</strong>{st.tip}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              }
+            />
+          )}
 
           <div
             style={{
@@ -564,6 +651,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
           onDecline={recording.declineConsent}
           label={recording.savedLabel}
           saving={recording.savingLabel}
+          defaultMode={defaultPrivacyMode}
           devicePicker={
             <DevicePicker value={devices} onChange={setDevices} />
           }
@@ -577,12 +665,36 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        {complianceBanner && (
+          <Alert
+            type="info" showIcon style={{ marginBottom: 12 }}
+            message={complianceBanner}
+          />
+        )}
         {consent === 'audio_only' && (
           <Alert
             type="info" showIcon style={{ marginBottom: 16 }}
             message="本场只采声音 —— 摄像头没有被打开"
             description="这是征询时选定的范围,不是故障。面部与手势两个维度本场没有数据,
               报告里会如实标注「未采集」。"
+          />
+        )}
+        {consent === 'anonymous_kinematics_only' && (
+          <Alert
+            type="success" showIcon style={{ marginBottom: 16 }}
+            message="匿名无影像隐私模式运行中 —— 原始图像、原声与原生录像均零落盘"
+            description="系统仅在内存提取三维面部姿态矩阵、上肢运动轨迹与声学特征标量日志，不写回任何可识别影像原件。"
+          />
+        )}
+        {initialTaskBanner?.prompt && (
+          <Alert
+            type="info" showIcon style={{ marginBottom: 16 }}
+            message={
+              initialTaskBanner.positionTitle
+                ? `当前实训关联岗位：${initialTaskBanner.positionTitle}（阅读 AI 回答 → 指出漏洞 → 口头修正）`
+                : '三阶段 AI 审辨实训提示（阅读 AI 回答 → 指出漏洞 → 口头修正）'
+            }
+            description={initialTaskBanner.prompt}
           />
         )}
         <DegradedBanner reasons={recording.degraded} />
@@ -650,7 +762,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
                   摄像头可能未启动，或音视频流在中途中断。原因见页面顶部的降级告警。
                 </p>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={() => navigate(sid ? `/report/${sid}` : '/reports')}
+                  <button onClick={() => navigate(reportRouteOf(sid))}
                     style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
                     去看本场报告
                   </button>
@@ -711,10 +823,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({ assessmentType }) => {
         onRetry={recording.retryLast}
         onAbandon={() => recording.setConfirmAbandonOpen(true)}
         onClose={() => recording.reset()}
+        consentMode={consent}
         hideDefaultOk
         extraActions={
           <>
-            <button onClick={() => navigate(sid ? `/report/${sid}` : '/reports')}
+            <button onClick={() => navigate(reportRouteOf(sid))}
               style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
               去看本场报告
             </button>

@@ -60,6 +60,43 @@ export interface EvaluationResult {
     version: string;
     timestamp: string;
   };
+  scene_profile?: SceneProfilePayload;
+}
+
+export interface SceneProfileBlockedOverride {
+  key: string;
+  label: string;
+  reason: string;
+}
+
+export interface MetacognitionTextExtensionIndicator {
+  name: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  confidence: string;
+  gap?: string | null;
+  summary?: string;
+}
+
+export interface SceneProfilePayload {
+  id: 'research_interview' | 'ai_metacognition' | 'longitudinal_followup' | string;
+  name: string;
+  short_label?: string;
+  weight_label?: string;
+  route_base?: string;
+  baseline_mode?: string;
+  compliance_banner?: string;
+  description?: string;
+  explicit_blocked_overrides?: SceneProfileBlockedOverride[];
+  extensions?: {
+    metacognition_text?: {
+      available?: boolean;
+      indicators?: MetacognitionTextExtensionIndicator[];
+      summary_plain?: string;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export type DimensionKey =
