@@ -1,7 +1,8 @@
 @import './tokens.css';
+@import './themes.css';
 
 /* ════════════════════════════════════════════════════════════
-   衡才智析 全局基线 —— 严格按 DESIGN.md 实现
+   衡才智析 全局基线 —— 四套大厂视觉体系共享布局底座
    ════════════════════════════════════════════════════════════ */
 
 * {
@@ -145,19 +146,20 @@ h6 {
 }
 
 .ax-btn--pill.ant-btn {
-  border-radius: var(--ax-rounded-pill);
-  padding: 11px 22px;
+  border-radius: var(--ax-radius-btn);
+  padding: 9px 18px;
   height: auto;
   font-family: var(--ax-font-text);
-  font-weight: 400;
-  letter-spacing: var(--ax-body-ls);
+  font-weight: 500;
+  letter-spacing: 0;
   box-shadow: none;
   transition:
     transform 0.1s ease,
-    background-color 0.15s ease;
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 .ax-btn--pill.ant-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.97);
 }
 
 .ax-btn--ghost.ant-btn {
@@ -198,9 +200,9 @@ h6 {
 
 .ax-card,
 .ax-card.ant-card {
-  background: var(--ax-canvas);
+  background: var(--ax-surface);
   border: 1px solid var(--ax-hairline);
-  border-radius: var(--ax-rounded-lg);
+  border-radius: var(--ax-radius-card);
   box-shadow: none;
   transition:
     border-color 0.18s ease,
@@ -286,25 +288,26 @@ h6 {
 }
 
 .ax-narrative-paper {
-  background: var(--ax-canvas);
+  background: var(--ax-surface);
   border: 1px solid var(--ax-hairline);
-  border-top: 3px solid var(--ax-primary);
-  border-radius: var(--ax-rounded-lg);
-  padding: 32px 36px;
-  margin-bottom: 20px;
+  border-left: 3px solid var(--ax-primary);
+  border-radius: var(--ax-radius-card);
+  padding: 36px 40px;
+  margin-bottom: 24px;
 }
 
 .ax-narrative-paper__section + .ax-narrative-paper__section {
-  margin-top: 22px;
-  padding-top: 20px;
+  margin-top: 24px;
+  padding-top: 22px;
   border-top: 1px solid var(--ax-divider-soft);
 }
 
 .ax-narrative-paper__section h3 {
-  margin: 0 0 10px;
-  font-size: 18px;
+  margin: 0 0 12px;
+  font-family: var(--ax-font-serif, var(--ax-font-display));
+  font-size: 19px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--ax-ink);
 }
 
@@ -312,10 +315,11 @@ h6 {
   margin: 0;
   font-size: 16px;
   font-weight: 400;
-  line-height: 1.85;
-  letter-spacing: -0.12px;
+  line-height: 1.88;
+  letter-spacing: 0;
   color: var(--ax-ink-muted-80);
   white-space: pre-wrap;
+  max-width: 78ch;
 }
 
 .ax-tile--dark .ax-card.ant-card,

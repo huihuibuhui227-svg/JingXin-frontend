@@ -4,6 +4,7 @@ import {
 } from 'antd';
 import { PlusOutlined, SafetyCertificateOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import ModuleSubnav from '@/components/common/ModuleSubnav';
 import {
   dashboardApi,
   longitudinalApi,
@@ -14,7 +15,7 @@ import {
 import LongitudinalTrajectorySvg from '@/components/report/LongitudinalTrajectorySvg';
 
 const { Content } = Layout;
-const { Title, Paragraph, Text } = Typography;
+const { Paragraph, Text } = Typography;
 
 const extractSidFromReportItem = (item: any): string | null => {
   if (item?.session_id && /^\d{8}_\d{6}_[0-9a-f]{4}$/i.test(String(item.session_id))) {
@@ -148,40 +149,100 @@ const FollowupPage: React.FC = () => {
   };
 
   return (
-    <Content className="ax-workbench" style={{ padding: '24px' }}>
-      <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
-          <div>
-            <Tag style={{ marginBottom: 8, color: 'var(--ax-b3)', background: 'var(--ax-b3-soft)', borderColor: 'var(--ax-b3-border)', fontWeight: 600 }}>
-              时序观微 · 匿名个体纵向随访（非医疗）
-            </Tag>
-            <Title level={1} style={{ margin: 0, fontSize: 28 }}>
-              时序观微 · 匿名受试编号个体内纵向跟踪
-            </Title>
-            <Paragraph type="secondary" style={{ margin: '6px 0 0', maxWidth: 820 }}>
-              默认采用最高隐私保护模式（仅保存匿名三维姿态与声学标量，不保存原始画面与录音），以个人首访作为自我参照基线观测时间变化。
-            </Paragraph>
-          </div>
-          <Button
-            type="primary"
-            className="ax-btn--pill"
-            icon={<VideoCameraOutlined />}
-            onClick={() =>
-              navigate(selectedCode ? `/followup/capture?subject=${encodeURIComponent(selectedCode)}` : '/followup/capture')
-            }
+    <div style={{ background: 'var(--ax-canvas)', minHeight: '100%' }}>
+      <ModuleSubnav
+        world="oura"
+        moduleTitle="03 / 时序观微"
+        items={[
+          { to: '/hub/followup', label: '场景概览' },
+          { to: '/followup', label: '匿名随访档案' },
+          { to: '/followup/capture', label: '无影像匿名采录' },
+        ]}
+      />
+      <Content style={{ background: 'var(--ax-canvas)', padding: '32px 24px 56px' }}>
+        <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              flexWrap: 'wrap',
+              gap: 18,
+              paddingBottom: 22,
+              marginBottom: 22,
+              borderBottom: '1px solid var(--ax-hairline)',
+            }}
           >
-            发起本次匿名无影像采录
-          </Button>
-        </div>
+            <div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 12px',
+                  borderRadius: 9999,
+                  background: '#ecf2ec',
+                  border: '1px solid #bfd1c1',
+                  color: '#224228',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  marginBottom: 10,
+                }}
+              >
+                时序观微 · 匿名个体纵向随访（非医疗）
+              </span>
+              <h1
+                style={{
+                  margin: 0,
+                  fontFamily: 'var(--ax-font-display)',
+                  fontWeight: 300,
+                  fontSize: 'clamp(28px, 3vw, 34px)',
+                  lineHeight: 1.18,
+                  letterSpacing: '-0.01em',
+                  color: '#1c1b1a',
+                }}
+              >
+                匿名受试编号个体内纵向跟踪
+              </h1>
+              <Paragraph
+                style={{
+                  margin: '10px 0 0',
+                  maxWidth: 780,
+                  fontSize: 15.5,
+                  lineHeight: 1.7,
+                  color: '#4a4741',
+                }}
+              >
+                默认采用最高隐私保护模式（仅保存匿名三维姿态与声学标量，不保存原始画面与录音），以个人首访作为自我参照基线观测时间变化。
+              </Paragraph>
+            </div>
+            <Button
+              type="primary"
+              icon={<VideoCameraOutlined />}
+              style={{
+                background: '#2264ca',
+                borderColor: '#2264ca',
+                color: '#ffffff',
+                borderRadius: 9999,
+                height: 44,
+                paddingInline: 22,
+                fontWeight: 600,
+              }}
+              onClick={() =>
+                navigate(selectedCode ? `/followup/capture?subject=${encodeURIComponent(selectedCode)}` : '/followup/capture')
+              }
+            >
+              发起本次匿名无影像采录
+            </Button>
+          </div>
 
-        <Alert
-          type="warning"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          style={{ marginBottom: 20 }}
-          message="非医疗器械合规声明"
-          description={complianceNote}
-        />
+          <Alert
+            type="warning"
+            showIcon
+            icon={<SafetyCertificateOutlined />}
+            style={{ marginBottom: 22, borderRadius: 12 }}
+            message="非医疗器械合规声明"
+            description={complianceNote}
+          />
 
         <Row gutter={[20, 20]}>
           <Col xs={24} lg={8}>
@@ -204,6 +265,13 @@ const FollowupPage: React.FC = () => {
                     type="primary"
                     icon={<PlusOutlined />}
                     loading={creating}
+                    style={{
+                      background: '#224228',
+                      borderColor: '#224228',
+                      color: '#ffffff',
+                      borderRadius: 9999,
+                      fontWeight: 500,
+                    }}
                     onClick={() => void handleCreateSubject()}
                   >
                     创建匿名随访编号
@@ -228,10 +296,10 @@ const FollowupPage: React.FC = () => {
                           }}
                           style={{
                             textAlign: 'left',
-                            padding: '10px 12px',
-                            borderRadius: 'var(--ax-rounded-md)',
-                            background: active ? 'var(--ax-info-soft)' : 'var(--ax-parchment)',
-                            border: active ? '1px solid var(--ax-info-border)' : '1px solid var(--ax-hairline)',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            background: active ? '#ecf2ec' : '#faf7f2',
+                            border: active ? '1px solid #224228' : '1px solid var(--ax-hairline)',
                             cursor: 'pointer',
                             fontFamily: 'var(--ax-font-text)',
                           }}
@@ -268,6 +336,13 @@ const FollowupPage: React.FC = () => {
                     <Button
                       size="small"
                       type="primary"
+                      style={{
+                        background: '#224228',
+                        borderColor: '#224228',
+                        color: '#ffffff',
+                        borderRadius: 9999,
+                        paddingInline: 14,
+                      }}
                       onClick={() => navigate(`/followup/capture?subject=${encodeURIComponent(selectedCode)}`)}
                     >
                       为此编号新增采录 ›
@@ -310,7 +385,18 @@ const FollowupPage: React.FC = () => {
                         { label: '保留完整音视频', value: 'full' },
                       ]}
                     />
-                    <Button type="primary" loading={attaching} onClick={() => void handleAttachVisit()}>
+                    <Button
+                      type="primary"
+                      loading={attaching}
+                      style={{
+                        background: '#224228',
+                        borderColor: '#224228',
+                        color: '#ffffff',
+                        borderRadius: 9999,
+                        paddingInline: 20,
+                      }}
+                      onClick={() => void handleAttachVisit()}
+                    >
                       挂入序列
                     </Button>
                   </div>
@@ -344,8 +430,9 @@ const FollowupPage: React.FC = () => {
             )}
           </Col>
         </Row>
-      </div>
-    </Content>
+        </div>
+      </Content>
+    </div>
   );
 };
 

@@ -12,11 +12,11 @@ import type {
 const { Text } = Typography;
 
 const TIER_TONE: Record<string, React.CSSProperties> = {
-  T1: { color: '#0b5d2e', background: '#edf7f0', borderColor: '#bfe3cb' },
-  T2a: { color: '#0a4a8f', background: '#eef5fc', borderColor: '#c2dcf5' },
-  T2b: { color: '#0a4a8f', background: '#eef5fc', borderColor: '#c2dcf5' },
-  T3a: { color: '#7a4a05', background: '#fdf6e9', borderColor: '#eed39e' },
-  T3b: { color: '#5c5c61', background: '#f5f5f7', borderColor: '#e0e0e0' },
+  T1: { color: 'var(--ax-success)', background: 'var(--ax-success-soft)', borderColor: 'var(--ax-success-border)' },
+  T2a: { color: 'var(--ax-info)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)' },
+  T2b: { color: 'var(--ax-info)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)' },
+  T3a: { color: 'var(--ax-warning)', background: 'var(--ax-warning-soft)', borderColor: 'var(--ax-warning-border)' },
+  T3b: { color: 'var(--ax-text-secondary)', background: 'var(--ax-parchment)', borderColor: 'var(--ax-hairline)' },
 };
 
 const AGREEMENT_TONE: Record<string, React.CSSProperties> = {

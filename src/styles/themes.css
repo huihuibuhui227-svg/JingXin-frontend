@@ -1,0 +1,409 @@
+/* ════════════════════════════════════════════════════════════════════════
+   衡才智析 四大厂设计体系（源自 docs/design-systems/*.DESIGN.md）
+     1. Vercel : 主门户 & 公共工具页 (极简黑白架构线网 · 6px 锐利圆角)
+     2. Linear : 研思循证 · 科研过程 (曜石暗底精密仪器 · #5e6ad2 克制点缀)
+     3. Claude : 元智审辨 · 职业实训 (象牙暖纸 · 常规字重衬线标题 · 暗炭对比块)
+     4. Oura   : 时序观微 · 匿名随访 (深森绿顶带 · 极轻字重衬线 · 亚麻柔和表面)
+   所有辅助文字与按钮主色均经 WCAG AA (>= 4.5:1) 实测校准。
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. VERCEL (默认总门户 & 工具工作台) ─────────────────────────────── */
+html[data-design-theme='vercel'] {
+  --ax-canvas: #ffffff;
+  --ax-parchment: #fafafa;
+  --ax-surface: #ffffff;
+  --ax-surface-alt: #f5f5f5;
+  --ax-pearl: #fafafa;
+  --ax-black: #0a0a0a;
+
+  --ax-primary: #171717;
+  --ax-primary-hover: #333333;
+  --ax-primary-focus: #0068d6;
+  --ax-primary-on-dark: #60a5fa;
+  --ax-on-primary: #ffffff;
+  --ax-accent: #0068d6;
+
+  --ax-ink: #171717;
+  --ax-on-dark: #ffffff;
+  --ax-ink-muted-80: #4d4d4d;
+  --ax-text-secondary: #5c5c5c; /* 白底对比 6.7:1, 替代过浅的 #888888 */
+  --ax-ink-muted-48: #666666;
+  --ax-body-muted: #d4d4d4;
+
+  --ax-hairline: #ebebeb;
+  --ax-divider-soft: #f0f0f0;
+  --ax-border-strong: #c7c7c7;
+
+  --ax-info: #0759b5;
+  --ax-info-soft: #eef5ff;
+  --ax-info-border: #bfd9ff;
+  --ax-success: #0b5d2e;
+  --ax-success-soft: #ecfdf3;
+  --ax-success-border: #b7ebce;
+  --ax-warning: #7a4a05;
+  --ax-warning-soft: #fff9eb;
+  --ax-warning-border: #f3d79e;
+  --ax-error: #9e1f1f;
+  --ax-error-soft: #fff1f1;
+  --ax-error-border: #f5c2c2;
+
+  --ax-b1: #434ec0;
+  --ax-b1-soft: #f2f3fd;
+  --ax-b1-border: #d0d4f7;
+  --ax-b2: #a34f33;
+  --ax-b2-soft: #faf3ef;
+  --ax-b2-border: #ebd1c6;
+  --ax-b3: #224228;
+  --ax-b3-soft: #f1f6f1;
+  --ax-b3-border: #c5d9c6;
+
+  --ax-header-bg: rgba(255, 255, 255, 0.92);
+  --ax-header-border: #ebebeb;
+  --ax-header-ink: #171717;
+  --ax-header-muted: #525252;
+  --ax-footer-bg: #ffffff;
+  --ax-footer-ink: #4d4d4d;
+  --ax-footer-link: #171717;
+
+  --ax-font-display: 'Geist', 'Inter', system-ui, -apple-system, 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --ax-font-text: 'Geist', 'Inter', system-ui, -apple-system, 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --ax-font-serif: 'Copernicus', 'Tiempos Headline', 'Noto Serif CJK SC', 'Source Han Serif SC', Georgia, serif;
+  --ax-font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ax-rounded-xs: 4px;
+  --ax-rounded-sm: 6px;
+  --ax-rounded-md: 6px;
+  --ax-rounded-lg: 8px;
+  --ax-rounded-pill: 6px;
+  --ax-radius-btn: 6px;
+  --ax-radius-card: 8px;
+
+  --ax-svg-bg: #ffffff;
+  --ax-svg-grid: #ebebeb;
+  --ax-svg-ink: #171717;
+  --ax-svg-muted: #5c5c5c;
+  --ax-svg-band: rgba(0, 104, 214, 0.09);
+  --ax-svg-line: #0068d6;
+  --ax-svg-median: #0b5d2e;
+  --ax-svg-ewma: #92400e;
+  --ax-svg-gap: #9e1f1f;
+  --ax-svg-dot-ring: #ffffff;
+}
+
+/* ── 2. LINEAR (研思循证 · 曜石暗底精密仪器) ──────────────────────────── */
+html[data-design-theme='linear'] {
+  --ax-canvas: #08090a;
+  --ax-parchment: #08090a;
+  --ax-surface: #0f1011;
+  --ax-surface-alt: #141516;
+  --ax-pearl: #18191a;
+  --ax-black: #010102;
+
+  --ax-primary: #5e6ad2;
+  --ax-primary-hover: #7480e8;
+  --ax-primary-focus: #828fff;
+  --ax-primary-on-dark: #9da7ff;
+  --ax-on-primary: #ffffff;
+  --ax-accent: #5e6ad2;
+
+  --ax-ink: #f7f8f8;
+  --ax-on-dark: #f7f8f8;
+  --ax-ink-muted-80: #d0d6e0;
+  --ax-text-secondary: #9ba1ae; /* #0f1011 上对比度 > 6.8:1 */
+  --ax-ink-muted-48: #8a8f98;
+  --ax-body-muted: #9ba1ae;
+
+  --ax-hairline: #23252a;
+  --ax-divider-soft: #1c1e23;
+  --ax-border-strong: #34363d;
+
+  --ax-info: #93c5fd;
+  --ax-info-soft: #111b2e;
+  --ax-info-border: #243b61;
+  --ax-success: #4ade80;
+  --ax-success-soft: #0d2316;
+  --ax-success-border: #1d4a2d;
+  --ax-warning: #fbbf24;
+  --ax-warning-soft: #261c0b;
+  --ax-warning-border: #523b12;
+  --ax-error: #fca5a5;
+  --ax-error-soft: #291214;
+  --ax-error-border: #592226;
+
+  --ax-b1: #9da7ff;
+  --ax-b1-soft: #15182b;
+  --ax-b1-border: #2c3158;
+  --ax-b2: #5db8a6;
+  --ax-b2-soft: #102420;
+  --ax-b2-border: #224a42;
+  --ax-b3: #e0b467;
+  --ax-b3-soft: #241c10;
+  --ax-b3-border: #4a3a1e;
+
+  --ax-header-bg: rgba(8, 9, 10, 0.9);
+  --ax-header-border: #23252a;
+  --ax-header-ink: #f7f8f8;
+  --ax-header-muted: #9ba1ae;
+  --ax-footer-bg: #08090a;
+  --ax-footer-ink: #9ba1ae;
+  --ax-footer-link: #d0d6e0;
+
+  --ax-font-display: 'Linear Display', 'Inter', system-ui, -apple-system, 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --ax-font-text: 'Linear Text', 'Inter', system-ui, -apple-system, 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --ax-font-serif: 'Copernicus', 'Noto Serif CJK SC', Georgia, serif;
+  --ax-font-mono: 'Linear Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ax-rounded-xs: 4px;
+  --ax-rounded-sm: 6px;
+  --ax-rounded-md: 6px;
+  --ax-rounded-lg: 8px;
+  --ax-rounded-pill: 6px;
+  --ax-radius-btn: 6px;
+  --ax-radius-card: 8px;
+
+  --ax-svg-bg: #0f1011;
+  --ax-svg-grid: #23252a;
+  --ax-svg-ink: #f7f8f8;
+  --ax-svg-muted: #9ba1ae;
+  --ax-svg-band: rgba(94, 106, 210, 0.18);
+  --ax-svg-line: #828fff;
+  --ax-svg-median: #4ade80;
+  --ax-svg-ewma: #fbbf24;
+  --ax-svg-gap: #fca5a5;
+  --ax-svg-dot-ring: #0f1011;
+}
+
+/* ── 3. CLAUDE (元智审辨 · 象牙暖纸衬线编校) ──────────────────────────── */
+html[data-design-theme='claude'] {
+  --ax-canvas: #faf9f5;
+  --ax-parchment: #f5f0e8;
+  --ax-surface: #ffffff;
+  --ax-surface-alt: #efe9de;
+  --ax-pearl: #faf9f5;
+  --ax-black: #181715;
+
+  --ax-primary: #a34f33; /* 白字对比度 5.6:1 (AA+), 保留克制焦糖陶土调 */
+  --ax-primary-hover: #8d4026;
+  --ax-primary-focus: #a34f33;
+  --ax-primary-on-dark: #e69d83;
+  --ax-on-primary: #ffffff;
+  --ax-accent: #cc785c; /* 装饰线条与大尺寸徽记专用 */
+
+  --ax-ink: #141413;
+  --ax-on-dark: #faf9f5;
+  --ax-ink-muted-80: #3d3d3a;
+  --ax-text-secondary: #5e5c57; /* 暖象牙底对比 > 5.9:1 */
+  --ax-ink-muted-48: #6c6a64;
+  --ax-body-muted: #d2cbc0;
+
+  --ax-hairline: #e6dfd8;
+  --ax-divider-soft: #ebe6df;
+  --ax-border-strong: #cfc5b8;
+
+  --ax-info: #225c54;
+  --ax-info-soft: #ebf5f3;
+  --ax-info-border: #bddbd5;
+  --ax-success: #1f6440;
+  --ax-success-soft: #edf6f0;
+  --ax-success-border: #c1dec9;
+  --ax-warning: #7d4d08;
+  --ax-warning-soft: #fcf4e6;
+  --ax-warning-border: #e8cf9d;
+  --ax-error: #9c2424;
+  --ax-error-soft: #fcedec;
+  --ax-error-border: #edc0be;
+
+  --ax-b1: #434ec0;
+  --ax-b1-soft: #f2f3fd;
+  --ax-b1-border: #d0d4f7;
+  --ax-b2: #a34f33;
+  --ax-b2-soft: #faf1ec;
+  --ax-b2-border: #e8cbc0;
+  --ax-b3: #224228;
+  --ax-b3-soft: #eff5ef;
+  --ax-b3-border: #c5d9c6;
+
+  --ax-header-bg: rgba(250, 249, 245, 0.94);
+  --ax-header-border: #e6dfd8;
+  --ax-header-ink: #141413;
+  --ax-header-muted: #5e5c57;
+  --ax-footer-bg: #f5f0e8;
+  --ax-footer-ink: #3d3d3a;
+  --ax-footer-link: #8d4026;
+
+  --ax-font-display: 'Copernicus', 'Tiempos Headline', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  --ax-font-text: 'StyreneB', 'Inter', system-ui, -apple-system, 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --ax-font-serif: 'Copernicus', 'Tiempos Headline', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  --ax-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ax-rounded-xs: 4px;
+  --ax-rounded-sm: 8px;
+  --ax-rounded-md: 8px;
+  --ax-rounded-lg: 12px;
+  --ax-rounded-pill: 8px;
+  --ax-radius-btn: 8px;
+  --ax-radius-card: 12px;
+
+  --ax-svg-bg: #faf9f5;
+  --ax-svg-grid: #e6dfd8;
+  --ax-svg-ink: #141413;
+  --ax-svg-muted: #5e5c57;
+  --ax-svg-band: rgba(163, 79, 51, 0.11);
+  --ax-svg-line: #a34f33;
+  --ax-svg-median: #225c54;
+  --ax-svg-ewma: #8a5300;
+  --ax-svg-gap: #9c2424;
+  --ax-svg-dot-ring: #ffffff;
+}
+
+/* ── 4. OURA (时序观微 · 森绿亚麻个人静谧时序) ──────────────────────── */
+html[data-design-theme='oura'] {
+  --ax-canvas: #f7f1e8;
+  --ax-parchment: #f0e9dd;
+  --ax-surface: #ffffff;
+  --ax-surface-alt: #f7f1e8;
+  --ax-pearl: #fbf8f3;
+  --ax-black: #19191c;
+
+  --ax-primary: #2264ca; /* Oura 克制单一行动蓝 (AA 5.7:1) */
+  --ax-primary-hover: #1b52a8;
+  --ax-primary-focus: #2264ca;
+  --ax-primary-on-dark: #93c5fd;
+  --ax-on-primary: #ffffff;
+  --ax-accent: #224228;
+
+  --ax-ink: #1c1b1a;
+  --ax-on-dark: #f7f1e8;
+  --ax-ink-muted-80: #4a4741;
+  --ax-text-secondary: #5b5851; /* 亚麻底对比 > 6.1:1 */
+  --ax-ink-muted-48: #6b6860;
+  --ax-body-muted: #d6cfc3;
+
+  --ax-hairline: #e1dcd3;
+  --ax-divider-soft: #ece6dc;
+  --ax-border-strong: #c8c1b5;
+
+  --ax-info: #224228;
+  --ax-info-soft: #ecf2ec;
+  --ax-info-border: #bfd1c1;
+  --ax-success: #224228;
+  --ax-success-soft: #ebf3eb;
+  --ax-success-border: #b8cfb9;
+  --ax-warning: #7d4e07;
+  --ax-warning-soft: #fdf5e7;
+  --ax-warning-border: #e9d19e;
+  --ax-error: #a32617;
+  --ax-error-soft: #fdf0ee;
+  --ax-error-border: #efc1bb;
+
+  --ax-b1: #434ec0;
+  --ax-b1-soft: #f2f3fd;
+  --ax-b1-border: #d0d4f7;
+  --ax-b2: #a34f33;
+  --ax-b2-soft: #faf1ec;
+  --ax-b2-border: #e8cbc0;
+  --ax-b3: #224228;
+  --ax-b3-soft: #ecf2ec;
+  --ax-b3-border: #bfd1c1;
+
+  --ax-oura-forest: #224228;
+  --ax-oura-olive: #4a5e4b;
+  --ax-oura-sage: #738762;
+  --ax-oura-sage-pale: #ced4b8;
+  --ax-oura-stone: #4a4741;
+  --ax-oura-gold: #8f5c0f;
+  --ax-oura-clay: #6b443d;
+
+  --ax-header-bg: rgba(247, 241, 232, 0.94);
+  --ax-header-border: #e1dcd3;
+  --ax-header-ink: #1c1b1a;
+  --ax-header-muted: #4a4741;
+  --ax-footer-bg: #19191c;
+  --ax-footer-ink: #d6cfc3;
+  --ax-footer-link: #ced4b8;
+
+  --ax-font-display: 'Editorial New', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  --ax-font-text: 'AkkuratLL', 'Inter', system-ui, -apple-system, 'Noto Sans CJK SC', 'PingFang SC', sans-serif;
+  --ax-font-serif: 'Editorial New', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  --ax-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --ax-rounded-xs: 4px;
+  --ax-rounded-sm: 10px;
+  --ax-rounded-md: 12px;
+  --ax-rounded-lg: 16px;
+  --ax-rounded-pill: 9999px;
+  --ax-radius-btn: 9999px;
+  --ax-radius-card: 16px;
+
+  --ax-svg-bg: #faf7f2;
+  --ax-svg-grid: #e1dcd3;
+  --ax-svg-ink: #1c1b1a;
+  --ax-svg-muted: #5b5851;
+  --ax-svg-band: rgba(115, 135, 98, 0.16);
+  --ax-svg-line: #224228;
+  --ax-svg-median: #4a5e4b;
+  --ax-svg-ewma: #8f5c0f;
+  --ax-svg-gap: #a32617;
+  --ax-svg-dot-ring: #ffffff;
+}
+
+/* ── 切换过渡动效（尊重 prefers-reduced-motion） ───────────────────── */
+html[data-design-theme],
+html[data-design-theme] body {
+  transition:
+    background-color 240ms ease,
+    color 200ms ease,
+    border-color 220ms ease;
+}
+
+/* ── Linear 暗色模式 AntD 细节补齐（绝不泄白） ──────────────────────── */
+html[data-design-theme='linear'] .ant-table-wrapper .ant-table {
+  background: var(--ax-surface);
+  color: var(--ax-ink);
+}
+html[data-design-theme='linear'] .ant-table-wrapper .ant-table-tbody > tr > td {
+  border-color: var(--ax-hairline);
+}
+html[data-design-theme='linear'] .ant-card {
+  background: var(--ax-surface);
+  border-color: var(--ax-hairline);
+  color: var(--ax-ink);
+}
+html[data-design-theme='linear'] .ant-card-head {
+  border-bottom-color: var(--ax-hairline);
+  color: var(--ax-ink);
+}
+html[data-design-theme='linear'] .ant-collapse.ax-audit-collapse {
+  background: var(--ax-surface);
+  border-color: var(--ax-hairline);
+}
+html[data-design-theme='linear'] .ant-collapse.ax-audit-collapse .ant-collapse-header {
+  background: var(--ax-surface);
+  color: var(--ax-ink) !important;
+}
+html[data-design-theme='linear'] .ant-collapse.ax-audit-collapse .ant-collapse-content {
+  background: var(--ax-surface);
+  color: var(--ax-ink);
+  border-top-color: var(--ax-hairline);
+}
+html[data-design-theme='linear'] .ant-tag:not([class*='ant-tag-']) {
+  background: var(--ax-surface-alt);
+  border-color: var(--ax-hairline);
+  color: var(--ax-ink-muted-80);
+}
+html[data-design-theme='linear'] .ant-empty-img-simple ellipse {
+  fill: #141516;
+}
+html[data-design-theme='linear'] .ant-empty-img-simple g,
+html[data-design-theme='linear'] .ant-empty-img-simple path {
+  stroke: #383c46;
+}
+html[data-design-theme='linear'] .ant-empty-img-simple g path {
+  fill: #181a20;
+}
+html[data-design-theme='linear'] ::-webkit-scrollbar-thumb {
+  background: #2e323b;
+}
+html[data-design-theme='linear'] ::-webkit-scrollbar-thumb:hover {
+  background: #424754;
+}

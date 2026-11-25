@@ -5,6 +5,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { ApiOutlined, ArrowRightOutlined, SearchOutlined, ToolOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import ModuleSubnav from '@/components/common/ModuleSubnav';
 import {
   careerMcpApi,
   CareerPosition,
@@ -15,7 +16,7 @@ import {
 } from '@/services/api';
 
 const { Content } = Layout;
-const { Title, Paragraph, Text } = Typography;
+const { Paragraph, Text } = Typography;
 
 const INDICATOR_LABELS: Record<string, string> = {
   discourse_marker_rate: '连接词逻辑密度',
@@ -269,48 +270,110 @@ const CareerMcpPage: React.FC = () => {
   ];
 
   return (
-    <Content className="ax-workbench" style={{ padding: '24px' }}>
-      <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
-          <div>
-            <Tag style={{ marginBottom: 8, color: 'var(--ax-b2)', background: 'var(--ax-b2-soft)', borderColor: 'var(--ax-b2-border)', fontWeight: 600 }}>
-              元智审辨 · AI 元能力与职业实训
-            </Tag>
-            <Title level={1} style={{ margin: 0, fontSize: 28 }}>
-              元智审辨 · 岗位能力画像与行为证据对照
-            </Title>
-            <Paragraph type="secondary" style={{ margin: '6px 0 0', maxWidth: 800 }}>
-              连接校招或科研助理岗位画像与多模态实测证据，将岗位需求拆解为「可观测行为线索」与「主动封停硬技能缺口」，联动三阶段 AI 审辨实训。
-            </Paragraph>
+    <div style={{ background: 'var(--ax-canvas)', minHeight: '100%' }}>
+      <ModuleSubnav
+        world="claude"
+        moduleTitle="02 / 元智审辨"
+        items={[
+          { to: '/hub/metacognition', label: '场景概览' },
+          { to: '/career-mcp', label: '岗位对照' },
+          { to: '/metacognition', label: 'AI 审辨实训' },
+        ]}
+      />
+      <Content style={{ background: 'var(--ax-canvas)', padding: '32px 24px 56px' }}>
+        <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              flexWrap: 'wrap',
+              gap: 18,
+              paddingBottom: 22,
+              marginBottom: 22,
+              borderBottom: '1px solid var(--ax-hairline)',
+            }}
+          >
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span aria-hidden="true" style={{ color: '#cc785c', fontSize: 14, lineHeight: 1 }}>✦</span>
+                <span
+                  style={{
+                    fontFamily: 'var(--ax-font-text)',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#8d4026',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  元智审辨 · AI 元能力与职业实训
+                </span>
+              </div>
+              <h1
+                style={{
+                  margin: 0,
+                  fontFamily: 'var(--ax-font-display)',
+                  fontWeight: 400,
+                  fontSize: 'clamp(28px, 3vw, 34px)',
+                  lineHeight: 1.2,
+                  letterSpacing: '-0.02em',
+                  color: 'var(--ax-ink)',
+                }}
+              >
+                岗位能力画像与行为证据对照
+              </h1>
+              <Paragraph
+                style={{
+                  margin: '10px 0 0',
+                  maxWidth: 760,
+                  fontSize: 15.5,
+                  lineHeight: 1.68,
+                  color: 'var(--ax-ink-muted-80)',
+                }}
+              >
+                连接校招或科研助理岗位画像与多模态实测证据，将岗位需求拆解为「可观测行为线索」与「主动封停硬技能缺口」，联动三阶段 AI 审辨实训。
+              </Paragraph>
+            </div>
+            <Space wrap align="center" size={10}>
+              <Button
+                type="default"
+                size="middle"
+                icon={<ApiOutlined />}
+                style={{
+                  borderRadius: 8,
+                  borderColor: 'var(--ax-border-strong)',
+                  background: 'var(--ax-canvas)',
+                  color: 'var(--ax-ink-muted-80)',
+                }}
+                onClick={() => { setRpcOpen(true); void runRpcDemo('tools/list'); }}
+              >
+                开发者接口验证
+              </Button>
+              <Button
+                type="primary"
+                icon={<ArrowRightOutlined />}
+                style={{
+                  background: '#a34f33',
+                  borderColor: '#a34f33',
+                  color: '#ffffff',
+                  borderRadius: 8,
+                  height: 40,
+                  paddingInline: 18,
+                  fontWeight: 500,
+                }}
+                onClick={() => void launchMetacognitionTraining()}
+              >
+                进入三阶段 AI 审辨实训
+              </Button>
+            </Space>
           </div>
-          <Space wrap align="center">
-            <Button
-              type="text"
-              size="small"
-              icon={<ApiOutlined />}
-              style={{ color: 'var(--ax-text-secondary)' }}
-              onClick={() => { setRpcOpen(true); void runRpcDemo('tools/list'); }}
-            >
-              开发者接口验证
-            </Button>
-            <Button
-              type="primary"
-              className="ax-btn--pill"
-              icon={<ArrowRightOutlined />}
-              style={{ background: 'var(--ax-b2)', borderColor: 'var(--ax-b2)' }}
-              onClick={() => void launchMetacognitionTraining()}
-            >
-              进入三阶段 AI 审辨实训
-            </Button>
-          </Space>
-        </div>
 
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 20 }}
-          message="严格遵循非筛选原则：岗位对照仅揭示已有行为证据覆盖与待补录缺口，不出具契合度分数、评级划档或筛选建议。"
-        />
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 22, borderRadius: 10 }}
+            message="严格遵循非筛选原则：岗位对照仅揭示已有行为证据覆盖与待补录缺口，不出具契合度分数、评级划档或筛选建议。"
+          />
 
         <Row gutter={[20, 20]}>
           <Col xs={24} lg={11}>
@@ -323,28 +386,28 @@ const CareerMcpPage: React.FC = () => {
                     label: `内置岗位库（${positions.length} 个）`,
                     children: (
                       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                           <Input
                             aria-label="搜索岗位关键词"
-                            placeholder="关键词：算法 / 科研 / 大模型 / 数据…"
+                            placeholder="关键词：算法 / 科研 / 大模型…"
                             prefix={<SearchOutlined />}
                             value={keyword}
                             onChange={(e) => setKeyword(e.target.value)}
                             onPressEnter={() => void fetchPositions(keyword, trackFilter, levelFilter)}
-                            style={{ flex: '1 1 180px' }}
+                            style={{ flex: '1 1 130px', minWidth: 130 }}
                           />
                           <Select
                             aria-label="筛选岗位赛道"
                             value={trackFilter}
                             onChange={(v) => { setTrackFilter(v); void fetchPositions(keyword, v, levelFilter); }}
-                            style={{ width: 130 }}
+                            style={{ width: 108 }}
                             options={[{ label: '全部赛道', value: '全部' }, ...tracks.map((t) => ({ label: t, value: t }))]}
                           />
                           <Select
                             aria-label="筛选岗位层级"
                             value={levelFilter}
                             onChange={(v) => { setLevelFilter(v); void fetchPositions(keyword, trackFilter, v); }}
-                            style={{ width: 120 }}
+                            style={{ width: 96 }}
                             options={[{ label: '全部层级', value: '全部' }, ...levels.map((l) => ({ label: l, value: l }))]}
                           />
                           <Button loading={loadingPos} onClick={() => void fetchPositions(keyword, trackFilter, levelFilter)}>
@@ -366,9 +429,9 @@ const CareerMcpPage: React.FC = () => {
                                 }}
                                 style={{
                                   textAlign: 'left',
-                                  background: active ? 'var(--ax-b2-soft)' : 'var(--ax-parchment)',
-                                  border: active ? '1px solid var(--ax-b2-border)' : '1px solid var(--ax-hairline)',
-                                  borderRadius: 'var(--ax-rounded-md)',
+                                  background: active ? '#efe9de' : 'var(--ax-canvas)',
+                                  border: active ? '1px solid #a34f33' : '1px solid var(--ax-hairline)',
+                                  borderRadius: 8,
                                   padding: '12px 14px',
                                   cursor: 'pointer',
                                   fontFamily: 'var(--ax-font-text)',
@@ -403,7 +466,12 @@ const CareerMcpPage: React.FC = () => {
                           onChange={(e) => setJdText(e.target.value)}
                           placeholder="粘贴任意校招或科研岗位职责，例如：要求能审辨大模型幻觉与统计口径偏差，完成结构化方案汇报，具备 Python 与 SQL 工程实现能力……"
                         />
-                        <Button type="primary" loading={decomposing} onClick={() => void handleDecomposeJd()}>
+                        <Button
+                          type="primary"
+                          loading={decomposing}
+                          style={{ background: '#a34f33', borderColor: '#a34f33', color: '#ffffff', borderRadius: 8 }}
+                          onClick={() => void handleDecomposeJd()}
+                        >
                           拆解可观测行为线索
                         </Button>
                       </Space>
@@ -514,7 +582,12 @@ const CareerMcpPage: React.FC = () => {
                       options={sessionOptions}
                       style={{ minWidth: 300, flex: '1 1 300px' }}
                     />
-                    <Button type="primary" loading={aligning} onClick={() => void handleAlignEvidence()}>
+                    <Button
+                      type="primary"
+                      loading={aligning}
+                      style={{ background: '#a34f33', borderColor: '#a34f33', color: '#ffffff', borderRadius: 8 }}
+                      onClick={() => void handleAlignEvidence()}
+                    >
                       执行证据缺口对照
                     </Button>
                   </div>
@@ -554,9 +627,16 @@ const CareerMcpPage: React.FC = () => {
                       />
                       <Button
                         type="primary"
-                        className="ax-btn--pill"
                         icon={<ArrowRightOutlined />}
-                        style={{ background: 'var(--ax-b2)', borderColor: 'var(--ax-b2)' }}
+                        style={{
+                          background: '#a34f33',
+                          borderColor: '#a34f33',
+                          color: '#ffffff',
+                          borderRadius: 8,
+                          height: 40,
+                          paddingInline: 18,
+                          fontWeight: 500,
+                        }}
                         onClick={() => void launchMetacognitionTraining()}
                       >
                         携带推荐审辨题目进入实训采录 ›
@@ -616,12 +696,15 @@ const CareerMcpPage: React.FC = () => {
               <Text strong style={{ fontSize: 12.5 }}>请求消息体</Text>
               <pre
                 style={{
-                  marginTop: 4,
-                  padding: 12,
-                  background: '#1d1d1f',
-                  color: '#f5f5f7',
+                  marginTop: 6,
+                  padding: '14px 16px',
+                  background: '#181715',
+                  color: '#faf9f5',
+                  border: '1px solid #2d2a26',
                   borderRadius: 8,
-                  fontSize: 12,
+                  fontFamily: 'var(--ax-font-mono)',
+                  fontSize: 12.5,
+                  lineHeight: 1.6,
                   overflowX: 'auto',
                 }}
               >
@@ -633,12 +716,15 @@ const CareerMcpPage: React.FC = () => {
               <Text strong style={{ fontSize: 12.5 }}>返回响应体</Text>
               <pre
                 style={{
-                  marginTop: 4,
-                  padding: 12,
+                  marginTop: 6,
+                  padding: '14px 16px',
                   background: 'var(--ax-parchment)',
+                  color: 'var(--ax-ink)',
                   border: '1px solid var(--ax-hairline)',
                   borderRadius: 8,
-                  fontSize: 12,
+                  fontFamily: 'var(--ax-font-mono)',
+                  fontSize: 12.5,
+                  lineHeight: 1.6,
                   maxHeight: 360,
                   overflow: 'auto',
                 }}
@@ -648,8 +734,9 @@ const CareerMcpPage: React.FC = () => {
             </div>
           </Space>
         </Drawer>
-      </div>
-    </Content>
+        </div>
+      </Content>
+    </div>
   );
 };
 

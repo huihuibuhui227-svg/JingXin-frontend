@@ -1,0 +1,654 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Linear Obsidian Research Workbench & Cross-Theme Report Craft
+   Aligned with docs/design-systems/linear.DESIGN.md & claude.DESIGN.md.
+   Uses --ax-* design tokens so manual ThemeSwitcher toggles remain crisp.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. ResearchHubPage · Pure Linear Obsidian Precision ───────────────── */
+.ax-linear-hub {
+  background: var(--ax-canvas);
+  color: var(--ax-ink);
+  min-height: calc(100vh - var(--ax-nav-height));
+  padding-bottom: 72px;
+}
+
+.ax-linear-hub__inner {
+  max-width: var(--ax-content-max);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.ax-linear-header {
+  padding: 44px 0 32px;
+  border-bottom: 1px solid var(--ax-hairline);
+}
+
+.ax-linear-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--ax-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-eyebrow__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--ax-primary);
+  flex-shrink: 0;
+}
+
+.ax-linear-h1 {
+  margin: 12px 0 0;
+  font-family: var(--ax-font-display);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--ax-ink);
+}
+
+.ax-linear-lead {
+  margin: 14px 0 0;
+  max-width: 66ch;
+  font-family: var(--ax-font-text);
+  font-size: 15.5px;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: -0.005em;
+  color: var(--ax-ink-muted-80);
+}
+
+.ax-linear-cta-row {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ax-linear-btn-primary,
+.ax-linear-btn-secondary,
+.ax-linear-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-family: var(--ax-font-text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 100ms ease;
+}
+
+.ax-linear-btn-primary {
+  background: var(--ax-primary);
+  border: 1px solid var(--ax-primary);
+  color: var(--ax-on-primary);
+}
+.ax-linear-btn-primary:hover {
+  background: var(--ax-primary-hover);
+  border-color: var(--ax-primary-hover);
+}
+.ax-linear-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.ax-linear-btn-secondary {
+  background: var(--ax-surface);
+  border: 1px solid var(--ax-border-strong);
+  color: var(--ax-ink);
+}
+.ax-linear-btn-secondary:hover {
+  background: var(--ax-surface-alt);
+  border-color: var(--ax-primary);
+}
+.ax-linear-btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.ax-linear-btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ax-ink-muted-80);
+  padding: 9px 12px;
+}
+.ax-linear-btn-ghost:hover {
+  background: var(--ax-surface-alt);
+  color: var(--ax-ink);
+}
+
+/* ── Asymmetric 58 / 42 Precision Bento Grid ───────────────────────────── */
+.ax-linear-bento {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.ax-linear-panel {
+  background: var(--ax-surface);
+  border: 1px solid var(--ax-hairline);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+html[data-design-theme='linear'] .ax-linear-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.ax-linear-panel--interactive:hover {
+  border-color: var(--ax-primary);
+  background: var(--ax-surface-alt);
+}
+
+.ax-linear-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 16px;
+}
+
+.ax-linear-panel__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ax-linear-panel__index {
+  font-family: var(--ax-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--ax-font-mono);
+  font-size: 11.5px;
+  color: var(--ax-ink-muted-80);
+  background: var(--ax-surface-alt);
+  border: 1px solid var(--ax-hairline);
+  border-radius: 9999px;
+  padding: 2px 9px;
+}
+
+.ax-linear-status__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--ax-success);
+}
+
+.ax-linear-panel__title {
+  margin: 0;
+  font-family: var(--ax-font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--ax-ink);
+}
+
+.ax-linear-panel__desc {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-spec-list {
+  margin-top: 18px;
+  border-top: 1px solid var(--ax-divider-soft);
+}
+
+.ax-linear-spec-row {
+  display: grid;
+  grid-template-columns: 152px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ax-divider-soft);
+}
+
+.ax-linear-spec-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ax-ink);
+}
+
+.ax-linear-spec-detail {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-spec-tag {
+  font-family: var(--ax-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--ax-ink-muted-80);
+  background: var(--ax-surface-alt);
+  border: 1px solid var(--ax-hairline);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ax-linear-panel__footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ax-divider-soft);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ax-linear-panel__footnote {
+  font-size: 12.5px;
+  color: var(--ax-text-secondary);
+}
+
+/* ── Methodology & Guardrails Ledger (Changelog-row aesthetic) ─────────── */
+.ax-linear-ledger {
+  margin-top: 36px;
+}
+
+.ax-linear-ledger__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ax-linear-ledger__title {
+  margin: 0;
+  font-family: var(--ax-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ax-ink);
+}
+
+.ax-linear-ledger__sub {
+  font-family: var(--ax-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-ledger__box {
+  background: var(--ax-surface);
+  border: 1px solid var(--ax-hairline);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+html[data-design-theme='linear'] .ax-linear-ledger__box {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.ax-linear-ledger__row {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--ax-divider-soft);
+  align-items: start;
+}
+
+.ax-linear-ledger__row:last-child {
+  border-bottom: none;
+}
+
+.ax-linear-ledger__key {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+
+.ax-linear-ledger__code {
+  margin-top: 3px;
+  font-family: var(--ax-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-blocked-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.ax-linear-blocked-item {
+  background: var(--ax-surface-alt);
+  border: 1px solid var(--ax-hairline);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.ax-linear-blocked-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ax-linear-blocked-item__label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+
+.ax-linear-blocked-item__badge {
+  font-family: var(--ax-font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ax-surface);
+  border: 1px solid var(--ax-border-strong);
+  color: var(--ax-text-secondary);
+  white-space: nowrap;
+}
+
+.ax-linear-blocked-item__reason {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ax-text-secondary);
+}
+
+.ax-linear-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ax-linear-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--ax-surface-alt);
+  border: 1px solid var(--ax-border-strong);
+  font-size: 13px;
+  color: var(--ax-ink-muted-80);
+}
+
+.ax-linear-details {
+  font-size: 13.5px;
+  color: var(--ax-ink-muted-80);
+}
+
+.ax-linear-details summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ax-ink);
+  padding: 4px 0;
+  user-select: none;
+}
+
+.ax-linear-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.ax-linear-details summary::before {
+  content: '›';
+  display: inline-block;
+  font-family: var(--ax-font-mono);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ax-text-secondary);
+  transition: transform 140ms ease;
+}
+
+.ax-linear-details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.ax-linear-ref-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ax-text-secondary);
+}
+
+/* ── 2. Shared Mono Token & CompareSessionsPage Linear Integration ──────── */
+.ax-mono-code {
+  font-family: var(--ax-font-mono);
+  font-size: 12px;
+  color: var(--ax-ink-muted-80);
+  background: var(--ax-surface-alt);
+  border: 1px solid var(--ax-hairline);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.ax-compare-shell {
+  background: var(--ax-parchment);
+  min-height: calc(100vh - var(--ax-nav-height) - 44px);
+  padding: 28px 24px 56px;
+}
+
+.ax-compare-header {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ax-hairline);
+}
+
+/* ── 3. ReportPage Editorial Brief & Multi-Theme Adaptation ────────────── */
+.ax-report-shell {
+  --ax-accent-ink: var(--ax-primary);
+  background: var(--ax-parchment);
+  min-height: calc(100vh - var(--ax-nav-height));
+  padding: 28px 24px 56px;
+}
+
+html[data-design-theme='linear'] .ax-report-shell {
+  --ax-accent-ink: var(--ax-primary-on-dark);
+}
+
+.ax-report-header {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ax-hairline);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ax-report-title {
+  margin: 6px 0 0;
+  font-family: var(--ax-font-serif, var(--ax-font-display));
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: var(--ax-ink);
+}
+
+.ax-narrative-paper__title {
+  margin: 0;
+  font-family: var(--ax-font-serif, var(--ax-font-display));
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  color: var(--ax-ink);
+}
+
+html[data-design-theme='claude'] .ax-report-title,
+html[data-design-theme='claude'] .ax-narrative-paper__title,
+html[data-design-theme='oura'] .ax-report-title,
+html[data-design-theme='oura'] .ax-narrative-paper__title {
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+html[data-design-theme='linear'] .ax-report-shell .ax-narrative-paper {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ── Linear Dark Mode Child-Chart & AntD Empty Rescue (No Light Leakage) ─ */
+html[data-design-theme='linear'] .ax-compare-shell .ant-empty-description,
+html[data-design-theme='linear'] .ax-report-shell .ant-empty-description {
+  color: var(--ax-text-secondary);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell .ant-empty-img-simple-ellipse,
+html[data-design-theme='linear'] .ax-report-shell .ant-empty-img-simple-ellipse {
+  fill: var(--ax-surface-alt);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell .ant-empty-img-simple-path,
+html[data-design-theme='linear'] .ax-report-shell .ant-empty-img-simple-path {
+  fill: var(--ax-pearl);
+  stroke: var(--ax-border-strong);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell .ant-empty-img-simple-g,
+html[data-design-theme='linear'] .ax-report-shell .ant-empty-img-simple-g {
+  stroke: var(--ax-border-strong);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg text[fill='#1d1d1f'],
+html[data-design-theme='linear'] .ax-report-shell svg text[fill='#1d1d1f'] {
+  fill: var(--ax-ink);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg text[fill='#333333'],
+html[data-design-theme='linear'] .ax-report-shell svg text[fill='#333333'] {
+  fill: var(--ax-ink-muted-80);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg text[fill='#5c5c61'],
+html[data-design-theme='linear'] .ax-report-shell svg text[fill='#5c5c61'] {
+  fill: var(--ax-text-secondary);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg line[stroke='#e0e0e0'],
+html[data-design-theme='linear'] .ax-report-shell svg line[stroke='#e0e0e0'] {
+  stroke: var(--ax-hairline);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg text[fill='#0066cc'],
+html[data-design-theme='linear'] .ax-report-shell svg text[fill='#0066cc'] {
+  fill: var(--ax-svg-line);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg text[fill='#0b6e4f'],
+html[data-design-theme='linear'] .ax-report-shell svg text[fill='#0b6e4f'] {
+  fill: var(--ax-svg-median);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg text[fill='#9e1f1f'],
+html[data-design-theme='linear'] .ax-report-shell svg text[fill='#9e1f1f'] {
+  fill: var(--ax-svg-gap);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg circle[stroke='#ffffff'],
+html[data-design-theme='linear'] .ax-report-shell svg circle[stroke='#ffffff'] {
+  stroke: var(--ax-svg-dot-ring);
+}
+
+html[data-design-theme='linear'] .ax-compare-shell svg circle[fill='#ffffff'],
+html[data-design-theme='linear'] .ax-report-shell svg circle[fill='#ffffff'] {
+  fill: var(--ax-svg-bg);
+}
+
+html[data-design-theme='linear'] .ax-report-shell svg rect[fill='#f3f4f6'],
+html[data-design-theme='linear'] .ax-report-shell svg rect[fill='#ebedf0'] {
+  fill: var(--ax-surface-alt);
+}
+
+/* ── Responsive Breakpoints ────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .ax-linear-bento {
+    grid-template-columns: 1fr;
+  }
+
+  .ax-linear-stack {
+    grid-template-rows: auto auto;
+  }
+
+  .ax-linear-ledger__row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ax-linear-hub__inner {
+    padding: 0 16px;
+  }
+
+  .ax-linear-header {
+    padding: 32px 0 24px;
+  }
+
+  .ax-linear-h1,
+  .ax-report-title {
+    font-size: 28px;
+  }
+
+  .ax-linear-panel,
+  .ax-linear-ledger__row {
+    padding: 18px 16px;
+  }
+
+  .ax-linear-spec-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    align-items: start;
+  }
+
+  .ax-linear-spec-tag {
+    justify-self: start;
+  }
+
+  .ax-compare-shell,
+  .ax-report-shell {
+    padding: 20px 16px 40px;
+  }
+}

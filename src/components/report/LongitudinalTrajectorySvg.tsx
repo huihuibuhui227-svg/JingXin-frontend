@@ -170,7 +170,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
 
   if (!series.length) {
     return (
-      <Card size="small">
+      <Card size="small" className="ax-card">
         <Empty description="暂无可展示的多访次时序指标" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       </Card>
     );
@@ -310,7 +310,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
 
             <div
               style={{
-                background: 'var(--ax-parchment)',
+                background: 'var(--ax-svg-bg)',
                 border: '1px solid var(--ax-hairline)',
                 borderRadius: 'var(--ax-rounded-md)',
                 padding: '12px 10px 8px',
@@ -332,7 +332,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                         x2={SVG_W - PAD_R}
                         y1={y}
                         y2={y}
-                        stroke="#e0e0e0"
+                        stroke="var(--ax-svg-grid)"
                         strokeWidth={1}
                       />
                       <text
@@ -340,7 +340,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                         y={y + 4}
                         textAnchor="end"
                         fontSize={11}
-                        fill="#5c5c61"
+                        fill="var(--ax-svg-muted)"
                       >
                         {Math.abs(tick) >= 100 ? tick.toFixed(0) : tick.toFixed(2)}
                       </text>
@@ -355,7 +355,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                     y={Math.min(chartGeom.p75Y, chartGeom.p25Y)}
                     width={chartGeom.plotW}
                     height={Math.max(2, Math.abs(chartGeom.p25Y - chartGeom.p75Y))}
-                    fill="rgba(0, 102, 204, 0.10)"
+                    fill="var(--ax-svg-band)"
                   />
                 )}
 
@@ -367,17 +367,17 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                       x2={SVG_W - PAD_R}
                       y1={chartGeom.medianY}
                       y2={chartGeom.medianY}
-                      stroke="#0b6e4f"
+                      stroke="var(--ax-svg-median)"
                       strokeDasharray="3 3"
                       strokeWidth={1.15}
-                      opacity={0.75}
+                      opacity={0.8}
                     />
                     <text
                       x={PAD_L + 6}
                       y={chartGeom.medianY - 5}
                       textAnchor="start"
                       fontSize={10.5}
-                      fill="#0b6e4f"
+                      fill="var(--ax-svg-median)"
                     >
                       个人中位数
                     </text>
@@ -392,17 +392,17 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                       x2={SVG_W - PAD_R}
                       y1={chartGeom.t0Y}
                       y2={chartGeom.t0Y}
-                      stroke="#0066cc"
+                      stroke="var(--ax-svg-line)"
                       strokeDasharray="5 4"
                       strokeWidth={1.25}
-                      opacity={0.7}
+                      opacity={0.75}
                     />
                     <text
                       x={SVG_W - PAD_R - 4}
                       y={chartGeom.t0Y - 5}
                       textAnchor="end"
                       fontSize={10.5}
-                      fill="#0066cc"
+                      fill="var(--ax-svg-line)"
                     >
                       t0 基线
                     </text>
@@ -414,7 +414,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                   <polyline
                     key={`raw-${idx}`}
                     fill="none"
-                    stroke="#0066cc"
+                    stroke="var(--ax-svg-line)"
                     strokeWidth={2.5}
                     strokeLinejoin="round"
                     strokeLinecap="round"
@@ -427,7 +427,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                   <polyline
                     key={`ewma-${idx}`}
                     fill="none"
-                    stroke="#b45309"
+                    stroke="var(--ax-svg-ewma)"
                     strokeWidth={2}
                     strokeDasharray="6 4"
                     strokeLinejoin="round"
@@ -436,7 +436,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                   />
                 ))}
 
-                {/* 访次采样点（实测点实心蓝点，偏离提示加外圈，缺口点空心红圈） */}
+                {/* 访次采样点（实测点实心点，偏离提示加外圈，缺口点空心圈） */}
                 {chartGeom.pts.map((p, idx) => {
                   const cx = chartGeom.xOf(idx);
                   const hasVal = typeof p.value === 'number' && Number.isFinite(p.value);
@@ -452,7 +452,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                               cy={cy}
                               r={8.5}
                               fill="none"
-                              stroke="#b45309"
+                              stroke="var(--ax-svg-ewma)"
                               strokeWidth={1.6}
                               strokeDasharray="2 2"
                             />
@@ -461,8 +461,8 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                             cx={cx}
                             cy={cy}
                             r={5}
-                            fill={flagged ? '#b45309' : '#0066cc'}
-                            stroke="#ffffff"
+                            fill={flagged ? 'var(--ax-svg-ewma)' : 'var(--ax-svg-line)'}
+                            stroke="var(--ax-svg-dot-ring)"
                             strokeWidth={2}
                           />
                           <text
@@ -471,7 +471,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                             textAnchor="middle"
                             fontSize={11}
                             fontWeight={600}
-                            fill="#1d1d1f"
+                            fill="var(--ax-svg-ink)"
                           >
                             {fmtVal(p.value)}
                           </text>
@@ -482,12 +482,12 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                             cx={cx}
                             cy={cy}
                             r={5}
-                            fill="#ffffff"
-                            stroke="#9e1f1f"
+                            fill="var(--ax-svg-dot-ring)"
+                            stroke="var(--ax-svg-gap)"
                             strokeWidth={2}
                             strokeDasharray="2 2"
                           />
-                          <text x={cx} y={cy - 9} textAnchor="middle" fontSize={10.5} fill="#9e1f1f">
+                          <text x={cx} y={cy - 9} textAnchor="middle" fontSize={10.5} fill="var(--ax-svg-gap)">
                             缺口
                           </text>
                         </>
@@ -497,7 +497,7 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                         y={SVG_H - 16}
                         textAnchor="middle"
                         fontSize={11}
-                        fill="#333333"
+                        fill="var(--ax-svg-muted)"
                       >
                         {p.visit_label}
                       </text>
@@ -517,21 +517,21 @@ const LongitudinalTrajectorySvg: React.FC<Props> = ({
                 }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true" style={{ width: 16, height: 2.5, background: '#0066cc', display: 'inline-block' }} />
+                  <span aria-hidden="true" style={{ width: 16, height: 2.5, background: 'var(--ax-svg-line)', display: 'inline-block' }} />
                   实测轨迹
                 </span>
                 {chartGeom.ewmaSegments.length > 0 && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span aria-hidden="true" style={{ width: 16, borderTop: '2px dashed #b45309', display: 'inline-block' }} />
+                    <span aria-hidden="true" style={{ width: 16, borderTop: '2px dashed var(--ax-svg-ewma)', display: 'inline-block' }} />
                     EWMA 平滑趋势线
                   </span>
                 )}
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true" style={{ width: 14, height: 10, background: 'rgba(0, 102, 204, 0.14)', border: '1px solid rgba(0, 102, 204, 0.25)', display: 'inline-block' }} />
+                  <span aria-hidden="true" style={{ width: 14, height: 10, background: 'var(--ax-svg-band)', border: '1px solid var(--ax-svg-line)', display: 'inline-block' }} />
                   个人稳健参考带 (P25–P75)
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span aria-hidden="true" style={{ width: 14, borderTop: '1.5px dashed #0b6e4f', display: 'inline-block' }} />
+                  <span aria-hidden="true" style={{ width: 14, borderTop: '1.5px dashed var(--ax-svg-median)', display: 'inline-block' }} />
                   个人中位数
                 </span>
               </div>

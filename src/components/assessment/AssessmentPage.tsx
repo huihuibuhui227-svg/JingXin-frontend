@@ -484,7 +484,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
               display: 'inline-block',
               fontSize: 13,
               fontWeight: 600,
-              color: 'var(--ax-primary)',
+              color: 'var(--ax-info)',
               background: 'var(--ax-info-soft)',
               border: '1px solid var(--ax-info-border)',
               borderRadius: 'var(--ax-rounded-pill)',
@@ -777,11 +777,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
                 </p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => navigate(reportRouteOf(sid))}
-                    style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
+                    style={{ padding: '6px 20px', background: 'var(--ax-surface)', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
                     去看本场报告
                   </button>
                   <button onClick={handleNextSession}
-                    style={{ padding: '6px 20px', background: 'var(--ax-success)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                    style={{ padding: '6px 20px', background: 'var(--ax-success)', color: 'var(--ax-on-primary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                     录下一场
                   </button>
                 </div>
@@ -842,11 +842,11 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
         extraActions={
           <>
             <button onClick={() => navigate(reportRouteOf(sid))}
-              style={{ padding: '6px 20px', background: '#fff', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
+              style={{ padding: '6px 20px', background: 'var(--ax-surface)', color: 'var(--ax-primary)', border: '1px solid var(--ax-primary)', borderRadius: '6px', cursor: 'pointer' }}>
               去看本场报告
             </button>
             <button onClick={handleNextSession}
-              style={{ padding: '6px 20px', background: 'var(--ax-success)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              style={{ padding: '6px 20px', background: 'var(--ax-success)', color: 'var(--ax-on-primary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
               录下一场
             </button>
           </>

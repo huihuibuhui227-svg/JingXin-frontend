@@ -1,53 +1,54 @@
 /**
- * 衡才智析 设计令牌 —— 严格按 DESIGN.md（Apple-design-analysis）实现。
- *
- * 三条不可破的边界：
- *   1. 全站唯一交互强调色：Action Blue #0066cc（深底上用 Sky Link Blue #2997ff）。
- *   2. 正文 17px / 400 / 1.47 / -0.374px；字重阶梯只用 300 / 400 / 600 / 700（禁用 500）。
- *   3. 零装饰渐变、零卡片/按钮/文字投影；层级由面色切换（白/米灰/深炭）与 1px hairline 建立。
+ * 衡才智析 基础设计令牌 —— 配合 themes.css 动态切换四套大厂视觉世界
+ * (Vercel · Linear · Claude · Oura)。默认以 Vercel 架构体系兜底。
  */
 
 :root {
   /* ══ Colors · Brand & Accent ══════════════════════════════ */
-  --ax-primary: #0066cc;
-  --ax-primary-focus: #0071e3;
-  --ax-primary-on-dark: #2997ff;
+  --ax-primary: #171717;
+  --ax-primary-hover: #333333;
+  --ax-primary-focus: #0068d6;
+  --ax-primary-on-dark: #60a5fa;
   --ax-on-primary: #ffffff;
+  --ax-accent: #0068d6;
 
-  /* ══ Colors · 三大应用基地语义强调色（全部通过 WCAG AA >= 4.5:1） ══ */
-  --ax-b1: #005bb5;
-  --ax-b1-soft: #eef5fc;
-  --ax-b1-border: #c2dcf5;
+  /* ══ Colors · 三大应用模块语义强调色（全部通过 WCAG AA >= 4.5:1） ══ */
+  --ax-b1: #434ec0;
+  --ax-b1-soft: #f2f3fd;
+  --ax-b1-border: #d0d4f7;
 
-  --ax-b2: #0b6e4f;
-  --ax-b2-soft: #edf7f3;
-  --ax-b2-border: #b7dfd0;
+  --ax-b2: #a34f33;
+  --ax-b2-soft: #faf3ef;
+  --ax-b2-border: #ebd1c6;
 
-  --ax-b3: #8a5300;
-  --ax-b3-soft: #fdf6ea;
-  --ax-b3-border: #ebd4aa;
+  --ax-b3: #224228;
+  --ax-b3-soft: #f1f6f1;
+  --ax-b3-border: #c5d9c6;
 
   /* ══ Colors · Surface ═════════════════════════════════════ */
   --ax-canvas: #ffffff;
-  --ax-parchment: #f5f5f7;
-  --ax-pearl: #fafafc;
-  --ax-tile-1: #272729;
-  --ax-tile-2: #2a2a2c;
-  --ax-tile-3: #252527;
-  --ax-black: #000000;
+  --ax-parchment: #fafafa;
+  --ax-surface: #ffffff;
+  --ax-surface-alt: #f5f5f5;
+  --ax-pearl: #fafafa;
+  --ax-tile-1: #18191a;
+  --ax-tile-2: #141516;
+  --ax-tile-3: #0f1011;
+  --ax-black: #0a0a0a;
   --ax-chip-translucent: rgba(210, 210, 215, 0.64);
 
   /* ══ Colors · Text ════════════════════════════════════════ */
-  --ax-ink: #1d1d1f;
+  --ax-ink: #171717;
   --ax-on-dark: #ffffff;
-  --ax-body-muted: #cccccc;
-  --ax-ink-muted-80: #333333;
-  --ax-ink-muted-48: #7a7a7a; /* 仅限禁用态与极小法务注脚 */
-  --ax-text-secondary: #5c5c61; /* 白底 6.7:1，米灰底 6.2:1，WCAG AA+ */
+  --ax-body-muted: #d4d4d4;
+  --ax-ink-muted-80: #4d4d4d;
+  --ax-ink-muted-48: #666666;
+  --ax-text-secondary: #5c5c5c;
 
   /* ══ Colors · Hairlines & Borders ═════════════════════════ */
   --ax-divider-soft: #f0f0f0;
-  --ax-hairline: #e0e0e0;
+  --ax-hairline: #ebebeb;
+  --ax-border-strong: #c7c7c7;
 
   /* ══ Colors · Semantic Status (测量与审计状态色，WCAG AA > 7:1) ══ */
   --ax-info: #0a4a8f;
@@ -172,9 +173,11 @@
   --ax-hairline-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 
   /* ══ Layout Container 两档版心 ════════════════════════════ */
-  --ax-nav-height: 44px;
-  --ax-subnav-height: 52px;
-  --ax-sticky-height: 64px;
+  --ax-nav-height: 58px;
+  --ax-subnav-height: 0px;
+  --ax-sticky-height: 58px;
+  --ax-radius-btn: 6px;
+  --ax-radius-card: 8px;
   --ax-content-max: 1120px;   /* 阅读页（首页 / 报告页 / 题库页） */
   --ax-workbench-max: 1320px; /* 工作台（测评 / 实时监测 / 列表 / 素材 / 导出） */
 }

@@ -1,324 +1,469 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Button } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useDesignTheme } from '@/theme/ThemeContext';
+import ThemeSwitcher from './ThemeSwitcher';
 
-/**
- * 衡才智析两行式导航 —— 遵循 DESIGN.md 的 `global-nav` + `sub-nav-frosted`。
- * 第 1 行：纯黑 44px 全局导航（全站唯一纯黑面）。
- * 第 2 行：磨砂子导航（米白 80% + backdrop-filter），52px；正在采集页隐藏右侧主 CTA，减少干扰。
- */
-
-interface NavGroup {
-  key: string;
+interface PrimaryNavItem {
+  to: string;
   label: string;
-  accent: string;
-  soft: string;
-  border: string;
   prefixes: string[];
-  subLinks: Array<{ to: string; label: string }>;
 }
 
-const NAV_GROUPS: NavGroup[] = [
+interface WorkbenchGroup {
+  groupLabel: string;
+  items: Array<{ to: string; label: string; desc: string }>;
+}
+
+const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
+  { to: '/', label: '总门户', prefixes: ['/'] },
   {
-    key: '/',
-    label: '总门户',
-    accent: 'var(--ax-primary)',
-    soft: 'var(--ax-info-soft)',
-    border: 'var(--ax-info-border)',
-    prefixes: ['/'],
-    subLinks: [
-      { to: '/hub/research', label: '研思循证' },
-      { to: '/hub/metacognition', label: '元智审辨' },
-      { to: '/hub/followup', label: '时序观微' },
-      { to: '/reports', label: '报告中心' },
-    ],
-  },
-  {
-    key: '/hub/research',
+    to: '/hub/research',
     label: '研思循证',
-    accent: 'var(--ax-b1)',
-    soft: 'var(--ax-b1-soft)',
-    border: 'var(--ax-b1-border)',
     prefixes: ['/hub/research', '/research', '/interview', '/compare'],
-    subLinks: [
-      { to: '/hub/research', label: '场景概览' },
-      { to: '/research', label: '科研采录' },
-      { to: '/interview', label: '模拟答辩' },
-      { to: '/compare', label: '多场对比' },
-    ],
   },
   {
-    key: '/hub/metacognition',
+    to: '/hub/metacognition',
     label: '元智审辨',
-    accent: 'var(--ax-b2)',
-    soft: 'var(--ax-b2-soft)',
-    border: 'var(--ax-b2-border)',
     prefixes: ['/hub/metacognition', '/career-mcp', '/metacognition'],
-    subLinks: [
-      { to: '/hub/metacognition', label: '场景概览' },
-      { to: '/career-mcp', label: '岗位对照' },
-      { to: '/metacognition', label: 'AI 审辨实训' },
-    ],
   },
   {
-    key: '/hub/followup',
+    to: '/hub/followup',
     label: '时序观微',
-    accent: 'var(--ax-b3)',
-    soft: 'var(--ax-b3-soft)',
-    border: 'var(--ax-b3-border)',
     prefixes: ['/hub/followup', '/followup'],
-    subLinks: [
-      { to: '/hub/followup', label: '场景概览' },
-      { to: '/followup', label: '匿名随访档案' },
-      { to: '/followup/capture', label: '匿名无影像采录' },
+  },
+  {
+    to: '/reports',
+    label: '报告中心',
+    prefixes: ['/reports', '/report'],
+  },
+];
+
+const WORKBENCH_GROUPS: WorkbenchGroup[] = [
+  {
+    groupLabel: '01 · 采录与对比',
+    items: [
+      { to: '/research', label: '科研采录', desc: '课题组汇报与过程采录' },
+      { to: '/interview', label: '答辩采录', desc: '复试答辩与问答行为采样' },
+      { to: '/compare', label: '多场对比', desc: '同代次纵向并排对照' },
     ],
   },
   {
-    key: '/reports',
-    label: '报告与资源',
-    accent: 'var(--ax-primary)',
-    soft: 'var(--ax-info-soft)',
-    border: 'var(--ax-info-border)',
-    prefixes: ['/reports', '/report', '/analysis', '/recordings', '/export', '/question-bank', '/benchmarks'],
-    subLinks: [
-      { to: '/reports', label: '报告中心' },
-      { to: '/analysis', label: '实时监测' },
-      { to: '/recordings', label: '录制素材' },
-      { to: '/export', label: '数据导出' },
-      { to: '/question-bank', label: '题库管理' },
-      { to: '/benchmarks', label: '科研基准' },
+    groupLabel: '02 · 实训与随访',
+    items: [
+      { to: '/career-mcp', label: '岗位对照', desc: '岗位需求与行为线索核查' },
+      { to: '/metacognition', label: 'AI 审辨实训', desc: '三阶段口头批判校准' },
+      { to: '/followup', label: '随访档案', desc: '匿名个体轨迹档案' },
+      { to: '/followup/capture', label: '无影像采录', desc: '零原始影像静默采样' },
+    ],
+  },
+  {
+    groupLabel: '03 · 资源与验证',
+    items: [
+      { to: '/analysis', label: '实时监测', desc: '多通道同步采集监测台' },
+      { to: '/recordings', label: '录制素材', desc: '场次录像与可控清理' },
+      { to: '/export', label: '数据导出', desc: '结构化指标与原表导出' },
+      { to: '/question-bank', label: '题库管理', desc: '多场景问答题目配置' },
+      { to: '/benchmarks', label: '科研基准', desc: '跨语料与三维姿态验证' },
     ],
   },
 ];
 
-const isGroupActive = (group: NavGroup, pathname: string): boolean => {
-  if (group.key === '/') return pathname === '/';
-  return group.prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+const SECONDARY_ROUTES = new Set(
+  WORKBENCH_GROUPS.flatMap((group) => group.items.map((item) => item.to))
+);
+
+const ACTIVE_CAPTURE_ROUTES = [
+  '/interview',
+  '/research',
+  '/metacognition',
+  '/followup/capture',
+  '/analysis',
+];
+
+const isNavItemActive = (item: PrimaryNavItem, pathname: string): boolean => {
+  if (item.to === '/') return pathname === '/';
+  return item.prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 };
-
-const activeGroupOf = (pathname: string): NavGroup =>
-  NAV_GROUPS.find((g) => isGroupActive(g, pathname)) ?? NAV_GROUPS[0];
-
-const sectionName = (pathname: string): string => {
-  if (pathname === '/') return '衡才智析 · 多模态行为证据分析';
-  if (pathname === '/hub/research') return '研思循证 · 科研行为过程分析';
-  if (pathname === '/hub/metacognition') return '元智审辨 · AI 元能力与职业实训';
-  if (pathname === '/hub/followup') return '时序观微 · 匿名个体纵向随访';
-  if (pathname.startsWith('/report/')) return '行为证据披露报告';
-  if (pathname === '/reports') return '报告中心';
-  if (pathname === '/career-mcp') return '岗位能力画像与行为对照';
-  if (pathname === '/metacognition') return 'AI 审辨三阶段实训';
-  if (pathname === '/followup/capture') return '匿名无影像随访采录';
-  if (pathname === '/followup') return '匿名个体随访档案';
-  if (pathname === '/compare') return '多场次纵向对比工作台';
-  if (pathname === '/research') return '科研过程行为采录';
-  if (pathname === '/interview') return '答辩与面试行为采录';
-  if (pathname === '/analysis') return '多通道实时监测台';
-  if (pathname === '/recordings') return '录制素材管理';
-  if (pathname === '/export') return '数据导出与原表复核';
-  if (pathname === '/question-bank') return '多模块题库管理';
-  if (pathname === '/benchmarks') return '方法学验证与科研基准';
-  return '衡才智析';
-};
-
-const ACTIVE_CAPTURE_ROUTES = ['/interview', '/research', '/metacognition', '/followup/capture', '/analysis'];
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const inCapture = ACTIVE_CAPTURE_ROUTES.some((p) => location.pathname.startsWith(p));
-  const activeGroup = activeGroupOf(location.pathname);
+  const { themeSpec } = useDesignTheme();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const inCapture = ACTIVE_CAPTURE_ROUTES.some((prefix) => location.pathname.startsWith(prefix));
+  const inSecondaryTool = SECONDARY_ROUTES.has(location.pathname);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | PointerEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        menuTriggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  const menuShadow = themeSpec.isDark
+    ? '0 14px 36px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.06)'
+    : '0 2px 6px rgba(0, 0, 0, 0.04), 0 16px 32px -6px rgba(0, 0, 0, 0.12)';
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
-      <nav
-        aria-label="全局导航"
+    <header
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        height: 58,
+        background: 'var(--ax-header-bg)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderBottom: '1px solid var(--ax-header-border)',
+        color: 'var(--ax-header-ink)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <style>{`
+        .jx-header-nav-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .jx-header-nav-scroll::-webkit-scrollbar {
+          display: none;
+        }
+        .jx-header-link:hover {
+          color: var(--ax-header-ink) !important;
+        }
+        .jx-workbench-item:hover {
+          background: var(--ax-surface-alt) !important;
+        }
+      `}</style>
+
+      <div
         style={{
-          height: 'var(--ax-nav-height)',
-          background: 'var(--ax-black)',
+          width: '100%',
+          maxWidth: 'var(--ax-workbench-max)',
+          height: '100%',
+          padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
         }}
       >
-        <div
+        {/* 左侧：几何品牌标记 + 字标 */}
+        <button
+          type="button"
+          onClick={() => navigate('/')}
           style={{
-            width: '100%',
-            maxWidth: 'var(--ax-workbench-max)',
-            padding: '0 24px',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: 28,
+            gap: 9,
+            background: 'none',
+            border: 'none',
+            padding: '4px 2px',
+            cursor: 'pointer',
+            color: 'var(--ax-header-ink)',
+            flexShrink: 0,
           }}
         >
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="ax-press"
+          <svg
+            aria-hidden="true"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            style={{ flexShrink: 0 }}
+          >
+            <rect
+              x="1.5"
+              y="1.5"
+              width="17"
+              height="17"
+              rx="3"
+              stroke="var(--ax-header-ink)"
+              strokeWidth="1.25"
+              strokeOpacity="0.28"
+            />
+            <path d="M10 4.5L15.2 14.2H4.8L10 4.5Z" fill="var(--ax-primary)" />
+            <circle cx="10" cy="11.2" r="1.4" fill="var(--ax-on-primary)" />
+          </svg>
+          <span
             style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              color: 'var(--ax-on-dark)',
-              fontSize: 14,
+              fontFamily: 'var(--ax-font-display)',
+              fontSize: 15,
               fontWeight: 600,
-              letterSpacing: '-0.12px',
-              fontFamily: 'var(--ax-font-text)',
+              letterSpacing: '-0.02em',
               whiteSpace: 'nowrap',
             }}
           >
             衡才智析
-          </button>
+          </span>
+        </button>
 
+        {/* 中央：主导航链路 + 工作台下拉菜单 */}
+        <nav
+          aria-label="全局导航"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+            height: '100%',
+            justifyContent: 'center',
+          }}
+        >
           <ul
+            className="jx-header-nav-scroll"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 22,
+              gap: 20,
               listStyle: 'none',
               margin: 0,
-              padding: 0,
-              flex: 1,
+              padding: '0 4px',
+              height: '100%',
               overflowX: 'auto',
             }}
           >
-            {NAV_GROUPS.map((group) => {
-              const active = isGroupActive(group, location.pathname);
+            {PRIMARY_NAV_ITEMS.map((item) => {
+              const active = isNavItemActive(item, location.pathname);
               return (
-                <li key={group.key}>
+                <li key={item.to} style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
                   <button
                     type="button"
-                    onClick={() => navigate(group.key)}
+                    onClick={() => navigate(item.to)}
                     aria-current={active ? 'page' : undefined}
-                    className="ax-press ax-nav-link"
+                    className="jx-header-link"
                     style={{
-                      position: 'relative',
+                      height: '100%',
                       display: 'inline-flex',
                       alignItems: 'center',
                       background: 'none',
                       border: 'none',
                       borderTop: '2px solid transparent',
-                      borderBottom: active ? '2px solid #ffffff' : '2px solid transparent',
-                      padding: '10px 2px',
+                      borderBottom: active ? '2px solid var(--ax-primary)' : '2px solid transparent',
+                      padding: '0 2px',
                       cursor: 'pointer',
                       fontFamily: 'var(--ax-font-text)',
-                      fontSize: 'var(--ax-nav-link-size)',
+                      fontSize: 13.5,
                       fontWeight: active ? 600 : 400,
-                      lineHeight: 'var(--ax-nav-link-lh)',
-                      letterSpacing: 'var(--ax-nav-link-ls)',
-                      color: active ? 'var(--ax-on-dark)' : 'rgba(255,255,255,0.82)',
+                      letterSpacing: '-0.01em',
+                      color: active ? 'var(--ax-header-ink)' : 'var(--ax-header-muted)',
                       whiteSpace: 'nowrap',
+                      transition: 'color 140ms ease, border-color 140ms ease',
                     }}
                   >
-                    {group.label}
+                    {item.label}
                   </button>
                 </li>
               );
             })}
           </ul>
-        </div>
-      </nav>
 
-      <div
-        style={{
-          minHeight: 'var(--ax-subnav-height)',
-          background: 'rgba(245, 245, 247, 0.85)',
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 'var(--ax-workbench-max)',
-            padding: '8px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <span
-              className="ax-tagline"
+          <div
+            ref={menuContainerRef}
+            style={{
+              position: 'relative',
+              display: 'inline-flex',
+              alignItems: 'center',
+              flexShrink: 0,
+              marginLeft: 6,
+            }}
+          >
+            <button
+              ref={menuTriggerRef}
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="jx-header-link"
               style={{
-                color: 'var(--ax-ink)',
-                whiteSpace: 'nowrap',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 8,
+                gap: 5,
+                height: 30,
+                padding: '0 9px',
+                borderRadius: 'var(--ax-rounded-sm)',
+                background: menuOpen || inSecondaryTool ? 'var(--ax-surface-alt)' : 'transparent',
+                border:
+                  menuOpen || inSecondaryTool
+                    ? '1px solid var(--ax-hairline)'
+                    : '1px solid transparent',
+                cursor: 'pointer',
+                fontFamily: 'var(--ax-font-text)',
+                fontSize: 13,
+                fontWeight: inSecondaryTool ? 600 : 500,
+                color: inSecondaryTool || menuOpen ? 'var(--ax-header-ink)' : 'var(--ax-header-muted)',
+                whiteSpace: 'nowrap',
+                transition: 'color 140ms ease, background-color 140ms ease, border-color 140ms ease',
               }}
             >
-              <span
+              <span>工作台</span>
+              <svg
                 aria-hidden="true"
+                width="10"
+                height="10"
+                viewBox="0 0 12 12"
+                fill="none"
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: activeGroup.accent,
-                  display: 'inline-block',
-                  flexShrink: 0,
+                  transform: menuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 150ms ease',
                 }}
-              />
-              {sectionName(location.pathname)}
-            </span>
+              >
+                <path
+                  d="M2.5 4.5L6 8L9.5 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
 
-            <nav aria-label="场景子导航" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {activeGroup.subLinks.map((sub) => {
-                const subActive = location.pathname === sub.to;
-                return (
-                  <button
-                    key={sub.to}
-                    type="button"
-                    onClick={() => navigate(sub.to)}
-                    aria-current={subActive ? 'page' : undefined}
-                    className="ax-press"
-                    style={{
-                      background: subActive ? activeGroup.soft : 'transparent',
-                      border: subActive ? `1px solid ${activeGroup.border}` : '1px solid transparent',
-                      borderRadius: 'var(--ax-rounded-pill)',
-                      padding: '4px 12px',
-                      cursor: 'pointer',
-                      fontFamily: 'var(--ax-font-text)',
-                      fontSize: 12.5,
-                      fontWeight: subActive ? 600 : 400,
-                      color: subActive ? activeGroup.accent : 'var(--ax-text-secondary)',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {sub.label}
-                  </button>
-                );
-              })}
-            </nav>
+            {menuOpen && (
+              <div
+                role="menu"
+                aria-label="工作台与工具页面"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 10px)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 560,
+                  maxWidth: 'calc(100vw - 24px)',
+                  background: 'var(--ax-surface)',
+                  border: '1px solid var(--ax-hairline)',
+                  borderRadius: 8,
+                  boxShadow: menuShadow,
+                  padding: 14,
+                  zIndex: 1200,
+                  color: 'var(--ax-ink)',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {WORKBENCH_GROUPS.map((group) => (
+                  <div key={group.groupLabel} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--ax-font-mono)',
+                        fontSize: 10.5,
+                        color: 'var(--ax-text-secondary)',
+                        padding: '2px 8px 6px',
+                        borderBottom: '1px solid var(--ax-hairline)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      {group.groupLabel}
+                    </div>
+                    {group.items.map((sub) => {
+                      const subActive = location.pathname === sub.to;
+                      return (
+                        <button
+                          key={sub.to}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            navigate(sub.to);
+                          }}
+                          className="jx-workbench-item"
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1,
+                            padding: '6px 8px',
+                            borderRadius: 6,
+                            background: subActive ? 'var(--ax-surface-alt)' : 'transparent',
+                            border: subActive
+                              ? '1px solid var(--ax-hairline)'
+                              : '1px solid transparent',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontFamily: 'var(--ax-font-text)',
+                            transition: 'background-color 120ms ease',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: subActive ? 600 : 500,
+                              color: 'var(--ax-ink)',
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {sub.label}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: 'var(--ax-text-secondary)',
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {sub.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        </nav>
 
+        {/* 右侧：主题切境触发器 + 单一克制辅助入口 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <ThemeSwitcher />
           {!inCapture && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Button
-                className="ax-btn--pill ax-btn--ghost"
-                size="small"
-                onClick={() => navigate('/report/latest')}
-                style={{ fontSize: 'var(--ax-caption-size)', paddingInline: 16, height: 32 }}
-              >
-                查看最新报告
-              </Button>
-              <Button
-                type="primary"
-                className="ax-btn--pill"
-                size="small"
-                onClick={() => navigate('/research')}
-                style={{ fontSize: 'var(--ax-caption-size)', paddingInline: 18, height: 32 }}
-              >
-                开始科研采录
-              </Button>
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/report/latest')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                height: 32,
+                padding: '0 11px',
+                borderRadius: 'var(--ax-rounded-sm)',
+                background: 'transparent',
+                border: '1px solid var(--ax-hairline)',
+                color: 'var(--ax-header-ink)',
+                fontFamily: 'var(--ax-font-text)',
+                fontSize: 12.5,
+                fontWeight: 500,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              最新报告
+            </button>
           )}
         </div>
       </div>

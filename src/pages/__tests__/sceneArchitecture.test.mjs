@@ -4,7 +4,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -100,6 +100,44 @@ describe('第三隐私挡位与随访合规守卫', () => {
       for (const bad of ['患者', '抑郁', '焦虑', '推荐录用', '能力等级']) {
         assert.equal(pageText.includes(bad), false, `${rel} 不允许出现禁止词「${bad}」`);
       }
+    }
+  });
+});
+
+describe('四套大厂设计体系与动态切境架构', () => {
+  test('docs/design-systems 保存 4 份权威 DESIGN.md 原文', () => {
+    const docsRoot = resolve(SRC_ROOT, '../docs/design-systems');
+    for (const file of ['vercel.DESIGN.md', 'linear.DESIGN.md', 'claude.DESIGN.md', 'oura.DESIGN.md']) {
+      const p = resolve(docsRoot, file);
+      assert.equal(existsSync(p), true, `缺少权威设计文档 ${file}`);
+      assert.ok(readFileSync(p, 'utf8').length > 2000, `设计文档 ${file} 内容过短`);
+    }
+  });
+
+  test('designThemes.ts 与 ThemeContext.tsx 注册四大世界及路由动态切境，App.tsx 已接入 DesignThemeProvider', () => {
+    const themesCode = codeOf(readFileSync(resolve(SRC_ROOT, 'theme/designThemes.ts'), 'utf8'));
+    const ctxCode = codeOf(readFileSync(resolve(SRC_ROOT, 'theme/ThemeContext.tsx'), 'utf8'));
+    const switcherCode = codeOf(readFileSync(resolve(SRC_ROOT, 'components/common/ThemeSwitcher.tsx'), 'utf8'));
+    const appCode = codeOf(readFileSync(resolve(SRC_ROOT, 'App.tsx'), 'utf8'));
+
+    for (const world of ["'vercel'", "'linear'", "'claude'", "'oura'"]) {
+      assert.match(themesCode, new RegExp(world), `designThemes.ts 缺少世界 ${world}`);
+    }
+    assert.match(themesCode, /darkAlgorithm/, 'Linear 世界必须启用 AntD darkAlgorithm');
+    assert.match(ctxCode, /DesignThemeProvider/, '缺少 DesignThemeProvider');
+    assert.match(switcherCode, /useDesignTheme/, 'ThemeSwitcher 未接入 useDesignTheme');
+    assert.match(appCode, /DesignThemeProvider/, 'App.tsx 未包裹 DesignThemeProvider');
+  });
+
+  test('三大场景 Hub 独立精雕构图，不再共享 BaseHubTemplate 通用模板', () => {
+    assert.equal(
+      existsSync(resolve(SRC_ROOT, 'components/common/BaseHubTemplate.tsx')),
+      false,
+      '应移除通用模版 BaseHubTemplate.tsx'
+    );
+    for (const hub of ['pages/ResearchHubPage.tsx', 'pages/MetacognitionHubPage.tsx', 'pages/FollowupHubPage.tsx']) {
+      const code = readFileSync(resolve(SRC_ROOT, hub), 'utf8');
+      assert.equal(code.includes('BaseHubTemplate'), false, `${hub} 不应继续依赖 BaseHubTemplate`);
     }
   });
 });

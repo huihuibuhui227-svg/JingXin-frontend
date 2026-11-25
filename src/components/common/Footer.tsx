@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDesignTheme } from '@/theme/ThemeContext';
 import { BRAND_FULL_TITLE, BRAND_PRINCIPLE, BRAND_SLOGAN } from '@/utils/constants';
 
 const QUICK_LINKS = [
@@ -15,13 +16,14 @@ const QUICK_LINKS = [
 
 const Footer: React.FC = () => {
   const navigate = useNavigate();
+  const { themeSpec } = useDesignTheme();
 
   return (
     <footer
       style={{
-        background: 'var(--ax-parchment)',
-        color: 'var(--ax-ink-muted-80)',
-        padding: '48px 24px 32px',
+        background: 'var(--ax-footer-bg)',
+        color: 'var(--ax-footer-ink)',
+        padding: '44px 24px 28px',
         borderTop: '1px solid var(--ax-hairline)',
       }}
     >
@@ -36,42 +38,54 @@ const Footer: React.FC = () => {
             paddingBottom: 24,
           }}
         >
-          <div style={{ maxWidth: 480 }}>
+          <div style={{ maxWidth: 500 }}>
             <div
               style={{
                 fontFamily: 'var(--ax-font-display)',
                 fontSize: 15,
                 fontWeight: 600,
-                color: 'var(--ax-ink)',
-                letterSpacing: '-0.2px',
+                color: 'var(--ax-footer-link)',
+                letterSpacing: '-0.02em',
               }}
             >
               {BRAND_FULL_TITLE}
             </div>
-            <div
+            <p
               className="ax-fine-print"
-              style={{ color: 'var(--ax-text-secondary)', marginTop: 6, lineHeight: 1.65 }}
+              style={{
+                color: 'var(--ax-footer-ink)',
+                margin: '8px 0 0',
+                lineHeight: 1.68,
+              }}
             >
               {BRAND_SLOGAN} · {BRAND_PRINCIPLE}。原始音视频与采集日志按场次独立留存并支持可控清理；
               报告层不产出综合评分、不作等级评定、不作心理或临床推断。
-            </div>
+            </p>
           </div>
 
-          <nav aria-label="页脚快捷入口" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px' }}>
+          <nav
+            aria-label="页脚快捷入口"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px 18px',
+              maxWidth: 420,
+            }}
+          >
             {QUICK_LINKS.map((item) => (
               <button
                 key={item.to}
                 type="button"
                 onClick={() => navigate(item.to)}
-                className="ax-press"
                 style={{
                   background: 'none',
                   border: 'none',
                   padding: '4px 0',
                   cursor: 'pointer',
                   fontFamily: 'var(--ax-font-text)',
-                  fontSize: 'var(--ax-caption-size)',
-                  color: 'var(--ax-primary)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: 'var(--ax-footer-link)',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -82,18 +96,29 @@ const Footer: React.FC = () => {
         </div>
 
         <div
+          aria-hidden="true"
+          style={{
+            height: 1,
+            background: 'var(--ax-footer-ink)',
+            opacity: 0.2,
+            marginBottom: 16,
+          }}
+        />
+
+        <div
           className="ax-fine-print"
           style={{
-            borderTop: '1px solid var(--ax-hairline)',
-            paddingTop: 16,
-            color: 'var(--ax-text-secondary)',
+            color: 'var(--ax-footer-ink)',
             display: 'flex',
             justifyContent: 'space-between',
+            alignItems: 'center',
             gap: 16,
             flexWrap: 'wrap',
           }}
         >
-          <span>{BRAND_FULL_TITLE}</span>
+          <span>
+            {BRAND_FULL_TITLE} · 视觉风格：{themeSpec.brandName} ({themeSpec.zhLabel})
+          </span>
           <span>面部动作观察 · 上肢姿态轨迹 · 语音声学与转写 · 可追溯行为证据</span>
         </div>
       </div>

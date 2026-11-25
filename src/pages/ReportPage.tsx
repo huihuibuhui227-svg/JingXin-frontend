@@ -44,6 +44,7 @@ import { getAdminToken } from '@/services/recordingsApi';
 import { API_BASE_URL } from '@/utils/constants';
 import { downloadFile } from '@/utils/helpers';
 import { EvaluationResult, Coverage } from '@/types/assessment';
+import '@/styles/world-linear.css';
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -368,7 +369,7 @@ const ReportPage: React.FC = () => {
 
   if (error) {
     return (
-      <Content style={{ padding: '40px' }}>
+      <Content className="ax-report-shell" style={{ padding: '40px 24px' }}>
         <Result
           status="warning"
           title="暂无报告数据"
@@ -388,7 +389,7 @@ const ReportPage: React.FC = () => {
 
   if (!report) {
     return (
-      <Content style={{ padding: '40px' }}>
+      <Content className="ax-report-shell" style={{ padding: '40px 24px' }}>
         <Result
           status="info"
           title="暂无行为证据报告"
@@ -435,25 +436,50 @@ const ReportPage: React.FC = () => {
         : [];
 
   return (
-    <Content style={{ padding: '24px' }}>
+    <Content className="ax-report-shell" style={{ padding: '28px 24px 56px' }}>
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
         {/* 顶栏操作 */}
-        <div
-          style={{
-            marginBottom: 20,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <Space wrap align="center" size={14}>
-            <Button onClick={() => navigate('/reports')}>← 返回报告中心</Button>
-            <h1 style={{ margin: 0, fontSize: 'var(--ax-display-md-size)', fontWeight: 600 }}>
+        <header className="ax-report-header">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <Button
+                type="text"
+                size="small"
+                onClick={() => navigate('/reports')}
+                style={{
+                  padding: '2px 8px 2px 0',
+                  height: 'auto',
+                  color: 'var(--ax-text-secondary)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                ← 返回报告中心
+              </Button>
+              <span aria-hidden="true" style={{ color: 'var(--ax-hairline)' }}>
+                |
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--ax-font-mono)',
+                  fontSize: 11.5,
+                  letterSpacing: '0.06em',
+                  color: 'var(--ax-text-secondary)',
+                }}
+              >
+                EVIDENCE DISCLOSURE BRIEF · 行为证据核验简报
+              </span>
+            </div>
+            <h1
+              className="ax-report-title"
+              style={{
+                margin: '10px 0 0',
+                fontFamily: 'var(--ax-font-serif, var(--ax-font-display))',
+              }}
+            >
               行为证据披露报告
             </h1>
-          </Space>
+          </div>
           <Space wrap>
             <Segmented
               aria-label="切换报告场景档案"
@@ -479,7 +505,7 @@ const ReportPage: React.FC = () => {
               disabledReason={describedId ? undefined : '报告尚未生成(这份报告还没有关联会话)'}
             />
           </Space>
-        </div>
+        </header>
 
         {!describedId && (
           <Alert
@@ -490,8 +516,8 @@ const ReportPage: React.FC = () => {
             description={
               <span style={{ fontSize: 13 }}>
                 要下载文件:到「历史报告」列表,点那一行行尾的「下载」。
-                要看某一场的结构化报告:在「历史报告」里选那一份,或直接访问
-                <code>{'/report/<会话号>'}</code>。
+                要看某一场的结构化报告:在「历史报告」里选那一份,或直接访问{' '}
+                <code className="ax-mono-code">{'/report/<会话号>'}</code>。
               </span>
             }
             action={
@@ -515,7 +541,7 @@ const ReportPage: React.FC = () => {
 
         {/* 受试者身份 / 演示模式脱敏横幅 */}
         {subject !== null && (
-          <Card size="small" style={{ marginBottom: 16 }} data-testid="report-subject">
+          <Card className="ax-card" size="small" style={{ marginBottom: 16 }} data-testid="report-subject">
             {isRedactedSubject ? (
               <div
                 style={{
@@ -547,14 +573,14 @@ const ReportPage: React.FC = () => {
               </div>
             ) : subjectPairs.length === 0 ? (
               <div style={{ color: 'var(--ax-text-secondary)', fontSize: 13.5 }}>
-                受试者：<strong>未填写身份信息</strong>
+                受试者：<strong style={{ color: 'var(--ax-ink)' }}>未填写身份信息</strong>
               </div>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 18px' }}>
                 {subjectPairs.map(([k, v]) => (
                   <span key={k} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
                     <span style={{ color: 'var(--ax-text-secondary)', fontSize: 13 }}>{k}</span>
-                    <strong>{v}</strong>
+                    <strong style={{ color: 'var(--ax-ink)' }}>{v}</strong>
                   </span>
                 ))}
               </div>
@@ -567,7 +593,7 @@ const ReportPage: React.FC = () => {
                 {describedSession && (
                   <>
                     {' '}
-                    · 采录场次 <code style={{ fontSize: 12 }}>{describedSession}</code>
+                    · 采录场次 <code className="ax-mono-code">{describedSession}</code>
                   </>
                 )}
               </div>
@@ -590,7 +616,7 @@ const ReportPage: React.FC = () => {
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 <span
                   style={{
                     display: 'inline-flex',
@@ -598,7 +624,7 @@ const ReportPage: React.FC = () => {
                     gap: 6,
                     fontSize: 13,
                     fontWeight: 600,
-                    color: 'var(--ax-primary)',
+                    color: 'var(--ax-accent-ink)',
                   }}
                 >
                   <ReadOutlined />
@@ -636,10 +662,10 @@ const ReportPage: React.FC = () => {
               </div>
 
               <h2
+                className="ax-narrative-paper__title"
                 style={{
                   margin: 0,
-                  fontSize: 22,
-                  fontWeight: 600,
+                  fontFamily: 'var(--ax-font-serif, var(--ax-font-display))',
                   color: 'var(--ax-ink)',
                 }}
               >
@@ -725,7 +751,7 @@ const ReportPage: React.FC = () => {
 
         {/* 当前场景档案合规边界、主动封停项与场景扩展观测 */}
         {report.scene_profile && (
-          <Card size="small" style={{ marginBottom: 16 }}>
+          <Card className="ax-card" size="small" style={{ marginBottom: 16 }}>
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
               <div
                 style={{
@@ -740,7 +766,7 @@ const ReportPage: React.FC = () => {
                   <Tag
                     style={{
                       margin: 0,
-                      color: 'var(--ax-primary)',
+                      color: 'var(--ax-info)',
                       background: 'var(--ax-info-soft)',
                       borderColor: 'var(--ax-info-border)',
                       fontWeight: 600,
@@ -749,7 +775,16 @@ const ReportPage: React.FC = () => {
                     当前场景：{report.scene_profile.name}
                   </Tag>
                   {report.scene_profile.weight_label && (
-                    <Tag style={{ margin: 0 }}>{report.scene_profile.weight_label}</Tag>
+                    <Tag
+                      style={{
+                        margin: 0,
+                        color: 'var(--ax-ink-muted-80)',
+                        background: 'var(--ax-surface-alt)',
+                        borderColor: 'var(--ax-hairline)',
+                      }}
+                    >
+                      {report.scene_profile.weight_label}
+                    </Tag>
                   )}
                 </Space>
                 {reviewNote && (
@@ -762,7 +797,12 @@ const ReportPage: React.FC = () => {
                             background: 'var(--ax-success-soft)',
                             borderColor: 'var(--ax-success-border)',
                           }
-                        : { margin: 0 }
+                        : {
+                            margin: 0,
+                            color: 'var(--ax-text-secondary)',
+                            background: 'var(--ax-surface-alt)',
+                            borderColor: 'var(--ax-hairline)',
+                          }
                     }
                   >
                     复核状态：{reviewNote.verification_label}
@@ -846,11 +886,13 @@ const ReportPage: React.FC = () => {
         {/* 10 秒看懂导语卡片 */}
         {leadSummary && (
           <Card
+            className="ax-card"
             size="small"
             style={{
               marginBottom: 16,
               background: 'var(--ax-info-soft)',
               borderColor: 'var(--ax-info-border)',
+              borderLeft: '3px solid var(--ax-info)',
             }}
           >
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ax-info)', marginBottom: 4 }}>
@@ -917,13 +959,13 @@ const ReportPage: React.FC = () => {
           })()}
 
         {/* 三段式覆盖大数卡片 */}
-        <Card style={{ marginBottom: 20 }}>
+        <Card className="ax-card" style={{ marginBottom: 20 }}>
           <div style={{ textAlign: 'center', padding: '14px 12px' }}>
             <div
               style={{
                 fontSize: 44,
                 fontWeight: 700,
-                color: 'var(--ax-primary)',
+                color: 'var(--ax-accent-ink)',
                 marginBottom: 6,
                 fontVariantNumeric: 'tabular-nums',
               }}
@@ -952,18 +994,28 @@ const ReportPage: React.FC = () => {
                           minWidth: 155,
                           maxWidth: 250,
                           textAlign: 'left',
-                          padding: '10px 14px',
+                          padding: '12px 14px',
+                          background: 'var(--ax-surface-alt)',
                           border: '1px solid var(--ax-hairline)',
-                          borderRadius: 10,
+                          borderRadius: 'var(--ax-rounded-md)',
                         }}
                       >
-                        <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--ax-primary)' }}>
+                        <div
+                          style={{
+                            fontSize: 22,
+                            fontWeight: 600,
+                            color: 'var(--ax-accent-ink)',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
                           {seg.n}{' '}
                           <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ax-text-secondary)' }}>
                             项
                           </span>
                         </div>
-                        <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{seg.label}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ax-ink)', marginTop: 2 }}>
+                          {seg.label}
+                        </div>
                         {seg.n_passed !== null && (
                           <div style={{ fontSize: 13, color: 'var(--ax-text-secondary)' }}>
                             通过 {seg.n_passed} / {seg.n}
@@ -1010,7 +1062,7 @@ const ReportPage: React.FC = () => {
               </>
             )}
             {coverage?.confidence_cap && (
-              <div style={{ color: 'var(--ax-primary)', fontWeight: 600, marginTop: 12 }}>
+              <div style={{ color: 'var(--ax-accent-ink)', fontWeight: 600, marginTop: 12 }}>
                 全场最高置信度上限：{coverage.confidence_cap}
               </div>
             )}
@@ -1022,10 +1074,10 @@ const ReportPage: React.FC = () => {
 
         {/* 会话数据源实况 */}
         {sources !== null && (
-          <Card size="small" style={{ marginBottom: 20 }}>
+          <Card className="ax-card" size="small" style={{ marginBottom: 20 }}>
             <div style={{ color: 'var(--ax-text-secondary)', fontSize: 13.5 }}>
-              <strong>本场采录记录：</strong>
-              <code>{describedSession ?? '（无 —— 本场没有任何日志）'}</code>
+              <strong style={{ color: 'var(--ax-ink)' }}>本场采录记录：</strong>
+              <code className="ax-mono-code">{describedSession ?? '（无 —— 本场没有任何日志）'}</code>
             </div>
             {sources && (
               <ul
