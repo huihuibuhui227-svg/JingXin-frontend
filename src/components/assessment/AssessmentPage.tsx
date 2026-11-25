@@ -37,43 +37,43 @@ interface AssessmentConfig {
 const CONFIG: Record<AssessmentScenarioType, AssessmentConfig> = {
   interview: {
     type: 'interview',
-    badge: '面试过程观测 · 基地一',
-    title: '面试行为采集与观测',
-    subtitle: '按题库顺序完成问答，同步记录面部动作、上肢姿态与语音转写，结束后自动生成行为证据报告。',
-    inProgressTitle: '面试采集进行中',
-    startButtonText: '开始面试采集',
-    startButtonColor: 'var(--ax-primary)',
-    loadingTip: '正在启动面试采集会话...',
+    badge: '研思循证 · 模拟答辩与面试采录',
+    title: '答辩与面试行为采录',
+    subtitle: '按题库顺序完成问答，同步记录面部动作、上肢姿态与语音转写，结束后自动生成可读行为观察报告。',
+    inProgressTitle: '答辩采录进行中',
+    startButtonText: '开始答辩采录',
+    startButtonColor: 'var(--ax-b1)',
+    loadingTip: '正在准备采录环境...',
   },
   research: {
     type: 'research',
-    badge: '科研过程观测 · 基地一（60% 主线）',
-    title: '科研行为采集与观测',
-    subtitle: '记录科研汇报与课题问答过程中的多模态行为数据与语音转写，结束后自动生成行为证据报告。',
-    inProgressTitle: '科研采集进行中',
-    startButtonText: '开始科研采集',
-    startButtonColor: 'var(--ax-primary)',
-    loadingTip: '正在启动科研采集会话...',
+    badge: '研思循证 · 科研行为过程分析',
+    title: '科研行为采录与过程观测',
+    subtitle: '记录科研汇报与课题问答过程中的多模态行为线索与语音转写，结束后自动生成可读行为观察报告。',
+    inProgressTitle: '科研采录进行中',
+    startButtonText: '开始科研采录',
+    startButtonColor: 'var(--ax-b1)',
+    loadingTip: '正在准备采录环境...',
   },
   metacognition: {
     type: 'metacognition',
-    badge: 'AI 元能力三阶段审辨实训 · 基地二（30% 拓展）',
-    title: 'AI 元能力与求职审辨实训',
-    subtitle: '围绕「阅读 AI 回答 → 审辨找错 → 阐述修正」三阶段结构完成作答，提取连接质疑标记与复核锚点证据。',
-    inProgressTitle: 'AI 元能力审辨实训中',
+    badge: '元智审辨 · AI 元能力与职业实训',
+    title: 'AI 元能力三阶段审辨实训',
+    subtitle: '围绕「阅读 AI 回答 → 审辨找错 → 阐述修正」三阶段结构完成作答，客观记录质疑标记与三环调控过程。',
+    inProgressTitle: 'AI 审辨实训进行中',
     startButtonText: '开始审辨实训',
-    startButtonColor: 'var(--ax-primary)',
-    loadingTip: '正在启动 AI 元能力审辨实训会话...',
+    startButtonColor: 'var(--ax-b2)',
+    loadingTip: '正在准备实训环境...',
   },
   followup: {
     type: 'followup',
-    badge: '非医疗长周期科研随访 · 基地三（10% 前瞻）',
+    badge: '时序观微 · 匿名个体纵向随访',
     title: '匿名无影像行为随访采录',
-    subtitle: '默认仅在内存提取匿名三维姿态与声学标量，零原始图像及原声落盘，仅作个体内首访基线对比。',
+    subtitle: '仅保存匿名特征（不保存原始画面与录音），仅作个人首访基线自我参照对比。',
     inProgressTitle: '匿名随访采录进行中',
     startButtonText: '开始匿名随访采录',
-    startButtonColor: 'var(--ax-primary)',
-    loadingTip: '正在启动匿名随访会话...',
+    startButtonColor: 'var(--ax-b3)',
+    loadingTip: '正在准备匿名随访环境...',
   },
 };
 
@@ -148,7 +148,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
       const ok = await start();
       if (!ok) {
         // `useAssessment.start()` 已经喊过具体原因了,这里不重复喊。
-        message.error('这一场没有开始 —— 会话没有铸成,采不到任何素材', 0);
+        message.error('未能生成本场采录编号，未开始采集', 0);
         return false;
       }
       return true;
@@ -534,7 +534,7 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
               style={{ marginTop: 16, textAlign: 'left' }}
               message={
                 initialTaskBanner.positionTitle
-                  ? `联动自岗位 MCP：${initialTaskBanner.positionTitle}`
+                  ? `关联岗位实训：${initialTaskBanner.positionTitle}`
                   : '三阶段 AI 审辨实训指引'
               }
               description={
@@ -662,40 +662,56 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
 
   const busy = recording.saveState !== 'idle' || ended;
 
+  const privacySummary =
+    consent === 'anonymous_kinematics_only'
+      ? '仅保存匿名特征（不保存原始画面与录音）'
+      : consent === 'audio_only'
+        ? '仅采集声音（未打开摄像头，面部与上肢记录为未采集）'
+        : null;
+
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        {complianceBanner && (
-          <Alert
-            type="info" showIcon style={{ marginBottom: 12 }}
-            message={complianceBanner}
-          />
-        )}
-        {consent === 'audio_only' && (
-          <Alert
-            type="info" showIcon style={{ marginBottom: 16 }}
-            message="本场只采声音 —— 摄像头没有被打开"
-            description="这是征询时选定的范围,不是故障。面部与手势两个维度本场没有数据,
-              报告里会如实标注「未采集」。"
-          />
-        )}
-        {consent === 'anonymous_kinematics_only' && (
-          <Alert
-            type="success" showIcon style={{ marginBottom: 16 }}
-            message="匿名无影像隐私模式运行中 —— 原始图像、原声与原生录像均零落盘"
-            description="系统仅在内存提取三维面部姿态矩阵、上肢运动轨迹与声学特征标量日志，不写回任何可识别影像原件。"
-          />
-        )}
-        {initialTaskBanner?.prompt && (
-          <Alert
-            type="info" showIcon style={{ marginBottom: 16 }}
-            message={
-              initialTaskBanner.positionTitle
-                ? `当前实训关联岗位：${initialTaskBanner.positionTitle}（阅读 AI 回答 → 指出漏洞 → 口头修正）`
-                : '三阶段 AI 审辨实训提示（阅读 AI 回答 → 指出漏洞 → 口头修正）'
-            }
-            description={initialTaskBanner.prompt}
-          />
+        {(complianceBanner || privacySummary || initialTaskBanner?.prompt) && (
+          <div
+            role="status"
+            style={{
+              marginBottom: 16,
+              padding: '10px 16px',
+              borderRadius: 'var(--ax-rounded-md)',
+              background: 'var(--ax-info-soft)',
+              border: '1px solid var(--ax-info-border)',
+              color: 'var(--ax-ink)',
+              fontSize: 13,
+              lineHeight: 1.65,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            {privacySummary && (
+              <div>
+                <strong style={{ color: 'var(--ax-success)' }}>隐私模式：</strong>
+                <span>{privacySummary}</span>
+              </div>
+            )}
+            {complianceBanner && (
+              <div>
+                <strong style={{ color: 'var(--ax-info)' }}>场景说明：</strong>
+                <span>{complianceBanner}</span>
+              </div>
+            )}
+            {initialTaskBanner?.prompt && (
+              <div>
+                <strong style={{ color: 'var(--ax-info)' }}>
+                  {initialTaskBanner.positionTitle
+                    ? `实训提示（${initialTaskBanner.positionTitle}）：`
+                    : '实训提示：'}
+                </strong>
+                <span>{initialTaskBanner.prompt}</span>
+              </div>
+            )}
+          </div>
         )}
         <DegradedBanner reasons={recording.degraded} />
         <LabelErrorBanner error={recording.labelError} />
@@ -703,10 +719,8 @@ const AssessmentPage: React.FC<AssessmentPageProps> = ({
         <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 'var(--ax-display-md-size)', fontWeight: 600 }}>{config.inProgressTitle}</h1>
-            {/* 本场 session_id 必须看得见:录完要拿它去跑报告(报告按 id 取每个模态的
-                日志),而"报告里什么都没有"往往就是这个号对不上。 */}
             <div style={{ fontSize: '13px', marginTop: '4px', color: sid ? 'var(--ax-success)' : 'var(--ax-text-secondary)' }}>
-              {sid ? `本场 session_id：${sid}` : '尚未铸到会话号'}
+              {sid ? `本场采录编号：${sid}` : '开始采录后自动生成'}
             </div>
             {recording.savedLabel && (
               <div style={{ fontSize: '13px', marginTop: '4px', color: 'var(--ax-primary)' }}>

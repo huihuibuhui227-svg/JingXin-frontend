@@ -58,13 +58,10 @@ export const LabelModal: React.FC<{
       <div style={{ display: 'grid', gap: '12px', paddingTop: '8px' }}>
         <div>
           <div style={{ fontSize: '13px', color: 'var(--ax-text-secondary)', marginBottom: '4px' }}>
-            时间(取自本场 session_id,不可改)
+            采录时间（自动生成，不可修改）
           </div>
-          {/* ⚠️ 开录前填标时**还不知道** sid —— 铸号发生在"确定"之后(见
-              `useSessionRecording` 的 `onPrepareSession`)。所以这里如实说"还不知道",
-              而不是留一个看着像坏了的空框。录完改标时它是有的。 */}
           <Input value={sidTime(sid)} readOnly disabled
-            placeholder={sid ? undefined : '(铸号之后才知道)'} />
+            placeholder={sid ? undefined : '（开始采录后自动生成）'} />
         </div>
         {LABEL_FIELDS.map(([key, title]) => (
           <div key={key}>
@@ -156,9 +153,9 @@ export const ConsentModal: React.FC<{
               </div>
             </Radio>
             <Radio value="anonymous_kinematics_only">
-              <strong>仅匿名特征（原始影像与原声零落盘）</strong>
+              <strong>仅保存匿名特征（不保存原始画面与录音）</strong>
               <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>
-                摄像头与麦克风仅在内存完成三维姿态与声学标量提取，服务端<strong>不落盘任何原始图像、原声或原生录像</strong>。
+                摄像头与麦克风仅在内存完成三维姿态与声学特征提取，不保存任何原始画面、录音或视频文件。
               </div>
             </Radio>
           </Space>
@@ -206,7 +203,7 @@ export const StopConfirmModal: React.FC<{
     <p style={{ margin: 0, color: 'var(--ax-text-secondary)', fontSize: '13px' }}>
       本场：{label ?? '(没有标注)'}
       <br />
-      session_id：{sid ?? '(没有会话号)'}
+      本场采录编号：{sid ?? '（开始采录后自动生成）'}
     </p>
   </Modal>
 );
@@ -274,7 +271,7 @@ export const SaveGateModal: React.FC<{
         : saveState === 'saving' ? '正在保存本场录像…'
           : saveState === 'purging' ? '正在删除本场素材…'
             : saveState === 'saved' ? '本场已留存'
-              : saveState === 'purged' ? '本场没有入盘'
+              : saveState === 'purged' ? '本场已清除（未做保存）'
                 : '本场没有处理成功'}
       open={saveState !== 'idle'}
       closable={false}
@@ -305,16 +302,16 @@ export const SaveGateModal: React.FC<{
       {(saveState === 'saved' || saveState === 'purged') && savedInfo && (
         <div style={{ fontSize: 14, lineHeight: 1.9 }}>
           <div>本场：<strong>{savedInfo.label ?? '(没有标注)'}</strong></div>
-          <div>session_id：{savedInfo.sid ?? '(没有会话号)'}</div>
+          <div>本场采录编号：{savedInfo.sid ?? '（尚未生成）'}</div>
           {saveState === 'saved' ? (
             <div>素材：<strong>{savedInfo.bytes
               ? `${(savedInfo.bytes / 1048576).toFixed(1)} MB`
               : consentMode === 'anonymous_kinematics_only'
-                ? '（匿名特征模式：仅记录三维姿态与声学标量日志，原始影像与原声未入盘）'
-                : '(本场没有原生录像,盘上只有帧与日志)'}</strong></div>
+                ? '（仅保存匿名特征，不保存原始画面与录音）'
+                : '(本场没有原生录像,仅保留提取记录)'}</strong></div>
           ) : (
             <div style={{ color: 'var(--ax-error)' }}>
-              已删除 —— 场次目录与日志 CSV 都从盘上抹掉了,<strong>没有入盘</strong>。
+              已删除 —— 本场文件与分析记录已彻底清除，<strong>未做保存</strong>。
             </div>
           )}
           {/* 录完当场体检:字节存下了 ≠ 存下的东西是好的。两者必须分开说,
@@ -390,7 +387,7 @@ export const AbandonConfirmModal: React.FC<{
       它<strong>只存在于内存里</strong>,放弃之后<strong>无法找回</strong>。
     </p>
     <p style={{ margin: 0, color: 'var(--ax-text-secondary)', fontSize: '13px' }}>
-      本场：{label ?? '(没有标注)'}　session_id：{sid ?? '(没有会话号)'}
+      本场：{label ?? '(没有标注)'}　采录编号：{sid ?? '（尚未生成）'}
     </p>
   </Modal>
 );

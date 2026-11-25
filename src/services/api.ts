@@ -348,11 +348,22 @@ export interface SystemHealthResponse {
   }>;
 }
 
+export type ReportAssistMode = 'narrative_review' | 'participant_feedback' | 'interview_guide' | 'summary';
+
+export interface ReportAssistSection {
+  title: string;
+  body: string;
+}
+
 export interface ReportLlmAssistResponse {
   status: string;
   session_id: string | null;
-  mode: 'summary' | 'interview_guide';
+  mode: ReportAssistMode;
   content: string;
+  sections?: ReportAssistSection[];
+  audience_label?: string;
+  scene_profile_id?: string;
+  reading_time_min?: number;
   source: 'local_llm' | 'deterministic_fallback';
   model: string;
   fallback_reason: string | null;
@@ -638,12 +649,14 @@ export const dashboardApi = {
 
   reportLlmAssist: async (params: {
     session_id?: string | null;
-    mode: 'summary' | 'interview_guide';
+    mode: ReportAssistMode;
     use_llm?: boolean;
+    scene_profile?: string;
+    refresh?: boolean;
   }): Promise<ReportLlmAssistResponse> => {
     const response = await axios.post(`${API_BASE_URL}/api/report/llm-assist`, params, {
       headers: adminHeaders(),
-      timeout: 20000,
+      timeout: 80000,
     });
     return response.data;
   },
@@ -664,10 +677,20 @@ export const dashboardApi = {
 
 // ── 一核三基地扩展接口：声明式场景档案 / Career MCP / 长周期随访 / 人工复核注记 ──
 
+export interface SceneProfileTheoreticalFoundation {
+  framework?: string;
+  core_principle?: string;
+  references?: string[];
+  key_constructs?: string[];
+}
+
 export interface SceneProfileDescriptor {
   id: string;
   name: string;
   short_label: string;
+  english_tag?: string;
+  theme_key?: 'base1' | 'base2' | 'base3' | string;
+  accent_color?: string;
   weight_label: string;
   route_base: string;
   baseline_mode: string;
@@ -681,6 +704,33 @@ export interface SceneProfileDescriptor {
   explicit_blocked_overrides: Array<{ key: string; label: string; reason: string }>;
   compliance_banner: string;
   description: string;
+  theoretical_foundation?: SceneProfileTheoreticalFoundation;
+  extensions?: {
+    all_metacognition_indicators?: Array<{
+      name: string;
+      label: string;
+      value: number | null;
+      unit: string;
+      confidence: string;
+      gap?: string | null;
+      summary?: string;
+    }>;
+    metacognition_regulation?: {
+      covered_loops_labels?: string[];
+      missing_loops_labels?: string[];
+      indicators?: Array<{
+        name: string;
+        label: string;
+        value: number | null;
+        unit: string;
+        confidence: string;
+        gap?: string | null;
+        summary?: string;
+      }>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export const sceneProfilesApi = {
@@ -707,6 +757,8 @@ export interface CareerCompetencyItem {
   required_indicators: string[];
   critique_focus?: string;
   matched_keywords?: string[];
+  theoretical_construct?: string;
+  theory_framework?: string;
 }
 
 export interface CareerPosition {
@@ -745,6 +797,8 @@ export interface EvidenceAlignmentResponse {
   position_title: string;
   scoring_participation: boolean;
   non_scoring_statement: string;
+  theoretical_construct?: string;
+  theory_framework?: string;
   summary_counts: {
     competencies_total: number;
     covered_strong: number;
@@ -760,6 +814,8 @@ export interface EvidenceAlignmentResponse {
     label: string;
     coverage_status: string;
     critique_focus: string;
+    theoretical_construct?: string;
+    theory_framework?: string;
     evidences: Array<{
       indicator: string;
       label: string;
@@ -855,6 +911,11 @@ export interface LongitudinalMetricSeries {
     p25: number | null;
     median: number | null;
     p75: number | null;
+    mad?: number | null;
+    iqr?: number | null;
+    ewma_lambda?: number;
+    ewma_latest?: number | null;
+    n_drift_flagged?: number;
     drawable: boolean;
   };
   points: Array<{
@@ -863,6 +924,9 @@ export interface LongitudinalMetricSeries {
     session_id: string;
     value: number | null;
     delta_from_t0_pct: number | null;
+    ewma_value?: number | null;
+    robust_drift_z?: number | null;
+    drift_status?: string;
     confidence: string;
     gap: string | null;
   }>;
@@ -895,6 +959,12 @@ export interface LongitudinalTrajectoryResponse {
   series: LongitudinalMetricSeries[];
   review_alerts: string[];
   compliance_note: string;
+  methodology?: {
+    paradigm?: string;
+    smoothing?: string;
+    robust_band?: string;
+    references?: string[];
+  };
 }
 
 export const longitudinalApi = {

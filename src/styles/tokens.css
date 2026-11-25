@@ -14,6 +14,19 @@
   --ax-primary-on-dark: #2997ff;
   --ax-on-primary: #ffffff;
 
+  /* ══ Colors · 三大应用基地语义强调色（全部通过 WCAG AA >= 4.5:1） ══ */
+  --ax-b1: #005bb5;
+  --ax-b1-soft: #eef5fc;
+  --ax-b1-border: #c2dcf5;
+
+  --ax-b2: #0b6e4f;
+  --ax-b2-soft: #edf7f3;
+  --ax-b2-border: #b7dfd0;
+
+  --ax-b3: #8a5300;
+  --ax-b3-soft: #fdf6ea;
+  --ax-b3-border: #ebd4aa;
+
   /* ══ Colors · Surface ═════════════════════════════════════ */
   --ax-canvas: #ffffff;
   --ax-parchment: #f5f5f7;

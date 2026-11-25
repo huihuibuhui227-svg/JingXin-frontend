@@ -17,6 +17,30 @@ import {
 const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
+const INDICATOR_LABELS: Record<string, string> = {
+  discourse_marker_rate: '连接词逻辑密度',
+  answer_detail_chars_p50: '回答详实度',
+  speech_rate: '语速',
+  counter_premise_marker_rate: '前提质疑与边界标记密度',
+  evidence_verification_marker_rate: '信息核验标记密度',
+  revision_anchor_density: '修正方案锚点密度',
+  metacognitive_regulation_balance: '三环调控覆盖度',
+  pause_structure_entropy: '停顿分布结构熵',
+  voiced_ratio: '有声占比',
+  pitch_variability_per_sec: '基频变化活跃度',
+  response_latency_sec: '首句响应时延',
+  pause_duration_p50: '单次停顿中位时长',
+  self_repair_rate: '口头自我修正率',
+  lexical_diversity: '词汇丰富度',
+  gaze_stability: '视线稳定性',
+  gaze_dwell_p50: '视线驻留中位时长',
+  gesture_activity_per_sec: '手势活动频率',
+  hand_openness_p50: '手掌舒展中位度',
+  smile_duration_p50: '微笑持续中位时长',
+};
+
+const labelOfIndicator = (key: string): string => INDICATOR_LABELS[key] || key;
+
 const extractSidFromReportItem = (item: any): string | null => {
   if (item?.session_id && /^\d{8}_\d{6}_[0-9a-f]{4}$/i.test(String(item.session_id))) {
     return String(item.session_id);
@@ -64,7 +88,7 @@ const CareerMcpPage: React.FC = () => {
         return res.positions[0] ?? null;
       });
     } catch (err: any) {
-      message.error(err?.response?.data?.message || err?.message || '读取岗位 MCP 目录失败');
+      message.error(err?.response?.data?.message || err?.message || '读取岗位能力库失败');
     } finally {
       setLoadingPos(false);
     }
@@ -102,7 +126,7 @@ const CareerMcpPage: React.FC = () => {
       setPracticeTask(taskRes);
       message.success('已完成岗位可观测线索拆解与审辨题生成');
     } catch (err: any) {
-      message.error(err?.response?.data?.message || err?.message || 'JD 拆解失败');
+      message.error(err?.response?.data?.message || err?.message || '岗位职责拆解失败');
     } finally {
       setDecomposing(false);
     }
@@ -111,7 +135,7 @@ const CareerMcpPage: React.FC = () => {
   const handleAlignEvidence = async () => {
     const sid = sessionId.trim();
     if (!sid) {
-      message.warning('请先选择或输入一个会话 session_id');
+      message.warning('请先选择或输入一个采录场次编号');
       return;
     }
     setAligning(true);
@@ -127,7 +151,7 @@ const CareerMcpPage: React.FC = () => {
       }
       message.success('已完成行为证据与岗位要求对照');
     } catch (err: any) {
-      message.error(err?.response?.data?.message || err?.message || '会话证据对照失败');
+      message.error(err?.response?.data?.message || err?.message || '采录证据对照失败');
     } finally {
       setAligning(false);
     }
@@ -179,13 +203,28 @@ const CareerMcpPage: React.FC = () => {
       key: 'label',
       render: (lbl: string, r) => (
         <div>
-          <Text strong>{lbl}</Text>
-          <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 2 }}>{r.critique_focus}</div>
+          <Space wrap size={6}>
+            <Text strong>{lbl}</Text>
+            {r.theoretical_construct && (
+              <Tag
+                style={{
+                  margin: 0,
+                  fontSize: 11.5,
+                  color: 'var(--ax-b2)',
+                  background: 'var(--ax-b2-soft)',
+                  borderColor: 'var(--ax-b2-border)',
+                }}
+              >
+                {r.theoretical_construct}
+              </Tag>
+            )}
+          </Space>
+          <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 4 }}>{r.critique_focus}</div>
         </div>
       ),
     },
     {
-      title: '证据覆盖判定',
+      title: '证据覆盖情况',
       dataIndex: 'coverage_status',
       key: 'coverage_status',
       width: 170,
@@ -214,7 +253,7 @@ const CareerMcpPage: React.FC = () => {
         <Space direction="vertical" size={4}>
           {evs.map((e) => (
             <div key={e.indicator} style={{ fontSize: 12.5 }}>
-              <Text strong>{e.label.replace(/\*\*/g, '')}</Text>：
+              <Text strong>{(e.label || labelOfIndicator(e.indicator)).replace(/\*\*/g, '')}</Text>：
               {e.value === null ? (
                 <Text type="secondary">缺口（{e.gap || '未采得'}）</Text>
               ) : (
@@ -234,24 +273,31 @@ const CareerMcpPage: React.FC = () => {
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
           <div>
-            <Tag style={{ marginBottom: 8, color: 'var(--ax-primary)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)', fontWeight: 600 }}>
-              基地二 · AI 元能力与求职实训中心（30% 拓展）
+            <Tag style={{ marginBottom: 8, color: 'var(--ax-b2)', background: 'var(--ax-b2-soft)', borderColor: 'var(--ax-b2-border)', fontWeight: 600 }}>
+              元智审辨 · AI 元能力与职业实训
             </Tag>
             <Title level={1} style={{ margin: 0, fontSize: 28 }}>
-              岗位搜索 · JD 拆解 · 标准 Career MCP 证据对照台
+              元智审辨 · 岗位能力画像与行为证据对照
             </Title>
             <Paragraph type="secondary" style={{ margin: '6px 0 0', maxWidth: 800 }}>
-              通过标准 JSON-RPC 2.0 MCP 服务连接校招/科研助理岗位画像与多模态实测内核，将岗位需求拆解为「可观测行为线索」与「主动封停硬技能缺口」，联动三阶段 AI 审辨实训。
+              连接校招或科研助理岗位画像与多模态实测证据，将岗位需求拆解为「可观测行为线索」与「主动封停硬技能缺口」，联动三阶段 AI 审辨实训。
             </Paragraph>
           </div>
-          <Space wrap>
-            <Button icon={<ApiOutlined />} onClick={() => { setRpcOpen(true); void runRpcDemo('tools/list'); }}>
-              MCP 协议调试台
+          <Space wrap align="center">
+            <Button
+              type="text"
+              size="small"
+              icon={<ApiOutlined />}
+              style={{ color: 'var(--ax-text-secondary)' }}
+              onClick={() => { setRpcOpen(true); void runRpcDemo('tools/list'); }}
+            >
+              开发者接口验证
             </Button>
             <Button
               type="primary"
               className="ax-btn--pill"
               icon={<ArrowRightOutlined />}
+              style={{ background: 'var(--ax-b2)', borderColor: 'var(--ax-b2)' }}
               onClick={() => void launchMetacognitionTraining()}
             >
               进入三阶段 AI 审辨实训
@@ -263,7 +309,7 @@ const CareerMcpPage: React.FC = () => {
           type="info"
           showIcon
           style={{ marginBottom: 20 }}
-          message="严格遵循白盒非筛选规则：岗位对照仅揭示已有行为证据覆盖与待补录缺口，不出具契合度分数或筛选建议。"
+          message="严格遵循非筛选原则：岗位对照仅揭示已有行为证据覆盖与待补录缺口，不出具契合度分数、评级划档或筛选建议。"
         />
 
         <Row gutter={[20, 20]}>
@@ -320,8 +366,8 @@ const CareerMcpPage: React.FC = () => {
                                 }}
                                 style={{
                                   textAlign: 'left',
-                                  background: active ? 'var(--ax-info-soft)' : 'var(--ax-parchment)',
-                                  border: active ? '1px solid var(--ax-info-border)' : '1px solid var(--ax-hairline)',
+                                  background: active ? 'var(--ax-b2-soft)' : 'var(--ax-parchment)',
+                                  border: active ? '1px solid var(--ax-b2-border)' : '1px solid var(--ax-hairline)',
                                   borderRadius: 'var(--ax-rounded-md)',
                                   padding: '12px 14px',
                                   cursor: 'pointer',
@@ -358,7 +404,7 @@ const CareerMcpPage: React.FC = () => {
                           placeholder="粘贴任意校招或科研岗位职责，例如：要求能审辨大模型幻觉与统计口径偏差，完成结构化方案汇报，具备 Python 与 SQL 工程实现能力……"
                         />
                         <Button type="primary" loading={decomposing} onClick={() => void handleDecomposeJd()}>
-                          调用 MCP 拆解可观测行为线索
+                          拆解可观测行为线索
                         </Button>
                       </Space>
                     ),
@@ -374,7 +420,7 @@ const CareerMcpPage: React.FC = () => {
                 className="ax-card"
                 title={
                   jdDecomposed
-                    ? '自定义 JD 拆解结果：可观测要求与主动封停硬技能'
+                    ? '自定义职位解析：可观测行为要点与暂不直接观测项'
                     : `岗位画像：${selectedPosition?.title || '请选择岗位'}`
                 }
               >
@@ -385,25 +431,54 @@ const CareerMcpPage: React.FC = () => {
                     <Space direction="vertical" size={12} style={{ width: '100%' }}>
                       <div>
                         <Text strong style={{ fontSize: 13 }}>可观测行为证据要求（{comps.length} 项）</Text>
-                        <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                        <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
                           {comps.map((c) => (
                             <div
                               key={c.key}
                               style={{
-                                padding: '8px 12px',
+                                padding: '10px 12px',
                                 background: 'var(--ax-parchment)',
                                 border: '1px solid var(--ax-hairline)',
                                 borderRadius: 'var(--ax-rounded-sm)',
                               }}
                             >
-                              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.label}</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--ax-ink)' }}>{c.label}</span>
+                                {c.theoretical_construct && (
+                                  <Tag
+                                    style={{
+                                      margin: 0,
+                                      fontSize: 11.5,
+                                      color: 'var(--ax-b2)',
+                                      background: 'var(--ax-b2-soft)',
+                                      borderColor: 'var(--ax-b2-border)',
+                                    }}
+                                  >
+                                    {c.theoretical_construct}
+                                  </Tag>
+                                )}
+                              </div>
                               {c.critique_focus && (
-                                <div style={{ fontSize: 12.5, color: 'var(--ax-text-secondary)', marginTop: 2 }}>
+                                <div style={{ fontSize: 12.5, color: 'var(--ax-text-secondary)', marginTop: 4 }}>
                                   审辨聚焦：{c.critique_focus}
                                 </div>
                               )}
-                              <div style={{ fontSize: 12, color: 'var(--ax-info)', marginTop: 4 }}>
-                                关联指标：<code>{c.required_indicators.join(' · ')}</code>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                <span style={{ fontSize: 12, color: 'var(--ax-text-secondary)' }}>关联观测量：</span>
+                                {c.required_indicators.map((ind) => (
+                                  <Tag
+                                    key={ind}
+                                    style={{
+                                      margin: 0,
+                                      fontSize: 12,
+                                      color: 'var(--ax-info)',
+                                      background: 'var(--ax-info-soft)',
+                                      borderColor: 'var(--ax-info-border)',
+                                    }}
+                                  >
+                                    {labelOfIndicator(ind)}
+                                  </Tag>
+                                ))}
                               </div>
                             </div>
                           ))}
@@ -411,11 +486,11 @@ const CareerMcpPage: React.FC = () => {
                       </div>
 
                       <div>
-                        <Text strong style={{ fontSize: 13 }}>主动封停项（单场采录不可直接观测的硬技能）</Text>
+                        <Text strong style={{ fontSize: 13 }}>需另行线下核验的硬技能（不通过单场行为观测评定）</Text>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                           {blocked.map((b) => (
                             <Tag key={b} color="warning" style={{ whiteSpace: 'normal' }}>
-                              主动封停：{b}
+                              需另行核验：{b}
                             </Tag>
                           ))}
                         </div>
@@ -425,25 +500,19 @@ const CareerMcpPage: React.FC = () => {
                 })()}
               </Card>
 
-              <Card className="ax-card" title="步骤 2 · 将真实采录会话证据对齐至该岗位">
+              <Card className="ax-card" title="步骤 2 · 将真实采录场次证据对齐至该岗位">
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                     <Select
-                      aria-label="选择已采录会话编号"
+                      aria-label="选择或搜索采录场次编号"
                       showSearch
                       allowClear
-                      placeholder="选择已有会话，或在右侧输入"
-                      value={sessionOptions.some((o) => o.value === sessionId) ? sessionId : undefined}
+                      optionFilterProp="label"
+                      placeholder="选择已有采录场次（支持搜索编号或姓名）"
+                      value={sessionId || undefined}
                       onChange={(val) => setSessionId(val || '')}
                       options={sessionOptions}
-                      style={{ minWidth: 260, flex: '1 1 240px' }}
-                    />
-                    <Input
-                      aria-label="手工输入 session_id"
-                      value={sessionId}
-                      onChange={(e) => setSessionId(e.target.value)}
-                      placeholder="例如 20260927_212143_95a8"
-                      style={{ maxWidth: 220 }}
+                      style={{ minWidth: 300, flex: '1 1 300px' }}
                     />
                     <Button type="primary" loading={aligning} onClick={() => void handleAlignEvidence()}>
                       执行证据缺口对照
@@ -455,8 +524,17 @@ const CareerMcpPage: React.FC = () => {
                       <Alert
                         type="success"
                         showIcon
-                        message={`${alignment.position_title} · 会话 ${alignment.session_id}`}
-                        description={alignment.non_scoring_statement}
+                        message={`${alignment.position_title} · 采录场次 ${alignment.session_id}`}
+                        description={
+                          <div>
+                            <div>{alignment.non_scoring_statement}</div>
+                            {(alignment.theory_framework || alignment.theoretical_construct) && (
+                              <div style={{ marginTop: 4, fontSize: 12.5 }}>
+                                理论框架：{alignment.theory_framework || alignment.theoretical_construct}
+                              </div>
+                            )}
+                          </div>
+                        }
                       />
                       <Space wrap size={8}>
                         <Tag style={{ color: 'var(--ax-success)', background: 'var(--ax-success-soft)', borderColor: 'var(--ax-success-border)' }}>
@@ -464,7 +542,7 @@ const CareerMcpPage: React.FC = () => {
                         </Tag>
                         <Tag>部分覆盖：{alignment.summary_counts.covered_partial}</Tag>
                         <Tag color="warning">待补录缺口：{alignment.summary_counts.missing_gap}</Tag>
-                        <Tag>第三层裁判：{alignment.referee_stage_summary.stage_label}</Tag>
+                        <Tag>综合核验阶段：{alignment.referee_stage_summary.stage_label}</Tag>
                       </Space>
                       <Table
                         size="small"
@@ -478,6 +556,7 @@ const CareerMcpPage: React.FC = () => {
                         type="primary"
                         className="ax-btn--pill"
                         icon={<ArrowRightOutlined />}
+                        style={{ background: 'var(--ax-b2)', borderColor: 'var(--ax-b2)' }}
                         onClick={() => void launchMetacognitionTraining()}
                       >
                         携带推荐审辨题目进入实训采录 ›
@@ -491,14 +570,14 @@ const CareerMcpPage: React.FC = () => {
         </Row>
 
         <Drawer
-          title={<Space><ToolOutlined />标准 MCP JSON-RPC 2.0 协议调用面板</Space>}
+          title={<Space><ToolOutlined />开发者接口验证面板</Space>}
           open={rpcOpen}
           onClose={() => setRpcOpen(false)}
           width={620}
         >
           <Space direction="vertical" size={14} style={{ width: '100%' }}>
             <Paragraph type="secondary" style={{ margin: 0, fontSize: 13 }}>
-              后端在 <code>POST /api/mcp/career</code> 及 stdio 模式暴露符合 Model Context Protocol 规范的 4 个确定性工具，支持任意合规客户端直接挂载。
+              供开发者调试外部协议接口（Model Context Protocol）的四个确定性工具调用与返回结构。
             </Paragraph>
             <Space wrap>
               <Button size="small" loading={rpcLoading} onClick={() => void runRpcDemo('initialize')}>
@@ -534,7 +613,7 @@ const CareerMcpPage: React.FC = () => {
             </Space>
 
             <div>
-              <Text strong style={{ fontSize: 12.5 }}>JSON-RPC Request</Text>
+              <Text strong style={{ fontSize: 12.5 }}>请求消息体</Text>
               <pre
                 style={{
                   marginTop: 4,
@@ -546,12 +625,12 @@ const CareerMcpPage: React.FC = () => {
                   overflowX: 'auto',
                 }}
               >
-                {rpcRequestText || '// 点击上方命令发送实时协议请求'}
+                {rpcRequestText || '// 点击上方按钮测试接口请求'}
               </pre>
             </div>
 
             <div>
-              <Text strong style={{ fontSize: 12.5 }}>JSON-RPC Response</Text>
+              <Text strong style={{ fontSize: 12.5 }}>返回响应体</Text>
               <pre
                 style={{
                   marginTop: 4,

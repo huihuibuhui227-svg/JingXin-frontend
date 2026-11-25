@@ -222,6 +222,102 @@ h6 {
   transform: scale(0.99);
 }
 
+/* ════════════════════════════════════════════════════════════
+   门户卡片 · 基地横幅 · 编辑级可读叙事报告纸张（零投影、1px hairline + 3px 顶线）
+   ════════════════════════════════════════════════════════════ */
+
+.ax-portal-card {
+  background: var(--ax-canvas);
+  border: 1px solid var(--ax-hairline);
+  border-top-width: 3px;
+  border-radius: var(--ax-rounded-lg);
+  padding: 30px 28px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.ax-portal-card--b1 {
+  border-top-color: var(--ax-b1);
+}
+.ax-portal-card--b1:hover {
+  border-color: var(--ax-b1);
+  transform: translateY(-2px);
+}
+
+.ax-portal-card--b2 {
+  border-top-color: var(--ax-b2);
+}
+.ax-portal-card--b2:hover {
+  border-color: var(--ax-b2);
+  transform: translateY(-2px);
+}
+
+.ax-portal-card--b3 {
+  border-top-color: var(--ax-b3);
+}
+.ax-portal-card--b3:hover {
+  border-color: var(--ax-b3);
+  transform: translateY(-2px);
+}
+
+.ax-hub-hero {
+  background: var(--ax-canvas);
+  border: 1px solid var(--ax-hairline);
+  border-top-width: 3px;
+  border-radius: var(--ax-rounded-lg);
+  padding: 32px 32px 28px;
+  margin-bottom: 24px;
+}
+
+.ax-hub-hero--b1 {
+  border-top-color: var(--ax-b1);
+}
+.ax-hub-hero--b2 {
+  border-top-color: var(--ax-b2);
+}
+.ax-hub-hero--b3 {
+  border-top-color: var(--ax-b3);
+}
+
+.ax-narrative-paper {
+  background: var(--ax-canvas);
+  border: 1px solid var(--ax-hairline);
+  border-top: 3px solid var(--ax-primary);
+  border-radius: var(--ax-rounded-lg);
+  padding: 32px 36px;
+  margin-bottom: 20px;
+}
+
+.ax-narrative-paper__section + .ax-narrative-paper__section {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ax-divider-soft);
+}
+
+.ax-narrative-paper__section h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ax-ink);
+}
+
+.ax-narrative-paper__section p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.85;
+  letter-spacing: -0.12px;
+  color: var(--ax-ink-muted-80);
+  white-space: pre-wrap;
+}
+
 .ax-tile--dark .ax-card.ant-card,
 .ax-tile--dark-2 .ax-card.ant-card,
 .ax-tile--dark-3 .ax-card.ant-card {
@@ -494,6 +590,11 @@ h6 {
   .ax-lead {
     font-size: 21px;
   }
+  .ax-portal-card,
+  .ax-hub-hero,
+  .ax-narrative-paper {
+    padding: 22px 18px;
+  }
 }
 
 /* ── 可访问性 ─────────────────────────────────────────────── */
@@ -517,6 +618,9 @@ h6 {
   .ax-card--interactive.ant-card:hover,
   .ax-card--interactive:active,
   .ax-card--interactive.ant-card:active,
+  .ax-portal-card--b1:hover,
+  .ax-portal-card--b2:hover,
+  .ax-portal-card--b3:hover,
   .ax-tile--dark .ax-card--dark-interactive:hover,
   .ax-tile--dark .ax-card--dark-interactive:active {
     transform: none;

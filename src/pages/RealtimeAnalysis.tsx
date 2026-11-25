@@ -187,13 +187,13 @@ const RealtimeAnalysis: React.FC = () => {
       try {
         await voiceApi.interview.start();
         const id = getSessionId();
-        if (!id) throw new Error('服务端没有返回 session_id');
+        if (!id) throw new Error('未能生成采录编号');
         setSid(id);
         return true;
       } catch (error: any) {
         const why = error?.response?.data?.detail || error?.message || '未知错误';
         setSessionError(why);
-        message.error(`会话铸号失败（未开始录制）：${why}`, 0);
+        message.error(`未能生成采录编号（未开始录制）：${why}`, 0);
         return false;
       }
     },
@@ -250,9 +250,9 @@ const RealtimeAnalysis: React.FC = () => {
             });
           }
         }).catch(err => {
-          console.error('面部分析失败:', err);
+          console.error('面部视觉通道分析失败:', err);
           lastFaceStatus = 'error';
-          analysisHealthRef.current.fail('面部');
+          analysisHealthRef.current.fail('面部视觉通道');
         }),
 
         gestureApi.analyzeGesture(frame).then((result) => {
@@ -280,8 +280,8 @@ const RealtimeAnalysis: React.FC = () => {
             });
           }
         }).catch(err => {
-          console.error('手势分析失败:', err);
-          analysisHealthRef.current.fail('手势');
+          console.error('上肢体态通道分析失败:', err);
+          analysisHealthRef.current.fail('上肢体态通道');
         }),
       ]);
 
@@ -402,15 +402,15 @@ const RealtimeAnalysis: React.FC = () => {
   const captureCapabilityBar = health
     ? [
         faceSvc?.landmarker_3d_matrix
-          ? `面部 478 网格 · ${faceSvc.blendshapes_count ?? 52} 系数 · 3D 姿态`
+          ? `面部 478 网格 · ${faceSvc.blendshapes_count ?? 52} 项动作系数 · 三维姿态`
           : '面部 478 网格',
         gestureSvc?.backend === 'rtmw'
-          ? '上肢 RTMW 133 点骨骼'
-          : '上肢 MediaPipe 双手与姿态',
+          ? '上肢体态 133 点骨骼'
+          : '上肢双手与肩臂姿态',
         voiceSvc?.live_pitch_backend === 'parselmouth'
           ? (voiceSvc.live_vad_backend === 'rms_threshold'
-            ? '语音 Praat 声学基频提取'
-            : '语音 Praat 声学 + 神经 VAD')
+            ? '语音声学基频提取'
+            : '语音声学与活动检测')
           : '语音转写与基频提取',
       ].join(' · ')
     : null;
@@ -425,10 +425,10 @@ const RealtimeAnalysis: React.FC = () => {
             </h1>
             <div style={{ fontSize: 13, marginTop: 4, color: sid ? 'var(--ax-success)' : 'var(--ax-text-secondary)' }}>
               {sid
-                ? `当前会话：${sid}`
+                ? `本场采录编号：${sid}`
                 : sessionError
-                  ? `未铸到会话：${sessionError}`
-                  : '查看三路采集服务状态、画面帧率、人脸识别率与麦克风实时音量'}
+                  ? `未能生成采录编号：${sessionError}`
+                  : '查看三路采集通道状态、画面帧率、人脸检出率与麦克风实时音量'}
             </div>
             {(recording.savedLabel || sid) && (
               <div style={{ fontSize: 13, marginTop: 4, color: 'var(--ax-primary)' }}>
@@ -476,11 +476,11 @@ const RealtimeAnalysis: React.FC = () => {
         <Card size="small" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
             <Space wrap size={10}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ax-ink)' }}>仪器服务健康度：</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ax-ink)' }}>采录通道健康度：</span>
               {[
-                { key: 'face', label: '面部 :8000', icon: <VideoCameraOutlined /> },
-                { key: 'gesture', label: '上肢 :8002', icon: <InteractionOutlined /> },
-                { key: 'voice', label: '语音 :8001', icon: <AudioOutlined /> },
+                { key: 'face', label: '面部视觉通道', icon: <VideoCameraOutlined /> },
+                { key: 'gesture', label: '上肢体态通道', icon: <InteractionOutlined /> },
+                { key: 'voice', label: '语音声学通道', icon: <AudioOutlined /> },
               ].map((s) => {
                 const st = health?.services?.[s.key];
                 const ok = st?.ok === true;
@@ -494,7 +494,7 @@ const RealtimeAnalysis: React.FC = () => {
                       borderColor: ok ? 'var(--ax-success-border)' : 'var(--ax-error-border)',
                     }}
                   >
-                    {s.label} {ok ? `在线 (${st.latency_ms}ms)` : st?.status === 'degraded' ? 'ASR 离线' : '离线'}
+                    {s.label} {ok ? `在线 (${st.latency_ms}ms)` : st?.status === 'degraded' ? '语音转写离线' : '离线'}
                   </Tag>
                 );
               })}
@@ -516,7 +516,7 @@ const RealtimeAnalysis: React.FC = () => {
                 lineHeight: 1.5,
               }}
             >
-              采集引擎：{captureCapabilityBar}
+              当前通道能力：{captureCapabilityBar}
             </div>
           )}
         </Card>
@@ -524,7 +524,7 @@ const RealtimeAnalysis: React.FC = () => {
         {sessionError && (
           <Alert
             type="error" showIcon style={{ marginBottom: 16 }}
-            message="本场未能创建会话号，不会纳入正式报告"
+            message="本场未能生成采录编号，不会纳入正式报告"
             description={sessionError}
           />
         )}
@@ -633,35 +633,32 @@ const RealtimeAnalysis: React.FC = () => {
             {[
               {
                 key: 'face',
-                name: '面部通道',
-                port: ':8000',
+                name: '面部视觉通道',
                 icon: <VideoCameraOutlined style={{ color: 'var(--ax-primary)' }} />,
-                spec: '478 点 3D 网格 + 52 项表情系数',
+                spec: '478 点三维网格 + 52 项表情系数',
                 detail: faceSvc?.landmarker_3d_matrix
-                  ? '3D 姿态矩阵解耦已启用'
-                  : '面部关键点与动作单元提取',
+                  ? '三维头部姿态校准已启用'
+                  : '面部关键点与动作幅度提取',
                 svc: faceSvc,
               },
               {
                 key: 'gesture',
-                name: '上肢通道',
-                port: ':8002',
+                name: '上肢体态通道',
                 icon: <InteractionOutlined style={{ color: 'var(--ax-primary)' }} />,
-                spec: 'RTMW 133 点骨骼 + 双手姿态',
+                spec: '133 点上肢骨骼 + 双手姿态',
                 detail: gestureSvc?.backend === 'rtmw'
-                  ? 'RTMW 全身与双手关键点就绪'
+                  ? '全身与双手关键点已就绪'
                   : '肩臂与双手稳定性实时提取',
                 svc: gestureSvc,
               },
               {
                 key: 'voice',
-                name: '语音通道',
-                port: ':8001',
+                name: '语音声学通道',
                 icon: <AudioOutlined style={{ color: 'var(--ax-primary)' }} />,
-                spec: 'Parselmouth 声学 + 神经 VAD + 转写',
+                spec: '声学韵律提取 + 语音活动检测 + 转写',
                 detail: voiceSvc?.asr_reachable
-                  ? 'FunASR 语音转写服务在线'
-                  : '等待语音转写服务连接',
+                  ? '本地离线语音识别引擎在线'
+                  : '等待本地语音识别引擎连接',
                 svc: voiceSvc,
               },
             ].map((ch) => {
@@ -719,15 +716,6 @@ const RealtimeAnalysis: React.FC = () => {
                         </span>
                         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ax-ink)' }}>
                           {ch.name}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: 'var(--ax-font-mono)',
-                            fontSize: 12,
-                            color: 'var(--ax-text-secondary)',
-                          }}
-                        >
-                          {ch.port}
                         </span>
                       </div>
                       <span

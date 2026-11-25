@@ -124,7 +124,7 @@ const DevicePicker: React.FC<Props> = ({ value, onChange, audioOnly = false }) =
         <Button size="small" icon={<ReloadOutlined />} onClick={() => void refresh()}>刷新设备</Button>
         {!named && (
           <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
-            设备名要授权之后才有 —— 现在显示的是序号
+            授权摄像头与麦克风权限后可显示具体设备名称
           </Typography.Text>
         )}
       </div>

@@ -156,7 +156,7 @@ export const useAssessment = (type: AssessmentScenarioType) => {
       return true;
     } catch (error: any) {
       console.error('❌ 启动失败:', error);
-      message.error(error?.response?.data?.detail || error.message || '启动失败，请检查语音服务（:8001）是否正常运行');
+      message.error(error?.response?.data?.detail || error.message || '启动失败，请检查语音声学通道是否正常运行');
       return false;
     } finally {
       setLoading(false);

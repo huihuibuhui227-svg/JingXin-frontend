@@ -31,7 +31,7 @@ dist-ssr
 .env.production
 
 # Recorded media assets
-recordings/
+/recordings/
 *.mp4
 *.webm
 *.wav

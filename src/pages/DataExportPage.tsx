@@ -404,7 +404,7 @@ const DataExportPage: React.FC = () => {
                   </Space>
                   <Alert
                     type="warning" showIcon
-                    message="转写文本由本地 FunASR 自动生成，未经人工校对"
+                    message="转写文本由本地离线语音识别引擎自动生成，未经人工校对"
                     description="标点与专有名词可能存在识别误差；用于研究分析前建议结合音频抽检复核。"
                   />
                   {files.transcript.preview && (

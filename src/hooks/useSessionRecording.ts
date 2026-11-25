@@ -157,7 +157,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
       }
       const prepared = await onPrepareSession?.();
       if (prepared === false) {
-        message.error('这一场没有开始 —— 会话没有铸成,采不到任何素材', 0);
+        message.error('未能生成本场采录编号，未开始采集', 0);
         return;
       }
       try {
@@ -295,8 +295,8 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
       // 使用者以为删了、其实什么都没发生,那是最坏的一种“成功”。
       failedFromRef.current = 'discard';
       setSaveState('failed');
-      setSaveError('没有本场 session_id —— 无法定位要删的东西');
-      message.error('本场没有 session_id,删不掉任何东西', 0);
+      setSaveError('缺少本场采录编号，无法定位要删除的数据');
+      message.error('缺少本场采录编号，无法执行删除', 0);
       return;
     }
     setSaveState('purging');
@@ -310,7 +310,7 @@ export const useSessionRecording = ({ onPrepareSession, onRecordStart,
       console.log('🗑️ 本场已作废:', r);
       setSavedInfo({ label: savedLabelRef.current, sid, bytes: 0 });
       setSaveState('purged');
-      message.success('本场没有入盘 —— 场次目录与日志已删除');
+      message.success('本场记录已清除（未做保存）');
     } catch (error: any) {
       const detail = error?.response?.data?.detail;
       const why = detail || error?.message || '未知错误';

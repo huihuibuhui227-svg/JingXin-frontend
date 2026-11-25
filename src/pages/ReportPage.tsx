@@ -1,7 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Layout, Card, Button, Result, Alert, Drawer, Segmented, Space, Tag, Typography, Select, Input, Table, message } from 'antd';
-import { EditOutlined, RobotOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import {
+  Layout,
+  Card,
+  Button,
+  Result,
+  Alert,
+  Drawer,
+  Segmented,
+  Space,
+  Tag,
+  Typography,
+  Select,
+  Input,
+  Table,
+  Skeleton,
+  message,
+} from 'antd';
+import {
+  CopyOutlined,
+  EditOutlined,
+  HighlightOutlined,
+  ReadOutlined,
+  SafetyCertificateOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import ReportViewer from '@/components/report/ReportViewer';
 import { BehaviorRegimeTimeline, RefereeStagePanel } from '@/components/report/ReportCharts';
@@ -10,23 +32,38 @@ import type { L1WithInstruments } from '@/components/report/InstrumentProvenance
 import DownloadButton from '@/components/report/DownloadButton';
 import Loading from '@/components/common/Loading';
 import { useAssessmentStore } from '@/store/assessmentStore';
-import { dashboardApi, getSessionId, ReportLlmAssistResponse, ReviewerNote, reviewerNotesApi } from '@/services/api';
+import {
+  dashboardApi,
+  getSessionId,
+  ReportAssistMode,
+  ReportLlmAssistResponse,
+  ReviewerNote,
+  reviewerNotesApi,
+} from '@/services/api';
 import { getAdminToken } from '@/services/recordingsApi';
 import { API_BASE_URL } from '@/utils/constants';
 import { downloadFile } from '@/utils/helpers';
 import { EvaluationResult, Coverage } from '@/types/assessment';
 
 const { Content } = Layout;
-const { Paragraph, Text } = Typography;
+const { Text } = Typography;
+
+type NarrativeMode = 'narrative_review' | 'participant_feedback' | 'interview_guide';
 
 const MODALITY_LABELS: Record<string, string> = {
-  face: '面部', gesture: '手势', voice_interview: '语音（面试）', voice_research: '语音（科研）',
+  face: '面部',
+  gesture: '手势',
+  voice_interview: '语音（答辩/面试）',
+  voice_research: '语音（科研）',
 };
 const STATUS_LABELS: Record<string, string> = {
-  loaded: '已读入', unreadable: '未读到数据', missing: '缺失',
+  loaded: '已读入',
+  unreadable: '未读到数据',
+  missing: '缺失',
 };
 const LOG_KEY_TO_MODALITY: Record<string, string> = {
-  voice_interview: 'voice', voice_research: 'voice',
+  voice_interview: 'voice',
+  voice_research: 'voice',
 };
 
 const SESSION_ID_RE = /^\d{8}_\d{6}_[0-9a-f]{4}$/;
@@ -41,15 +78,24 @@ export function coverageRateText(cov: Coverage): string | null {
   const rate = cov.pass_rate_of_measurable;
   if (rate === null) return '通过率不适用:可测量槽数为 0(分母为 0,不给百分比)';
   if (typeof rate === 'number') {
-    return `可测量槽通过率 ${cov.n_passed ?? '—'}/${cov.n_measurable ?? '—'}`
-      + `(${Math.round(rate * 100)}%),分母只含可测量槽,不含另外两段`;
+    return (
+      `可测量槽通过率 ${cov.n_passed ?? '—'}/${cov.n_measurable ?? '—'}` +
+      `(${Math.round(rate * 100)}%),分母只含可测量槽,不含另外两段`
+    );
   }
   return null;
 }
 
 const REPORT_TASK_TIMEOUT_MS = 120_000;
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-const tailOf = (text?: string, n = 240): string => (text || '').trim().slice(-n) || '(后端没有给出日志)';
+const tailOf = (text?: string, n = 240): string => (text || '').trim().slice(-n) || '(未返回详细输出)';
+
+const formatAssistPlainText = (data: ReportLlmAssistResponse): string => {
+  if (Array.isArray(data.sections) && data.sections.length > 0) {
+    return data.sections.map((s) => `【${s.title}】\n${s.body}`).join('\n\n');
+  }
+  return data.content || '';
+};
 
 const ReportPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -78,12 +124,13 @@ const ReportPage: React.FC = () => {
     text: string;
   } | null>(null);
 
-  // 本地按需辅助解读抽屉（严格隔离、不参与任何指标计算）
-  const [assistOpen, setAssistOpen] = useState(false);
-  const [assistMode, setAssistMode] = useState<'summary' | 'interview_guide'>('summary');
+  // 一等公民可读叙事报告（页面打开即自动展示，支持切换受众视角与本地大模型润色）
+  const [narrativeMode, setNarrativeMode] = useState<NarrativeMode>('narrative_review');
   const [assistLoading, setAssistLoading] = useState(false);
+  const [assistLlmLoading, setAssistLlmLoading] = useState(false);
   const [assistData, setAssistData] = useState<ReportLlmAssistResponse | null>(null);
   const [assistError, setAssistError] = useState<string | null>(null);
+  const assistReqSeq = useRef(0);
 
   // 管理员/导师人工复核注记（严格不打分，承接保形门不确定升级结果）
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -117,7 +164,8 @@ const ReportPage: React.FC = () => {
 
     const querySid = id && SESSION_ID_RE.test(id) ? id : undefined;
     setLoading(true);
-    dashboardApi.getStructuredReport(querySid, sceneProfile)
+    dashboardApi
+      .getStructuredReport(querySid, sceneProfile)
       .then((data) => {
         if (data.status === 'success' && data.result) {
           setReport(data.result);
@@ -136,10 +184,42 @@ const ReportPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [id, storeResult, sceneProfile]);
 
+  const describedId =
+    describedSession ??
+    (!id && storeResult ? getSessionId() : null) ??
+    (id && SESSION_ID_RE.test(id) ? id : null);
+
+  // 报告就绪或切换受众视角/场景时，自动拉取结构化可读叙事报告（use_llm: false 确保即时呈现）
+  useEffect(() => {
+    if (!report || loading) return;
+    const seq = ++assistReqSeq.current;
+    setAssistLoading(true);
+    setAssistError(null);
+    dashboardApi
+      .reportLlmAssist({
+        session_id: describedId,
+        mode: narrativeMode,
+        use_llm: false,
+        scene_profile: sceneProfile,
+      })
+      .then((res) => {
+        if (seq !== assistReqSeq.current) return;
+        setAssistData(res);
+      })
+      .catch((err: any) => {
+        if (seq !== assistReqSeq.current) return;
+        setAssistError(err?.response?.data?.message || err?.message || '暂未生成可读文字报告');
+      })
+      .finally(() => {
+        if (seq === assistReqSeq.current) setAssistLoading(false);
+      });
+  }, [report, loading, describedId, narrativeMode, sceneProfile]);
+
   useEffect(() => {
     const sid = describedSession ?? (id && SESSION_ID_RE.test(id) ? id : null);
     if (!sid || !SESSION_ID_RE.test(sid)) return;
-    reviewerNotesApi.get(sid)
+    reviewerNotesApi
+      .get(sid)
       .then((res) => {
         if (res?.note) {
           setReviewNote(res.note);
@@ -154,11 +234,8 @@ const ReportPage: React.FC = () => {
   const coverage = report?.coverage;
   const l1WithInstruments = report?.l1 as unknown as L1WithInstruments | undefined;
 
-  const describedId = describedSession
-    ?? (!id && storeResult ? getSessionId() : null)
-    ?? (id && SESSION_ID_RE.test(id) ? id : null);
   const isRedactedSubject = subject?.status === 'redacted';
-  const safeNamePrefix = !isRedactedSubject && subject?.name ? subject.name : (describedId || '本场');
+  const safeNamePrefix = !isRedactedSubject && subject?.name ? subject.name : describedId || '本场';
   const downloadName = `衡才智析-行为证据报告-${safeNamePrefix}.html`;
 
   const handleDownload = async () => {
@@ -170,7 +247,7 @@ const ReportPage: React.FC = () => {
     if (!describedId) return;
 
     setPreparing(true);
-    setDownloadNote({ kind: 'info', text: `正在按会话 ${describedId} 生成离线单文件 HTML 报告…` });
+    setDownloadNote({ kind: 'info', text: `正在按场次 ${describedId} 生成离线单文件 HTML 报告…` });
     try {
       const task = await dashboardApi.runModule('report', describedId);
       if (!task || task.status !== 'started' || !task.task_id) {
@@ -181,14 +258,14 @@ const ReportPage: React.FC = () => {
       let last: any = null;
       for (;;) {
         if (Date.now() > deadline) {
-          throw new Error(`等了 ${Math.round(REPORT_TASK_TIMEOUT_MS / 1000)} 秒还没跑完(task_id ${task.task_id})`);
+          throw new Error(`等待 ${Math.round(REPORT_TASK_TIMEOUT_MS / 1000)} 秒仍未生成完成，请稍后前往报告中心重试`);
         }
         await sleep(1000);
         const r = await axios.get(`${API_BASE_URL}/api/task/${task.task_id}`);
         last = r.data;
         if (last?.status === 'success') break;
         if (last?.status === 'error') {
-          throw new Error(`后端报告生成失败:${tailOf(last?.logs || last?.message)}`);
+          throw new Error(`离线报告生成失败:${tailOf(last?.logs || last?.message)}`);
         }
       }
 
@@ -198,7 +275,7 @@ const ReportPage: React.FC = () => {
         const files = await dashboardApi.getFiles('reports');
         const newest = Array.isArray(files) ? files[0] : null;
         if (!newest?.url) {
-          throw new Error('报告已生成,但 /api/files/reports 里一条都没读到 —— 去「报告中心」直接打开');
+          throw new Error('报告已生成,但列表中暂未读取到文件路径 —— 请前往「报告中心」直接打开');
         }
         targetUrl = String(newest.url);
         targetName = newest.display_name || newest.name || downloadName;
@@ -215,28 +292,46 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  const runAssist = async (mode: 'summary' | 'interview_guide', useLlm = true) => {
-    setAssistMode(mode);
-    setAssistLoading(true);
+  const handlePolishWithLlm = async () => {
+    const seq = ++assistReqSeq.current;
+    setAssistLlmLoading(true);
     setAssistError(null);
     try {
       const res = await dashboardApi.reportLlmAssist({
         session_id: describedId,
-        mode,
-        use_llm: useLlm,
+        mode: narrativeMode as ReportAssistMode,
+        use_llm: true,
+        scene_profile: sceneProfile,
+        refresh: true,
       });
+      if (seq !== assistReqSeq.current) return;
       setAssistData(res);
+      if (res.source === 'local_llm') {
+        message.success('已完成本地大模型文字润色');
+      } else {
+        message.info('当前保持结构化可读报告版本');
+      }
     } catch (err: any) {
-      setAssistError(err?.response?.data?.message || err?.message || '本地辅助解读请求失败');
+      if (seq !== assistReqSeq.current) return;
+      setAssistError(err?.response?.data?.message || err?.message || '智能文字润色请求失败');
     } finally {
-      setAssistLoading(false);
+      if (seq === assistReqSeq.current) setAssistLlmLoading(false);
     }
   };
 
-  const openAssistDrawer = () => {
-    setAssistOpen(true);
-    if (!assistData && !assistLoading) {
-      void runAssist(assistMode, true);
+  const handleCopyNarrative = async () => {
+    if (!assistData) return;
+    const text = formatAssistPlainText(assistData);
+    if (!text) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        message.success('文字报告已复制到剪贴板');
+      } else {
+        message.warning('当前浏览器不支持自动复制，请手动选择正文复制');
+      }
+    } catch {
+      message.warning('复制未成功，请手动选择正文复制');
     }
   };
 
@@ -279,8 +374,12 @@ const ReportPage: React.FC = () => {
           title="暂无报告数据"
           subTitle={error}
           extra={[
-            <Button key="back" onClick={() => navigate(-1)}>返回</Button>,
-            <Button key="home" type="primary" onClick={() => navigate('/')}>返回首页</Button>,
+            <Button key="back" onClick={() => navigate(-1)}>
+              返回
+            </Button>,
+            <Button key="home" type="primary" onClick={() => navigate('/')}>
+              返回首页
+            </Button>,
           ]}
         />
       </Content>
@@ -293,29 +392,62 @@ const ReportPage: React.FC = () => {
         <Result
           status="info"
           title="暂无行为证据报告"
-          subTitle="请先完成一次面试或科研采集会话"
-          extra={<Button type="primary" onClick={() => navigate('/interview')}>开始采集</Button>}
+          subTitle="请先完成一次科研、面试或审辨实训采录"
+          extra={
+            <Button type="primary" onClick={() => navigate('/research')}>
+              开始采录
+            </Button>
+          }
         />
       </Content>
     );
   }
 
-  const subjectPairs: Array<[string, string]> = subject && !isRedactedSubject
-    ? ([['被测者', subject.name], ['学号', subject.student_id],
-        ['院系', subject.department], ['场次', subject.serial]] as Array<[string, string | undefined]>)
-        .filter(([, v]) => !!v)
-        .map(([k, v]) => [k, v as string])
-    : [];
+  const subjectPairs: Array<[string, string]> =
+    subject && !isRedactedSubject
+      ? (
+          [
+            ['被测者', subject.name],
+            ['学号', subject.student_id],
+            ['院系', subject.department],
+            ['场次', subject.serial],
+          ] as Array<[string, string | undefined]>
+        )
+          .filter(([, v]) => !!v)
+          .map(([k, v]) => [k, v as string])
+      : [];
 
   const crossModal = report.l1?.cross_modal_coverage;
   const asrDisclosure = report.l1?.asr_confidence_disclosure;
   const leadSummary = report.l1?.lead_summary;
 
+  const metacogIndicators =
+    report.scene_profile?.extensions?.all_metacognition_indicators ??
+    report.scene_profile?.extensions?.metacognition_text?.indicators ??
+    [];
+  const metacogReg = report.scene_profile?.extensions?.metacognition_regulation;
+
+  const narrativeSections =
+    assistData?.sections && assistData.sections.length > 0
+      ? assistData.sections
+      : assistData?.content
+        ? [{ title: assistData.audience_label || '行为观察正文', body: assistData.content }]
+        : [];
+
   return (
     <Content style={{ padding: '24px' }}>
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
         {/* 顶栏操作 */}
-        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div
+          style={{
+            marginBottom: 20,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
           <Space wrap align="center" size={14}>
             <Button onClick={() => navigate('/reports')}>← 返回报告中心</Button>
             <h1 style={{ margin: 0, fontSize: 'var(--ax-display-md-size)', fontWeight: 600 }}>
@@ -329,9 +461,9 @@ const ReportPage: React.FC = () => {
               value={sceneProfile}
               onChange={(val) => handleSceneProfileChange(String(val))}
               options={[
-                { label: '科研过程', value: 'research_interview' },
-                { label: 'AI 元能力', value: 'ai_metacognition' },
-                { label: '长周期随访', value: 'longitudinal_followup' },
+                { label: '研思循证', value: 'research_interview' },
+                { label: '元智审辨', value: 'ai_metacognition' },
+                { label: '时序观微', value: 'longitudinal_followup' },
               ]}
             />
             {describedId && (
@@ -339,9 +471,6 @@ const ReportPage: React.FC = () => {
                 人工复核注记
               </Button>
             )}
-            <Button icon={<RobotOutlined />} onClick={openAssistDrawer}>
-              本地辅助解读
-            </Button>
             <DownloadButton
               href={reportHref}
               filename={downloadName}
@@ -388,9 +517,24 @@ const ReportPage: React.FC = () => {
         {subject !== null && (
           <Card size="small" style={{ marginBottom: 16 }} data-testid="report-subject">
             {isRedactedSubject ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
                 <Space wrap>
-                  <Tag style={{ margin: 0, color: 'var(--ax-info)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)' }}>
+                  <Tag
+                    style={{
+                      margin: 0,
+                      color: 'var(--ax-info)',
+                      background: 'var(--ax-info-soft)',
+                      borderColor: 'var(--ax-info-border)',
+                    }}
+                  >
                     演示模式已脱敏
                   </Tag>
                   <span style={{ fontSize: 13.5, color: 'var(--ax-text-secondary)' }}>
@@ -420,28 +564,204 @@ const ReportPage: React.FC = () => {
                 {headerTimes?.tested_at && <>采集时间 {headerTimes.tested_at}</>}
                 {headerTimes?.tested_at && headerTimes?.generated_at && ' · '}
                 {headerTimes?.generated_at && <>报告生成时间 {headerTimes.generated_at}</>}
-                {describedSession && <> · 会话 <code style={{ fontSize: 12 }}>{describedSession}</code></>}
+                {describedSession && (
+                  <>
+                    {' '}
+                    · 采录场次 <code style={{ fontSize: 12 }}>{describedSession}</code>
+                  </>
+                )}
               </div>
             )}
           </Card>
         )}
 
+        {/* ══ 一等公民核心区：「可读行为观察报告」编辑级纸张卡片 ═══════════════════ */}
+        <section aria-label="可读行为观察报告" className="ax-narrative-paper">
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              flexWrap: 'wrap',
+              gap: 14,
+              paddingBottom: 18,
+              borderBottom: '1px solid var(--ax-divider-soft)',
+              marginBottom: 20,
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--ax-primary)',
+                  }}
+                >
+                  <ReadOutlined />
+                  可读行为观察报告
+                </span>
+                {assistData && (
+                  <Tag
+                    icon={<SafetyCertificateOutlined />}
+                    style={{
+                      margin: 0,
+                      color:
+                        assistData.source === 'local_llm' ? 'var(--ax-success)' : 'var(--ax-info)',
+                      background:
+                        assistData.source === 'local_llm'
+                          ? 'var(--ax-success-soft)'
+                          : 'var(--ax-info-soft)',
+                      borderColor:
+                        assistData.source === 'local_llm'
+                          ? 'var(--ax-success-border)'
+                          : 'var(--ax-info-border)',
+                    }}
+                  >
+                    {assistData.source === 'local_llm'
+                      ? '智能文字润色 · 合规已核验'
+                      : assistData.redline_verified
+                        ? '结构化可读报告 · 合规已核验'
+                        : '结构化可读报告'}
+                  </Tag>
+                )}
+                {typeof assistData?.reading_time_min === 'number' && assistData.reading_time_min > 0 && (
+                  <span style={{ fontSize: 12.5, color: 'var(--ax-text-secondary)' }}>
+                    约 {assistData.reading_time_min} 分钟阅读
+                  </span>
+                )}
+              </div>
+
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: 'var(--ax-ink)',
+                }}
+              >
+                {assistData?.audience_label ||
+                  (narrativeMode === 'narrative_review'
+                    ? '导师审阅版 · 过程行为综述'
+                    : narrativeMode === 'participant_feedback'
+                      ? '个人成长版 · 表达反馈'
+                      : '追问与实训提纲')}
+              </h2>
+            </div>
+
+            <Space wrap size={10}>
+              <Segmented
+                aria-label="切换阅读受众版本"
+                value={narrativeMode}
+                onChange={(v) => setNarrativeMode(v as NarrativeMode)}
+                options={[
+                  { label: '导师审阅版', value: 'narrative_review' },
+                  { label: '个人成长版', value: 'participant_feedback' },
+                  { label: '追问与实训提纲', value: 'interview_guide' },
+                ]}
+              />
+              <Button
+                className="ax-btn--pill"
+                type="primary"
+                icon={<HighlightOutlined />}
+                loading={assistLlmLoading}
+                onClick={() => void handlePolishWithLlm()}
+              >
+                使用本地大模型深度润色
+              </Button>
+              <Button
+                className="ax-btn--pill"
+                icon={<CopyOutlined />}
+                disabled={!assistData}
+                onClick={() => void handleCopyNarrative()}
+              >
+                复制文字报告
+              </Button>
+            </Space>
+          </div>
+
+          {assistError && (
+            <Alert type="warning" showIcon style={{ marginBottom: 16 }} message={assistError} />
+          )}
+
+          {(assistLoading || assistLlmLoading) && !assistData ? (
+            <Skeleton active paragraph={{ rows: 6 }} />
+          ) : assistLlmLoading ? (
+            <div style={{ padding: '12px 0' }}>
+              <Skeleton active paragraph={{ rows: 5 }} />
+            </div>
+          ) : narrativeSections.length > 0 ? (
+            <div>
+              {narrativeSections.map((sec, idx) => (
+                <div key={`${sec.title}-${idx}`} className="ax-narrative-paper__section">
+                  <h3>{sec.title}</h3>
+                  <p>{sec.body}</p>
+                </div>
+              ))}
+              {assistData?.watermark && (
+                <div
+                  style={{
+                    marginTop: 22,
+                    paddingTop: 14,
+                    borderTop: '1px solid var(--ax-divider-soft)',
+                    fontSize: 12.5,
+                    color: 'var(--ax-text-secondary)',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {assistData.watermark}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ color: 'var(--ax-text-secondary)', fontSize: 14 }}>
+              暂未生成可读文字摘要，请查看下方分项测量明细。
+            </div>
+          )}
+        </section>
+
         {/* 当前场景档案合规边界、主动封停项与场景扩展观测 */}
         {report.scene_profile && (
           <Card size="small" style={{ marginBottom: 16 }}>
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
                 <Space wrap size={8}>
-                  <Tag style={{ margin: 0, color: 'var(--ax-primary)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)', fontWeight: 600 }}>
+                  <Tag
+                    style={{
+                      margin: 0,
+                      color: 'var(--ax-primary)',
+                      background: 'var(--ax-info-soft)',
+                      borderColor: 'var(--ax-info-border)',
+                      fontWeight: 600,
+                    }}
+                  >
                     当前场景：{report.scene_profile.name}
                   </Tag>
-                  {report.scene_profile.weight_label && <Tag style={{ margin: 0 }}>{report.scene_profile.weight_label}</Tag>}
+                  {report.scene_profile.weight_label && (
+                    <Tag style={{ margin: 0 }}>{report.scene_profile.weight_label}</Tag>
+                  )}
                 </Space>
                 {reviewNote && (
                   <Tag
                     style={
                       reviewNote.exists
-                        ? { margin: 0, color: 'var(--ax-success)', background: 'var(--ax-success-soft)', borderColor: 'var(--ax-success-border)' }
+                        ? {
+                            margin: 0,
+                            color: 'var(--ax-success)',
+                            background: 'var(--ax-success-soft)',
+                            borderColor: 'var(--ax-success-border)',
+                          }
                         : { margin: 0 }
                     }
                   >
@@ -456,39 +776,69 @@ const ReportPage: React.FC = () => {
                 </div>
               )}
 
-              {Array.isArray(report.scene_profile.explicit_blocked_overrides) && report.scene_profile.explicit_blocked_overrides.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {report.scene_profile.explicit_blocked_overrides.map((ov) => (
-                    <Tag key={ov.key} color="warning" style={{ margin: 0, whiteSpace: 'normal' }}>
-                      主动封停：{ov.label}
-                    </Tag>
-                  ))}
-                </div>
-              )}
-
-              {Array.isArray(report.scene_profile.extensions?.metacognition_text?.indicators) &&
-                report.scene_profile.extensions!.metacognition_text!.indicators!.length > 0 && (
-                  <div style={{ marginTop: 4 }}>
-                    <Text strong style={{ fontSize: 13.5 }}>AI 元能力审辨文本扩展观测量（纯规则结构指标，严禁黑盒给分）</Text>
-                    <Table
-                      size="small"
-                      style={{ marginTop: 8 }}
-                      rowKey="name"
-                      pagination={false}
-                      dataSource={report.scene_profile.extensions!.metacognition_text!.indicators}
-                      columns={[
-                        { title: '扩展观测量', dataIndex: 'label', key: 'label' },
-                        {
-                          title: '实测读数',
-                          key: 'value',
-                          render: (_, r) => (r.value === null ? '缺口暂不可给' : `${r.value} ${r.unit}`.trim()),
-                        },
-                        { title: '置信度', dataIndex: 'confidence', key: 'confidence' },
-                        { title: '说明', dataIndex: 'summary', key: 'summary' },
-                      ]}
-                    />
+              {Array.isArray(report.scene_profile.explicit_blocked_overrides) &&
+                report.scene_profile.explicit_blocked_overrides.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {report.scene_profile.explicit_blocked_overrides.map((ov) => (
+                      <Tag key={ov.key} color="warning" style={{ margin: 0, whiteSpace: 'normal' }}>
+                        主动封停：{ov.label}
+                      </Tag>
+                    ))}
                   </div>
                 )}
+
+              {metacogReg &&
+                ((metacogReg.covered_loops_labels && metacogReg.covered_loops_labels.length > 0) ||
+                  (metacogReg.missing_loops_labels && metacogReg.missing_loops_labels.length > 0)) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                    <Text strong style={{ fontSize: 13 }}>
+                      三环调控覆盖情况：
+                    </Text>
+                    {metacogReg.covered_loops_labels?.map((lbl) => (
+                      <Tag
+                        key={`cov-${lbl}`}
+                        style={{
+                          margin: 0,
+                          color: 'var(--ax-success)',
+                          background: 'var(--ax-success-soft)',
+                          borderColor: 'var(--ax-success-border)',
+                        }}
+                      >
+                        已覆盖：{lbl}
+                      </Tag>
+                    ))}
+                    {metacogReg.missing_loops_labels?.map((lbl) => (
+                      <Tag key={`miss-${lbl}`} color="warning" style={{ margin: 0 }}>
+                        待补充：{lbl}
+                      </Tag>
+                    ))}
+                  </div>
+                )}
+
+              {Array.isArray(metacogIndicators) && metacogIndicators.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <Text strong style={{ fontSize: 13.5 }}>
+                    AI 元能力审辨文本扩展观测量（纯规则结构指标，严禁打分）
+                  </Text>
+                  <Table
+                    size="small"
+                    style={{ marginTop: 8 }}
+                    rowKey="name"
+                    pagination={false}
+                    dataSource={metacogIndicators}
+                    columns={[
+                      { title: '扩展观测量', dataIndex: 'label', key: 'label' },
+                      {
+                        title: '实测读数',
+                        key: 'value',
+                        render: (_, r) => (r.value === null ? '缺口暂不可给' : `${r.value} ${r.unit}`.trim()),
+                      },
+                      { title: '置信度', dataIndex: 'confidence', key: 'confidence' },
+                      { title: '说明', dataIndex: 'summary', key: 'summary' },
+                    ]}
+                  />
+                </div>
+              )}
             </Space>
           </Card>
         )}
@@ -506,84 +856,112 @@ const ReportPage: React.FC = () => {
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ax-info)', marginBottom: 4 }}>
               本场数据概览
             </div>
-            <div style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--ax-ink)' }}>
-              {leadSummary}
-            </div>
+            <div style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--ax-ink)' }}>{leadSummary}</div>
           </Card>
         )}
 
         {/* 画面与声音同步、问答声音分离 & 语音转写说明 */}
-        {(crossModal || asrDisclosure || (report?.l1 as any)?.speaker_turn_audit) && (() => {
-          const cm = crossModal as any;
-          const stAudit = (report?.l1 as any)?.speaker_turn_audit;
-          const fgStatus = cm?.session?.pairs?.face_gesture?.status;
-          const all3Status = cm?.session?.all_three?.status;
-          let cmType: 'info' | 'warning' | 'error' | 'success' = 'info';
-          let cmLabel = '单路数据';
-          if (all3Status === 'aligned') {
-            cmType = 'success';
-            cmLabel = '画面与语音全程同步';
-          } else if (fgStatus === 'aligned' && (all3Status === 'blocked' || all3Status === 'degraded')) {
-            cmType = 'info';
-            cmLabel = '面部与手势画面同步良好，语音按题分段记录';
-          } else if (fgStatus === 'aligned') {
-            cmType = 'success';
-            cmLabel = '面部与手势画面同步良好';
-          } else if (fgStatus === 'blocked' || all3Status === 'blocked') {
-            cmType = 'warning';
-            cmLabel = '不同通道采集时段重合较少，已分项独立展示';
-          } else if (fgStatus === 'degraded' || all3Status === 'degraded') {
-            cmType = 'warning';
-            cmLabel = '部分时段重合';
-          }
-          const asr = asrDisclosure as any;
-          const asrDegraded = Array.isArray(asr?.degraded_indicators) ? asr.degraded_indicators : [];
-          return (
-            <Space direction="vertical" size={10} style={{ width: '100%', marginBottom: 16 }}>
-              {cm && (
-                <Alert
-                  showIcon
-                  type={cmType}
-                  message={`画面与声音同步：${cmLabel}`}
-                  description={
-                    <div>
-                      <div>{cm.summary_plain}</div>
-                      {stAudit?.summary_plain && (
-                        <div style={{ marginTop: 4 }}>{stAudit.summary_plain}</div>
-                      )}
-                    </div>
-                  }
-                />
-              )}
-              {asr && (
-                <Alert
-                  showIcon
-                  type={asrDegraded.length > 0 ? 'warning' : 'info'}
-                  message="语音转写说明"
-                  description={asr.note_plain || asr.summary_plain}
-                />
-              )}
-            </Space>
-          );
-        })()}
+        {(crossModal || asrDisclosure || (report?.l1 as any)?.speaker_turn_audit) &&
+          (() => {
+            const cm = crossModal as any;
+            const stAudit = (report?.l1 as any)?.speaker_turn_audit;
+            const fgStatus = cm?.session?.pairs?.face_gesture?.status;
+            const all3Status = cm?.session?.all_three?.status;
+            let cmType: 'info' | 'warning' | 'error' | 'success' = 'info';
+            let cmLabel = '单路数据';
+            if (all3Status === 'aligned') {
+              cmType = 'success';
+              cmLabel = '画面与语音全程同步';
+            } else if (fgStatus === 'aligned' && (all3Status === 'blocked' || all3Status === 'degraded')) {
+              cmType = 'info';
+              cmLabel = '面部与手势画面同步良好，语音按题分段记录';
+            } else if (fgStatus === 'aligned') {
+              cmType = 'success';
+              cmLabel = '面部与手势画面同步良好';
+            } else if (fgStatus === 'blocked' || all3Status === 'blocked') {
+              cmType = 'warning';
+              cmLabel = '不同通道采集时段重合较少，已分项独立展示';
+            } else if (fgStatus === 'degraded' || all3Status === 'degraded') {
+              cmType = 'warning';
+              cmLabel = '部分时段重合';
+            }
+            const asr = asrDisclosure as any;
+            const asrDegraded = Array.isArray(asr?.degraded_indicators) ? asr.degraded_indicators : [];
+            return (
+              <Space direction="vertical" size={10} style={{ width: '100%', marginBottom: 16 }}>
+                {cm && (
+                  <Alert
+                    showIcon
+                    type={cmType}
+                    message={`画面与声音同步：${cmLabel}`}
+                    description={
+                      <div>
+                        <div>{cm.summary_plain}</div>
+                        {stAudit?.summary_plain && (
+                          <div style={{ marginTop: 4 }}>{stAudit.summary_plain}</div>
+                        )}
+                      </div>
+                    }
+                  />
+                )}
+                {asr && (
+                  <Alert
+                    showIcon
+                    type={asrDegraded.length > 0 ? 'warning' : 'info'}
+                    message="语音转写说明"
+                    description={asr.note_plain || asr.summary_plain}
+                  />
+                )}
+              </Space>
+            );
+          })()}
 
         {/* 三段式覆盖大数卡片 */}
         <Card style={{ marginBottom: 20 }}>
           <div style={{ textAlign: 'center', padding: '14px 12px' }}>
-            <div style={{ fontSize: 44, fontWeight: 700, color: 'var(--ax-primary)', marginBottom: 6, fontVariantNumeric: 'tabular-nums' }}>
+            <div
+              style={{
+                fontSize: 44,
+                fontWeight: 700,
+                color: 'var(--ax-primary)',
+                marginBottom: 6,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
               {coverage ? coverageHeroNumber(coverage) : '—'}
             </div>
             <div style={{ fontSize: 18, color: 'var(--ax-text-secondary)', marginBottom: 8 }}>
-              项可测量指标通过白盒审查
+              项可测量指标通过客观审查
             </div>
             {coverage && (
               <>
                 {coverage.segments && coverage.segments.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', margin: '14px 0 8px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                      margin: '14px 0 8px',
+                    }}
+                  >
                     {coverage.segments.map((seg) => (
-                      <div key={seg.key} style={{ minWidth: 155, maxWidth: 250, textAlign: 'left', padding: '10px 14px', border: '1px solid var(--ax-hairline)', borderRadius: 10 }}>
+                      <div
+                        key={seg.key}
+                        style={{
+                          minWidth: 155,
+                          maxWidth: 250,
+                          textAlign: 'left',
+                          padding: '10px 14px',
+                          border: '1px solid var(--ax-hairline)',
+                          borderRadius: 10,
+                        }}
+                      >
                         <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--ax-primary)' }}>
-                          {seg.n} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ax-text-secondary)' }}>项</span>
+                          {seg.n}{' '}
+                          <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ax-text-secondary)' }}>
+                            项
+                          </span>
                         </div>
                         <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{seg.label}</div>
                         {seg.n_passed !== null && (
@@ -591,7 +969,14 @@ const ReportPage: React.FC = () => {
                             通过 {seg.n_passed} / {seg.n}
                           </div>
                         )}
-                        <div style={{ fontSize: 12, color: 'var(--ax-text-secondary)', marginTop: 4, lineHeight: 1.5 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: 'var(--ax-text-secondary)',
+                            marginTop: 4,
+                            lineHeight: 1.5,
+                          }}
+                        >
                           {seg.note}
                         </div>
                       </div>
@@ -604,14 +989,22 @@ const ReportPage: React.FC = () => {
                   </div>
                 )}
                 {coverage.explanation && (
-                  <p style={{ fontSize: 13, color: 'var(--ax-text-secondary)', maxWidth: '52em', margin: '8px auto 0', lineHeight: 1.6 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--ax-text-secondary)',
+                      maxWidth: '52em',
+                      margin: '8px auto 0',
+                      lineHeight: 1.6,
+                    }}
+                  >
                     {coverage.explanation}
                   </p>
                 )}
                 {!(coverage.segments && coverage.segments.length > 0) && (
                   <div style={{ fontSize: 13, color: 'var(--ax-text-secondary)', marginTop: 8 }}>
-                    这份载荷没带分段覆盖数(旧版),只有通过槽数
-                    {' '}{coverage.n_passed} / {coverage.n_slots} —— 那个分母里含无法测量的槽,不能当覆盖率读。
+                    这份旧版报告没带分段覆盖数，仅记录通过项数 {coverage.n_passed} / {coverage.n_slots}{' '}
+                    —— 该分母含不可测量项，不能直接当作覆盖率读。
                   </div>
                 )}
               </>
@@ -631,11 +1024,18 @@ const ReportPage: React.FC = () => {
         {sources !== null && (
           <Card size="small" style={{ marginBottom: 20 }}>
             <div style={{ color: 'var(--ax-text-secondary)', fontSize: 13.5 }}>
-              <strong>本场会话：</strong>
+              <strong>本场采录记录：</strong>
               <code>{describedSession ?? '（无 —— 本场没有任何日志）'}</code>
             </div>
             {sources && (
-              <ul style={{ margin: '8px 0 0', paddingLeft: 20, color: 'var(--ax-text-secondary)', fontSize: 13 }}>
+              <ul
+                style={{
+                  margin: '8px 0 0',
+                  paddingLeft: 20,
+                  color: 'var(--ax-text-secondary)',
+                  fontSize: 13,
+                }}
+              >
                 {Object.entries(sources)
                   .filter(([k]) => k !== 'none_bucket')
                   .map(([k, v]: [string, any]) => {
@@ -643,8 +1043,10 @@ const ReportPage: React.FC = () => {
                     if (v.status !== 'loaded' && got && got.n_measured > 0) {
                       return (
                         <li key={k}>
-                          <strong>{MODALITY_LABELS[k] ?? k} · 日志没有数据，但这个模态算出了{' '}
-                          {got.n_measured} / {got.n_total} 条指标</strong>
+                          <strong>
+                            {MODALITY_LABELS[k] ?? k} · 日志没有数据，但这个模态算出了 {got.n_measured} /{' '}
+                            {got.n_total} 条指标
+                          </strong>
                           {got.source_note ? `（${got.source_note}）` : ''}
                         </li>
                       );
@@ -658,7 +1060,9 @@ const ReportPage: React.FC = () => {
                   })}
                 {sources.none_bucket && (
                   <li>
-                    <em>另有未归属会话日志 {sources.none_bucket.rows} 行（未携带 session_id，不进入本场统计）</em>
+                    <em>
+                      另有未归属场次日志 {sources.none_bucket.rows} 行（未关联采录场次编号，不进入本场统计）
+                    </em>
                   </li>
                 )}
               </ul>
@@ -680,76 +1084,14 @@ const ReportPage: React.FC = () => {
         <InstrumentProvenance l1={l1WithInstruments} />
       </div>
 
-      {/* 按需本地辅助解读抽屉 */}
-      <Drawer
-        title={<Space><RobotOutlined />报告解读与追问参考</Space>}
-        open={assistOpen}
-        onClose={() => setAssistOpen(false)}
-        width={520}
-      >
-        <Space direction="vertical" size={14} style={{ width: '100%' }}>
-          <Segmented
-            block
-            value={assistMode}
-            onChange={(val) => void runAssist(val as 'summary' | 'interview_guide', true)}
-            options={[
-              { label: '客观导读摘要', value: 'summary' },
-              { label: '追问提纲建议', value: 'interview_guide' },
-            ]}
-          />
-
-          <Space wrap>
-            <Button size="small" type="primary" loading={assistLoading} onClick={() => void runAssist(assistMode, true)}>
-              生成详细解读
-            </Button>
-            <Button size="small" loading={assistLoading} onClick={() => void runAssist(assistMode, false)}>
-              快速提炼要点
-            </Button>
-          </Space>
-
-          {assistError && <Alert type="error" showIcon message={assistError} />}
-          {assistLoading && <Loading tip="正在生成合规解读..." />}
-
-          {!assistLoading && assistData && (
-            <>
-              <Space wrap size={6}>
-                <Tag
-                  icon={<SafetyCertificateOutlined />}
-                  style={{ color: 'var(--ax-success)', background: 'var(--ax-success-soft)', borderColor: 'var(--ax-success-border)' }}
-                >
-                  红线复检通过
-                </Tag>
-                <Tag>
-                  来源：{assistData.source === 'local_llm' ? `本地模型（${assistData.model}）` : '确定性规则引擎'}
-                </Tag>
-                <Tag>耗时 {assistData.latency_ms} ms</Tag>
-              </Space>
-
-              {assistData.fallback_reason && (
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  说明：{assistData.fallback_reason}
-                </Text>
-              )}
-
-              <Card size="small" style={{ background: 'var(--ax-parchment)' }}>
-                <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.75 }}>
-                  {assistData.content}
-                </Paragraph>
-              </Card>
-
-              <Alert
-                type="info"
-                showIcon
-                message={assistData.watermark}
-              />
-            </>
-          )}
-        </Space>
-      </Drawer>
-
       {/* 导师/管理员非打分人工复核注记抽屉 */}
       <Drawer
-        title={<Space><EditOutlined />人工复核注记（承接第三层不确定升级 · 严禁打分）</Space>}
+        title={
+          <Space>
+            <EditOutlined />
+            人工复核注记（承接不确定升级 · 严禁打分）
+          </Space>
+        }
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
         width={480}
@@ -763,7 +1105,9 @@ const ReportPage: React.FC = () => {
           {reviewError && <Alert type="error" showIcon message={reviewError} />}
 
           <div>
-            <Text strong style={{ fontSize: 13 }}>复核核验结论（非能力评价）</Text>
+            <Text strong style={{ fontSize: 13 }}>
+              复核核验结论（非能力评价）
+            </Text>
             <Select
               aria-label="选择复核状态"
               value={reviewStatusDraft}
@@ -780,7 +1124,9 @@ const ReportPage: React.FC = () => {
           </div>
 
           <div>
-            <Text strong style={{ fontSize: 13 }}>重点关注标记（可选多选）</Text>
+            <Text strong style={{ fontSize: 13 }}>
+              重点关注标记（可选多选）
+            </Text>
             <Select
               mode="tags"
               aria-label="编辑复核关注标签"
@@ -799,7 +1145,9 @@ const ReportPage: React.FC = () => {
           </div>
 
           <div>
-            <Text strong style={{ fontSize: 13 }}>客观复核备注（限 1000 字）</Text>
+            <Text strong style={{ fontSize: 13 }}>
+              客观复核备注（限 1000 字）
+            </Text>
             <Input.TextArea
               aria-label="输入人工复核备注"
               rows={5}
@@ -818,11 +1166,7 @@ const ReportPage: React.FC = () => {
           )}
 
           {isAdmin ? (
-            <Button
-              type="primary"
-              loading={reviewSaving}
-              onClick={() => void saveReviewNote()}
-            >
+            <Button type="primary" loading={reviewSaving} onClick={() => void saveReviewNote()}>
               保存人工复核注记
             </Button>
           ) : (
@@ -831,7 +1175,12 @@ const ReportPage: React.FC = () => {
               showIcon
               message="当前为只读演示状态"
               description={
-                <Button size="small" type="link" style={{ paddingLeft: 0 }} onClick={() => navigate('/recordings')}>
+                <Button
+                  size="small"
+                  type="link"
+                  style={{ paddingLeft: 0 }}
+                  onClick={() => navigate('/recordings')}
+                >
                   前往「录制素材」或「题库管理」登录管理员后解锁保存 ›
                 </Button>
               }

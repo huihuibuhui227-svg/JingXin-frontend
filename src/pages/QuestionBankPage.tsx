@@ -350,7 +350,7 @@ const QuestionBankPage: React.FC = () => {
               题库管理
             </Title>
             <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-              面试与科研两个模块可各自管理<strong>多套</strong>题库；设为「当前生效」后，下一场采集即时启用。参考答案仅用于存档展示，不参与自动评分。
+              各场景模块可各自管理<strong>多套</strong>题库；设为「当前生效」后，下一场采录即时启用。参考要点仅用于存档展示，不参与自动评分。
             </Paragraph>
           </div>
           {isAdmin ? (

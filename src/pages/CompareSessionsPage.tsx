@@ -61,7 +61,7 @@ const CompareSessionsPage: React.FC = () => {
       .filter(Boolean);
     const merged = Array.from(new Set([...selectedIds, ...manual]));
     if (merged.length < 2) {
-      message.warning('请至少选择或输入 2 个会话 session_id 进行纵向对比');
+      message.warning('请至少选择或输入 2 个采录场次编号进行纵向对比');
       return;
     }
     setLoading(true);
@@ -91,7 +91,15 @@ const CompareSessionsPage: React.FC = () => {
       title: '采录口径版本',
       dataIndex: 'def_version',
       key: 'def_version',
-      render: (ver: string) => <Tag>{ver}</Tag>,
+      render: (ver: string) => (
+        <Tag>
+          {ver === 'capture:gen1'
+            ? '第一代采录口径'
+            : ver === 'capture:gen2'
+              ? '第二代三维采录口径'
+              : ver}
+        </Tag>
+      ),
     },
     {
       title: '姿态口径',
@@ -148,14 +156,14 @@ const CompareSessionsPage: React.FC = () => {
     <Content className="ax-workbench" style={{ padding: '24px' }}>
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
         <div style={{ marginBottom: 18 }}>
-          <Tag style={{ marginBottom: 8, color: 'var(--ax-primary)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)', fontWeight: 600 }}>
-            基地一 · 科研过程多场次横向与纵向对照工作台
+          <Tag style={{ marginBottom: 8, color: 'var(--ax-b1)', background: 'var(--ax-b1-soft)', borderColor: 'var(--ax-b1-border)', fontWeight: 600 }}>
+            研思循证 · 多场次纵向对照工作台
           </Tag>
           <Title level={1} style={{ margin: 0, fontSize: 28 }}>
-            同受试者跨场次变化对照与可比性审计
+            研思循证 · 跨场次变化对照与可比性核查
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0', maxWidth: 820 }}>
-            并行核对同一受试者或科研组会多次汇报会话；系统强制执行采集版本（capture:gen1 / gen2）隔离守卫与缺口断线纪律，绝不跨口径混合连线或给出数值总分。
+            并行核对同一参与者多次汇报场次的变化情况；系统严格隔离第一代采录口径与第二代三维采录口径，遇缺失项保持断线绝不补零，亦不给出数值总分。
           </Paragraph>
         </div>
 
@@ -168,9 +176,9 @@ const CompareSessionsPage: React.FC = () => {
                 value={sceneProfile}
                 onChange={(v) => setSceneProfile(String(v))}
                 options={[
-                  { label: '科研过程', value: 'research_interview' },
-                  { label: 'AI 元能力', value: 'ai_metacognition' },
-                  { label: '长周期随访', value: 'longitudinal_followup' },
+                  { label: '研思循证', value: 'research_interview' },
+                  { label: '元智审辨', value: 'ai_metacognition' },
+                  { label: '时序观微', value: 'longitudinal_followup' },
                 ]}
               />
             </div>
@@ -178,16 +186,16 @@ const CompareSessionsPage: React.FC = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
               <Select
                 mode="multiple"
-                aria-label="多选历史会话进行对比"
-                placeholder="选择 2 至 6 个历史会话（按先后次序）"
+                aria-label="多选历史采录场次进行对比"
+                placeholder="选择 2 至 6 个历史采录场次（按先后次序）"
                 value={selectedIds}
                 onChange={setSelectedIds}
                 options={sessionOptions}
                 style={{ minWidth: 320, flex: '1 1 320px' }}
               />
               <Input
-                aria-label="补充输入会话编号"
-                placeholder="追加手动会话编号（逗号分隔）"
+                aria-label="补充输入采录场次编号"
+                placeholder="追加手动采录场次编号（逗号分隔）"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
                 style={{ maxWidth: 260 }}
@@ -236,6 +244,7 @@ const CompareSessionsPage: React.FC = () => {
               comparable={result.comparable}
               defVersions={result.def_versions}
               comparabilityNotes={result.comparability_notes}
+              methodology={result.methodology}
             />
           </Space>
         )}

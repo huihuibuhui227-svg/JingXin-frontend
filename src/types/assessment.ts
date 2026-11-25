@@ -79,15 +79,33 @@ export interface MetacognitionTextExtensionIndicator {
   summary?: string;
 }
 
+export interface SceneProfileTheoreticalFoundation {
+  framework?: string;
+  core_principle?: string;
+  references?: string[];
+  key_constructs?: string[];
+}
+
+export interface MetacognitionRegulationExtension {
+  covered_loops_labels?: string[];
+  missing_loops_labels?: string[];
+  indicators?: MetacognitionTextExtensionIndicator[];
+  [key: string]: unknown;
+}
+
 export interface SceneProfilePayload {
   id: 'research_interview' | 'ai_metacognition' | 'longitudinal_followup' | string;
   name: string;
   short_label?: string;
+  english_tag?: string;
+  theme_key?: 'base1' | 'base2' | 'base3' | string;
+  accent_color?: string;
   weight_label?: string;
   route_base?: string;
   baseline_mode?: string;
   compliance_banner?: string;
   description?: string;
+  theoretical_foundation?: SceneProfileTheoreticalFoundation;
   explicit_blocked_overrides?: SceneProfileBlockedOverride[];
   extensions?: {
     metacognition_text?: {
@@ -95,6 +113,8 @@ export interface SceneProfilePayload {
       indicators?: MetacognitionTextExtensionIndicator[];
       summary_plain?: string;
     };
+    all_metacognition_indicators?: MetacognitionTextExtensionIndicator[];
+    metacognition_regulation?: MetacognitionRegulationExtension;
     [key: string]: unknown;
   };
 }

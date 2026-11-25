@@ -141,7 +141,7 @@ const RecordingsPage: React.FC = () => {
             </Text>
           )}
           {r.is_none_bucket && (
-            <Tag color="orange">未归属场次（缺失会话号）</Tag>
+            <Tag color="orange">未归属场次（缺少采录编号）</Tag>
           )}
         </Space>
       ),
@@ -167,7 +167,7 @@ const RecordingsPage: React.FC = () => {
       title: '报告', dataIndex: 'report_count', width: 95,
       render: (v: number) => (v > 0
         ? <Tag color="processing">{v} 份</Tag>
-        : <Tooltip title="报告按需生成 —— 可点击「查账」实时查看结构化报告，或进详情生成离线 HTML"><Tag>未归档</Tag></Tooltip>),
+        : <Tooltip title="报告按需生成 —— 可点击「查看报告」实时阅读结构化报告，或进详情生成离线 HTML"><Tag>未归档</Tag></Tooltip>),
       sorter: (a, b) => a.report_count - b.report_count,
     },
     {
@@ -190,7 +190,7 @@ const RecordingsPage: React.FC = () => {
               icon={<BarChartOutlined />}
               onClick={() => navigate(`/report/${encodeURIComponent(r.sid)}`)}
             >
-              查账
+              查看报告
             </Button>
           )}
           <Button size="small" type="link" style={{ padding: '0 6px' }} icon={<PlayCircleOutlined />}
@@ -235,7 +235,7 @@ const RecordingsPage: React.FC = () => {
           <Alert
             style={{ marginBottom: 16 }} type="info" showIcon
             message="当前为公开只读脱敏视图"
-            description="仅展示场次编号、录像体积、抽帧数量与留存状态，可直接点击「查账」查看匿名化的结构化行为证据报告。姓名、学号、院系、原始录像回放、原始日志下载与移入回收站均在服务端执行管理员鉴权校验，未授权请求不会返回任何身份字段。"
+            description="仅展示采录场次编号、录像体积、抽帧数量与留存状态，可直接点击「查看报告」浏览匿名化的结构化行为证据报告。姓名、学号、院系、原始录像回放、原始日志下载与移入回收站均在服务端执行管理员鉴权校验，未授权请求不会返回任何身份字段。"
           />
         )}
         {listError && <Alert style={{ marginBottom: 16 }} type="error" showIcon message={listError} />}
@@ -292,7 +292,7 @@ const RecordingsPage: React.FC = () => {
             </Paragraph>
           )}
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            因移入回收站可逆，确认后即直接归档隔离，无需手工抄写会话号。
+            因移入回收站可逆，确认后即直接归档隔离，无需手工抄写采录编号。
           </Paragraph>
         </Modal>
       </div>

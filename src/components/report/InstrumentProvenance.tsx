@@ -205,8 +205,8 @@ const InstrumentProvenance: React.FC<InstrumentProvenanceProps> = ({ l1 }) => {
     >
       {!summary ? (
         <div style={{ color: 'var(--ax-text-secondary)' }}>
-          这份载荷<strong>没有带仪器来源字段</strong>（旧载荷 / 缓存里的旧结果）。
-          报告页不拿别的东西顶替它 —— 那不是"没有仪器"，是"这一份没说"。
+          这份记录<strong>没有包含仪器来源信息</strong>（历史版本或缓存结果）。
+          报告页不拿别的东西顶替它 —— 那不是"没有仪器"，是"这一份没记录"。
         </div>
       ) : (
         <>
@@ -278,7 +278,7 @@ const InstrumentProvenance: React.FC<InstrumentProvenanceProps> = ({ l1 }) => {
           {tableRows.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="载荷里的指标一条都没带仪器字段（不是「没有仪器」：是这一份没标）"
+              description="当前报告中的指标均未附带仪器来源字段（并非缺少仪器，仅该份记录未标注）"
             />
           ) : (
             <Collapse

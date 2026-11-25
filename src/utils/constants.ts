@@ -18,7 +18,7 @@ export const BRAND_NAME = '衡才智析';
 export const BRAND_SUBTITLE = '多模态行为证据分析系统';
 export const BRAND_FULL_TITLE = '衡才智析 · 多模态行为证据分析系统';
 export const BRAND_SLOGAN = '不给分，只给证据与缺口';
-export const BRAND_PRINCIPLE = '仪器可以是黑盒，裁判必须是白盒';
+export const BRAND_PRINCIPLE = '过程证据可追溯，缺口边界显式披露';
 
 export const SCENARIOS = {
   INTERVIEW: 'interview',

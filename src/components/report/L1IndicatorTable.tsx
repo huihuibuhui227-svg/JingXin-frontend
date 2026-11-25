@@ -582,8 +582,8 @@ const L1IndicatorTable: React.FC<L1IndicatorTableProps> = ({ l1 }) => {
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
             l1
-              ? '这一场没有产出任何 L1 指标记录（不是加载失败：载荷里有 l1 段，但指标为空）'
-              : '载荷里没有 l1 段'
+              ? '这一场没有产出任何行为指标记录（不是加载失败：已读取报告数据，但指标明细为空）'
+              : '未读取到行为指标明细'
           }
         />
       ) : (

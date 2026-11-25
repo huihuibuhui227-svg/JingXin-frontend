@@ -185,7 +185,7 @@ const ReportsList: React.FC = () => {
               style={{ paddingInline: 0, fontWeight: 600 }}
               onClick={() => navigate(`/report/${row.sessionId}`)}
             >
-              结构化查账
+              查看结构化报告
             </Button>
           )}
           <Button
@@ -245,7 +245,7 @@ const ReportsList: React.FC = () => {
             </Typography.Title>
             {!loadError && (
               <Text style={{ color: 'var(--ax-text-secondary)', fontSize: 14 }}>
-                共 {rows.length} 份行为证据报告 · 点击「结构化查账」进入交互审计，或点行尾「下载」保存离线单文件 HTML
+                共 {rows.length} 份行为证据报告 · 点击「查看结构化报告」进入交互阅读，或点行尾「下载」保存离线单文件 HTML
               </Text>
             )}
           </div>
@@ -293,7 +293,7 @@ const ReportsList: React.FC = () => {
               <Input
                 allowClear
                 prefix={<SearchOutlined style={{ color: 'var(--ax-text-secondary)' }} />}
-                placeholder="按会话号或文件名筛选报告…"
+                placeholder="按采录场次编号或文件名筛选报告…"
                 aria-label="筛选行为证据报告"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

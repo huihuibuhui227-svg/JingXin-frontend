@@ -24,6 +24,9 @@ const ROUTES = process.argv[2]
   ? [process.argv[2]]
   : [
       '/',
+      '/hub/research',
+      '/hub/metacognition',
+      '/hub/followup',
       '/interview',
       '/research',
       '/analysis',

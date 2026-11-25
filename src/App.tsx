@@ -23,6 +23,9 @@ const MetacognitionAssessment = React.lazy(() => import('./pages/MetacognitionAs
 const FollowupPage = React.lazy(() => import('./pages/FollowupPage'));
 const FollowupCapture = React.lazy(() => import('./pages/FollowupCapture'));
 const CompareSessionsPage = React.lazy(() => import('./pages/CompareSessionsPage'));
+const ResearchHubPage = React.lazy(() => import('./pages/ResearchHubPage'));
+const MetacognitionHubPage = React.lazy(() => import('./pages/MetacognitionHubPage'));
+const FollowupHubPage = React.lazy(() => import('./pages/FollowupHubPage'));
 
 const PageLoader: React.FC = () => <Loading tip="页面加载中…" />;
 
@@ -151,6 +154,9 @@ const App: React.FC = () => {
                   <Route path="/followup" element={<FollowupPage />} />
                   <Route path="/followup/capture" element={<FollowupCapture />} />
                   <Route path="/compare" element={<CompareSessionsPage />} />
+                  <Route path="/hub/research" element={<ResearchHubPage />} />
+                  <Route path="/hub/metacognition" element={<MetacognitionHubPage />} />
+                  <Route path="/hub/followup" element={<FollowupHubPage />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

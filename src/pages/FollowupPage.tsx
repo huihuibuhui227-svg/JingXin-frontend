@@ -126,7 +126,7 @@ const FollowupPage: React.FC = () => {
     if (!selectedCode) return;
     const sid = attachSid.trim();
     if (!sid) {
-      message.warning('请选择或输入要绑定的会话 session_id');
+      message.warning('请选择或输入要关联的采录场次编号');
       return;
     }
     setAttaching(true);
@@ -152,14 +152,14 @@ const FollowupPage: React.FC = () => {
       <div style={{ maxWidth: 'var(--ax-content-max)', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
           <div>
-            <Tag style={{ marginBottom: 8, color: 'var(--ax-primary)', background: 'var(--ax-info-soft)', borderColor: 'var(--ax-info-border)', fontWeight: 600 }}>
-              基地三 · 长周期行为随访中心（10% 前瞻预留 · 非医疗红线）
+            <Tag style={{ marginBottom: 8, color: 'var(--ax-b3)', background: 'var(--ax-b3-soft)', borderColor: 'var(--ax-b3-border)', fontWeight: 600 }}>
+              时序观微 · 匿名个体纵向随访（非医疗）
             </Tag>
             <Title level={1} style={{ margin: 0, fontSize: 28 }}>
-              匿名受试编号个体内长周期纵向跟踪
+              时序观微 · 匿名受试编号个体内纵向跟踪
             </Title>
             <Paragraph type="secondary" style={{ margin: '6px 0 0', maxWidth: 820 }}>
-              默认锁死零原始影像原声落盘隐私模式（仅存匿名三维姿态矩阵与声学标量日志），以本人首访（t0）作为自我参考基线观测时间变化。
+              默认采用最高隐私保护模式（仅保存匿名三维姿态与声学标量，不保存原始画面与录音），以个人首访作为自我参照基线观测时间变化。
             </Paragraph>
           </div>
           <Button
@@ -276,18 +276,18 @@ const FollowupPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                     <Select
-                      aria-label="选择已采录会话编号"
+                      aria-label="选择已采录场次编号"
                       showSearch
                       allowClear
-                      placeholder="从已有会话挑选或手动填入 session_id"
+                      placeholder="从已有采录场次中挑选，或在右侧手动输入"
                       value={sessionOptions.some((o) => o.value === attachSid) ? attachSid : undefined}
                       onChange={(val) => setAttachSid(val || '')}
                       options={sessionOptions}
                       style={{ minWidth: 220, flex: '1 1 200px' }}
                     />
                     <Input
-                      aria-label="输入会话编号"
-                      placeholder="session_id"
+                      aria-label="输入采录场次编号"
+                      placeholder="输入采录场次编号"
                       value={attachSid}
                       onChange={(e) => setAttachSid(e.target.value)}
                       style={{ width: 190 }}
@@ -303,11 +303,11 @@ const FollowupPage: React.FC = () => {
                       aria-label="选择隐私留存模式"
                       value={attachPrivacy}
                       onChange={(val) => setAttachPrivacy(val)}
-                      style={{ width: 185 }}
+                      style={{ width: 200 }}
                       options={[
-                        { label: '仅匿名特征（推荐）', value: 'anonymous_kinematics_only' },
-                        { label: '仅采声音', value: 'audio_only' },
-                        { label: '全模态留存', value: 'full' },
+                        { label: '仅保存匿名特征（推荐）', value: 'anonymous_kinematics_only' },
+                        { label: '仅采集声音', value: 'audio_only' },
+                        { label: '保留完整音视频', value: 'full' },
                       ]}
                     />
                     <Button type="primary" loading={attaching} onClick={() => void handleAttachVisit()}>
@@ -320,7 +320,7 @@ const FollowupPage: React.FC = () => {
                   <Alert
                     type="warning"
                     showIcon
-                    message="第三层分布偏离与保形不确定人工复核提示"
+                    message="个体内变化与采样环境复核提示"
                     description={
                       <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
                         {trajectory.review_alerts.map((a) => <li key={a}>{a}</li>)}
@@ -337,6 +337,7 @@ const FollowupPage: React.FC = () => {
                     comparable={trajectory.comparable}
                     defVersions={trajectory.def_versions}
                     comparabilityNotes={trajectory.comparability_notes}
+                    methodology={trajectory.methodology}
                   />
                 ) : null}
               </Space>

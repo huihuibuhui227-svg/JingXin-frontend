@@ -72,7 +72,7 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
     try {
       const t = await recordingsApi.generateReport(sid);
       const taskId = t?.task_id;
-      if (!taskId) throw new Error(t?.message || '服务端没有返回 task_id');
+      if (!taskId) throw new Error(t?.message || '报告生成任务创建失败');
       let done = false;
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 1000));
@@ -116,7 +116,7 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
               navigate(`/report/${encodeURIComponent(detail.sid)}`);
             }}
           >
-            结构化查账
+            查看结构化报告
           </Button>
           <Button
             size="small"
@@ -258,7 +258,7 @@ const RecordingDetail: React.FC<{ sid: string | null; onClose: () => void }> = (
                     <Alert
                       type="info" showIcon
                       message="本场尚未归档离线 HTML 报告"
-                      description="离线单文件报告按需生成，点击下方按钮即可按本场会话号从落盘日志实时生成；也可点击右上角「结构化查账」直接在线查看。"
+                      description="离线单文件报告按需生成，点击下方按钮即可按本场采录编号生成；也可点击右上角「查看结构化报告」直接在线阅读。"
                     />
                     <Button type="primary" icon={<BarChartOutlined />}
                       loading={generating} onClick={generateReport}>
